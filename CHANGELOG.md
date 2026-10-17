@@ -75,6 +75,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Importing a GEDCOM 7 file no longer loses the date text that GoTree's own 7.0 export keeps in
+  DATE.PHRASE: dates that are not dates, the explanation of "INT" dates and the second year of
+  dual dates such as 1750/51 come back as they were (#4)
+
 - A data directory whose path contains `#` or `?` no longer opens the wrong database file (#19)
 
 - A place name containing HTML, typed or imported from a GEDCOM file, no longer runs script in the

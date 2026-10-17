@@ -164,6 +164,45 @@ func TestExportContent(t *testing.T) {
 	}
 }
 
+func TestExportGedcom7DatePhraseRoundTrip(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	p, err := s.CreatePerson(ctx, a, PersonInput{GivenNames: "Anna", Surname: "Weber", Sex: "F"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dates := []struct{ typ, in, want string }{
+		{"BIRT", "Frühjahr 1850", "(Frühjahr 1850)"},
+		{"BAPM", "INT 1850 (nach dem Kirchenbuch)", "INT 1850 (nach dem Kirchenbuch)"},
+		{"DEAT", "12 FEB 1750/51", "12 FEB 1750/51"},
+		{"BURI", "BET 1750/51 AND 1760", "BET 1750/51 AND 1760"},
+	}
+	for _, d := range dates {
+		if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &p.ID, Type: d.typ, Date: d.in}); err != nil {
+			t.Fatalf("%s: %v", d.in, err)
+		}
+	}
+	text := exportText(t, s, a, ExportOptions{Version7: true})
+	if !strings.Contains(text, "3 PHRASE ") {
+		t.Fatalf("7.0 export has no DATE.PHRASE:\n%s", text)
+	}
+
+	s2, a2 := reimport(t, text)
+	got := findPerson(t, s2, a2, "anna")
+	byType := map[string]DateValue{}
+	for _, e := range got.Events {
+		byType[e.Type] = e.Date
+	}
+	for _, d := range dates {
+		if byType[d.typ].Raw != d.want {
+			t.Errorf("%s: %q came back as %q, want %q", d.typ, d.in, byType[d.typ].Raw, d.want)
+		}
+	}
+	if !byType["DEAT"].Valid || byType["BAPM"].Qualifier != "INT" {
+		t.Errorf("dates lost their meaning: %+v", byType)
+	}
+}
+
 func TestExportPrivacy(t *testing.T) {
 	s := newStore(t)
 	a := setup(t, s)

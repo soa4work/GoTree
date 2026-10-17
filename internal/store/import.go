@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/praetorianer777/gotree/internal/gedcom"
+	"github.com/praetorianer777/gotree/internal/gendate"
 )
 
 // Import modes.
@@ -814,8 +815,9 @@ func (im *importer) event(ctx context.Context, owner string, e *gedcom.Node, per
 	for _, c := range e.Children {
 		switch c.Tag {
 		case "DATE":
-			dateRaw = c.Value
+			dateRaw = eventDateText(c)
 			im.mapped(path + ".DATE")
+			im.mapped(path + ".DATE.PHRASE")
 		case "PLAC":
 			id, err := im.place(ctx, c, path, &kept)
 			if err != nil {
@@ -1088,6 +1090,42 @@ func dateText(n *gedcom.Node) string {
 		return "(" + ph + ")"
 	}
 	return ""
+}
+
+// eventDateText reads a DATE line together with the DATE.PHRASE that
+// GoTree's 7.0 export writes beside it: the text of a date that is not a
+// date, the explanation of an INT date, or the second year of a dual date.
+func eventDateText(n *gedcom.Node) string {
+	phrase := strings.TrimSpace(n.Text("PHRASE"))
+	value := strings.TrimSpace(n.Value)
+	if value == "" {
+		if phrase == "" {
+			return ""
+		}
+		return "(" + phrase + ")"
+	}
+	if phrase == "" {
+		return n.Value
+	}
+	d, err := gendate.Parse(value)
+	if err != nil || d.Qualifier == gendate.QualifierPhrase || d.Qualifier == gendate.QualifierInterpreted {
+		return n.Value
+	}
+	// The phrase of a dual date is the date as 5.5.1 writes it ("12 FEB 1750/51").
+	if p, err := gendate.Parse(phrase); err == nil && p.Qualifier == gendate.QualifierNone && p.Start.DualYear != 0 {
+		for _, sd := range []*gendate.SimpleDate{d.End, d.Start} {
+			if sd != nil && sd.DualYear == 0 && sd.Calendar == p.Start.Calendar && sd.Year == p.Start.Year &&
+				sd.Month == p.Start.Month && sd.Day == p.Start.Day && sd.BC == p.Start.BC {
+				sd.DualYear = p.Start.DualYear
+				return d.String()
+			}
+		}
+	}
+	if d.Qualifier != gendate.QualifierNone {
+		return n.Value
+	}
+	d.Qualifier, d.Phrase = gendate.QualifierInterpreted, phrase
+	return d.String()
 }
 
 // heirloom reads a GoTree _HEIRLOOM record (docs/gedcom-extensions.md).

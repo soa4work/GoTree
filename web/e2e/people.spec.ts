@@ -52,8 +52,16 @@ test('build a small family by keyboard and mouse', async ({ page }) => {
   const siblingDialog = page.getByRole('dialog', { name: `Add a sibling of Paul ${surname}` })
   await expect(siblingDialog.getByLabel('Surname')).toHaveValue(surname)
   await siblingDialog.getByLabel('Given names').fill('Lena')
+  // Birth and death are filled in the same dialog; no second dialog needed.
+  const birth = siblingDialog.getByRole('group', { name: 'Birth (optional)' })
+  await birth.getByLabel('Date').fill('1850')
+  await expect(birth.getByText('Stored as 1850')).toBeVisible()
   await siblingDialog.getByRole('button', { name: /^Add/ }).click()
   await expect(parents.getByRole('link', { name: `Lena ${surname}` })).toBeVisible()
+  await parents.getByRole('link', { name: `Lena ${surname}` }).click()
+  await expect(page.getByRole('heading', { level: 1, name: `Lena ${surname}` })).toBeVisible()
+  await expect(page.getByText('1850').first()).toBeVisible()
+  await page.goBack()
 
   // Esc closes a dialog and focus returns to the button that opened it.
   const editButton = page.getByRole('button', { name: /^Edit/ }).first()

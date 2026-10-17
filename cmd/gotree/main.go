@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -57,14 +59,19 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
-	srv := newHTTPServer(cfg.ListenAddr, (&api.Server{
+	// baseCtx is the parent of every request context; it is cancelled only
+	// when the graceful shutdown ran out of time, to abort what is still running.
+	baseCtx, cancelRequests := context.WithCancel(context.Background())
+	defer cancelRequests()
+	var inflight sync.WaitGroup
+	srv := newHTTPServer(cfg.ListenAddr, trackRequests(&inflight, (&api.Server{
 		Store:     st,
 		Files:     media.Files{Root: cfg.MediaDir()},
 		MaxUpload: int64(cfg.MaxUploadMB) << 20,
 		Version:   version,
 		Frontend:  web.Dist(),
 		Log:       log,
-	}).Handler())
+	}).Handler()), baseCtx)
 
 	errc := make(chan error, 1)
 	go func() {
@@ -78,35 +85,75 @@ func run(log *slog.Logger) error {
 			return err
 		}
 	case <-ctx.Done():
+		// Restore the default signal behavior: a second SIGINT or SIGTERM
+		// kills the process at once.
+		stop()
 		log.Info("shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
-		// conn.Close is deferred, so it runs only after Shutdown has returned:
-		// in-flight handlers (backup, export, import) are done by then, or the
-		// grace period expired and the connections are cut below.
+		// conn.Close is deferred, so it runs after this returns. Shutdown
+		// waits for in-flight requests (backup, export, import); when it gives
+		// up, the connections are closed, the requests' contexts are cancelled
+		// (which rolls back a running import) and handlers get a few more
+		// seconds to return before the database is closed under them.
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			_ = srv.Close()
+			cancelRequests()
+			if !waitTimeout(&inflight, handlerWait) {
+				log.Error("requests still running, closing the database anyway")
+			}
 			return fmt.Errorf("shutdown: %w", err)
 		}
 	}
 	return nil
 }
 
-// shutdownTimeout is how long in-flight requests get to finish on SIGINT or
-// SIGTERM, before the remaining connections are closed.
-const shutdownTimeout = 30 * time.Second
+const (
+	// shutdownTimeout is how long in-flight requests get to finish on SIGINT
+	// or SIGTERM.
+	shutdownTimeout = 30 * time.Second
+	// handlerWait is how long handlers get to return after their contexts
+	// were cancelled because shutdownTimeout expired.
+	handlerWait = 5 * time.Second
+)
 
 // newHTTPServer builds the server with the timeouts that are safe for every
 // route. There is deliberately no global ReadTimeout or WriteTimeout: they
 // would cut off legitimate large uploads, imports, backups and GEDZIP
 // downloads. Slow request bodies are bounded per handler instead, with a
-// read deadline sized to the upload limit (api.Server.limitUpload).
-func newHTTPServer(addr string, h http.Handler) *http.Server {
+// read deadline sized to the upload limit (api.Server.limitUpload). Request
+// contexts derive from base.
+func newHTTPServer(addr string, h http.Handler, base context.Context) *http.Server {
 	return &http.Server{
 		Addr:              addr,
 		Handler:           h,
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
+		BaseContext:       func(net.Listener) context.Context { return base },
+	}
+}
+
+// trackRequests counts the requests being handled in wg.
+func trackRequests(wg *sync.WaitGroup, h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wg.Add(1)
+		defer wg.Done()
+		h.ServeHTTP(w, r)
+	})
+}
+
+// waitTimeout waits for wg and reports whether it finished within d.
+func waitTimeout(wg *sync.WaitGroup, d time.Duration) bool {
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return true
+	case <-time.After(d):
+		return false
 	}
 }
 

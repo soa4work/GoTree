@@ -1,13 +1,14 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
 )
 
 func TestNewHTTPServerTimeouts(t *testing.T) {
-	srv := newHTTPServer(":0", http.NotFoundHandler())
+	srv := newHTTPServer(":0", http.NotFoundHandler(), context.Background())
 	if srv.ReadHeaderTimeout <= 0 || srv.IdleTimeout < time.Minute {
 		t.Errorf("ReadHeaderTimeout=%v IdleTimeout=%v, want both set", srv.ReadHeaderTimeout, srv.IdleTimeout)
 	}

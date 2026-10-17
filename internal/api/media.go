@@ -49,9 +49,24 @@ func (s *Server) listMedia(w http.ResponseWriter, r *http.Request) {
 	s.respond(w, http.StatusOK, list, err)
 }
 
-// minUploadRate is the slowest client, in bytes per second, that limitUpload
-// still serves.
-const minUploadRate = 64 << 10
+// Variables so that tests can shrink the deadline.
+var (
+	// minUploadRate is the slowest client, in bytes per second, that
+	// limitUpload still serves.
+	minUploadRate int64 = 64 << 10
+	// uploadGrace is added to the transfer time of a full-size upload.
+	uploadGrace = time.Minute
+)
+
+// writeSlowUpload answers 408 and reports true when err is the read deadline
+// set by limitUpload expiring.
+func writeSlowUpload(w http.ResponseWriter, err error) bool {
+	if !errors.Is(err, os.ErrDeadlineExceeded) {
+		return false
+	}
+	writeError(w, http.StatusRequestTimeout, "the upload took too long; check the connection and try again")
+	return true
+}
 
 // limitUpload caps the request body at MaxUpload plus the multipart framing
 // and sets a read deadline sized to it (a minute plus the time to send the
@@ -61,7 +76,7 @@ const minUploadRate = 64 << 10
 func (s *Server) limitUpload(w http.ResponseWriter, r *http.Request) {
 	limit := s.MaxUpload + 1<<20
 	r.Body = http.MaxBytesReader(w, r.Body, limit)
-	d := time.Minute + time.Duration(limit/minUploadRate)*time.Second
+	d := uploadGrace + time.Duration(limit/minUploadRate)*time.Second
 	// Unsupported by some ResponseWriters (tests); the limit still applies.
 	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(d))
 }
@@ -94,7 +109,9 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid upload")
+			if !writeSlowUpload(w, err) {
+				writeError(w, http.StatusBadRequest, "invalid upload")
+			}
 			return
 		}
 		if part.FormName() == "file" {
@@ -113,6 +130,9 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 	stored, err := s.Files.Save(buffered, s.MaxUpload)
 	if errors.Is(err, media.ErrTooLarge) {
 		writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("the file is larger than %d MB", s.MaxUpload>>20))
+		return
+	}
+	if writeSlowUpload(w, err) {
 		return
 	}
 	if err != nil {

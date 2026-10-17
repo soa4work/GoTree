@@ -59,6 +59,10 @@ database in it is a consistent snapshot taken while GoTree keeps running. Copyin
 directory works too, but only while GoTree is stopped, since the database may have changes in
 its `-wal` file that a copy taken mid-write would miss.
 
+GoTree finishes running requests for up to 30 seconds on shutdown. `docker stop` sends SIGKILL
+after 10 seconds by default, so use `--stop-timeout 30` (Compose: `stop_grace_period: 30s`) to
+shut down cleanly during a long import.
+
 To restore, stop GoTree, unzip the backup into an empty data directory (so that `gotree.db` and
 `media/` sit directly in it) and start GoTree again. Thumbnails are not in the backup; they are
 made again when first shown.

@@ -2,14 +2,19 @@ package api
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
 	"image"
 	"image/jpeg"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -83,6 +88,38 @@ func TestMediaUpload(t *testing.T) {
 	}
 	if status, _ := c.upload("/api/media", "big.jpg", append(jpegBytes(t, 8, 8), make([]byte, 2<<20)...)); status != http.StatusRequestEntityTooLarge {
 		t.Errorf("too large: status %d, want 413", status)
+	}
+
+	// A tiny PNG declaring 40000x40000 pixels is refused up front.
+	ihdr := append([]byte("IHDR"), 0, 0, 0x9c, 0x40, 0, 0, 0x9c, 0x40, 8, 6, 0, 0, 0)
+	bomb := append([]byte("\x89PNG\r\n\x1a\n\x00\x00\x00\x0d"), ihdr...)
+	bomb = binary.BigEndian.AppendUint32(bomb, crc32.ChecksumIEEE(ihdr))
+	if status, body := c.upload("/api/media", "bomb.png", bomb); status != http.StatusUnprocessableEntity {
+		t.Errorf("huge image: status %d %s, want 422", status, body)
+	}
+	// A truncated JPEG whose header cannot be read is still accepted.
+	if status, body := c.upload("/api/media", "cut.jpg", jpegBytes(t, 300, 200)[:100]); status != http.StatusCreated {
+		t.Errorf("truncated jpeg: status %d %s, want 201", status, body)
+	}
+
+	// Nothing of it is kept: no stored file, no leftover upload, no record.
+	sum := sha256.Sum256(bomb)
+	if p, _ := srv.Files.Path(hex.EncodeToString(sum[:])); p != "" {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Errorf("rejected image was stored: %v", err)
+		}
+	}
+	if left, _ := os.ReadDir(filepath.Join(srv.Files.Root, "tmp")); len(left) != 0 {
+		t.Errorf("%d temporary files left", len(left))
+	}
+	lr, err := c.http.Get(c.base + "/api/media")
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, _ := io.ReadAll(lr.Body)
+	lr.Body.Close()
+	if strings.Contains(string(list), "bomb.png") {
+		t.Errorf("rejected image has a record: %s", list)
 	}
 
 	// The original, with headers that keep it inert, and a range request.

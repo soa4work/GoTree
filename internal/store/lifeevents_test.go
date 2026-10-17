@@ -1,6 +1,9 @@
 package store
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestCreatePersonWithBirthAndDeath(t *testing.T) {
 	s := newStore(t)
@@ -42,12 +45,21 @@ func TestCreatePersonWithBirthAndDeath(t *testing.T) {
 		t.Errorf("events: %+v", d.Events)
 	}
 
-	// An invalid date, a missing place or a death for a living person
+	// Text that is not a GEDCOM date is kept as typed, like in the event dialog.
+	r, err := s.CreatePerson(ctx, a, PersonInput{GivenNames: "Odd", Birth: &LifeEventInput{Date: "31 FEB 1850"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d, _ = s.GetPersonDetail(ctx, a, r.ID); len(d.Events) != 1 || d.Events[0].Date.Raw != "31 FEB 1850" || d.Events[0].Date.Normalized != "" || d.Events[0].Date.Valid {
+		t.Errorf("events: %+v", d.Events)
+	}
+
+	// An over-long date, a missing place or a death for a living person
 	// rejects everything.
-	_, err = s.CreatePerson(ctx, a, PersonInput{GivenNames: "Bad", Birth: &LifeEventInput{Date: "31 FEB 1850"}})
+	_, err = s.CreatePerson(ctx, a, PersonInput{GivenNames: "Bad", Birth: &LifeEventInput{Date: strings.Repeat("x", 121)}})
 	validationField(t, err, "birth.date")
 	_, err = s.CreatePerson(ctx, a, PersonInput{GivenNames: "Bad", Death: &LifeEventInput{PlaceID: ptr(int64(9999))}})
-	validationField(t, err, "placeId")
+	validationField(t, err, "death.placeId")
 	_, err = s.CreatePerson(ctx, a, PersonInput{GivenNames: "Bad", IsLiving: ptr(true), Death: &LifeEventInput{Date: "1900"}})
 	validationField(t, err, "death")
 	list, err := s.ListPersons(ctx, a, "Bad", 10, 0)
@@ -74,8 +86,8 @@ func TestAddRelativeWithBirth(t *testing.T) {
 
 	// A bad date creates no relative at all.
 	_, err = s.AddRelative(ctx, a, paul.ID, RelativeInput{Relation: RelationSibling,
-		Person: &PersonInput{GivenNames: "Lena", Birth: &LifeEventInput{Date: "nonsense"}}})
-	validationField(t, err, "birth.date")
+		Person: &PersonInput{GivenNames: "Lena", Birth: &LifeEventInput{PlaceID: ptr(int64(9999))}}})
+	validationField(t, err, "birth.placeId")
 	if list, _ := s.ListPersons(ctx, a, "Lena", 10, 0); list.Total != 0 {
 		t.Errorf("rolled-back relative exists: %+v", list)
 	}

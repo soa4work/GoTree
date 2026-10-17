@@ -7,8 +7,6 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/praetorianer777/gotree/internal/gendate"
 )
 
 // AlternateName is a further name of a person: birth name, married name, …
@@ -105,6 +103,13 @@ type LifeEventInput struct {
 	PlaceID *int64 `json:"placeId"`
 }
 
+func (l *LifeEventInput) dateOrEmpty() string {
+	if l == nil {
+		return ""
+	}
+	return l.Date
+}
+
 func (l *LifeEventInput) empty() bool {
 	return l == nil || (strings.TrimSpace(l.Date) == "" && l.PlaceID == nil)
 }
@@ -167,16 +172,6 @@ func (in PersonInput) validate() error {
 	long("notes", in.Notes, 100_000)
 	v.check(oneOf(in.Sex, "M", "F", "U", "X"), "sex", "must be M, F, U or X")
 	v.check(len(in.AlternateNames) <= 50, "alternateNames", "too many names")
-	for field, l := range map[string]*LifeEventInput{"birth": in.Birth, "death": in.Death} {
-		if l == nil {
-			continue
-		}
-		date := collapse(l.Date)
-		_, err := gendate.Parse(date)
-		v.check(date == "" || err == nil, field+".date", "is not a recognized date")
-		v.check(utf8.RuneCountInString(date) <= 120, field+".date", "is too long")
-	}
-	v.check(in.Death.empty() || in.IsLiving == nil || !*in.IsLiving, "death", "a living person has no death")
 	for _, n := range in.AlternateNames {
 		v.check(oneOf(n.Type, nameTypes...), "alternateNames", "unknown name type "+n.Type)
 		v.check(n.GivenNames != "" || n.Surname != "" || n.Nickname != "", "alternateNames", "a name needs at least a given name, surname or nickname")
@@ -184,6 +179,16 @@ func (in PersonInput) validate() error {
 		v.check(n.Status == StatusAccepted || n.StatusReason != "", "alternateNames", "say why the name is disputed or disproven")
 		long("alternateNames", n.GivenNames+n.Surname, 400)
 	}
+	return v.err()
+}
+
+// validateLife checks the birth and death entered with a new person. Dates
+// are kept as typed like event dates, so only their length is limited.
+func (in PersonInput) validateLife() error {
+	var v validator
+	v.check(utf8.RuneCountInString(collapse(in.Birth.dateOrEmpty())) <= 120, "birth.date", "is too long")
+	v.check(utf8.RuneCountInString(collapse(in.Death.dateOrEmpty())) <= 120, "death.date", "is too long")
+	v.check(in.Death.empty() || in.IsLiving == nil || !*in.IsLiving, "death", "a living person has no death")
 	return v.err()
 }
 
@@ -200,6 +205,9 @@ func (s *Store) CreatePerson(ctx context.Context, a Actor, in PersonInput) (Pers
 func (s *Store) createPerson(ctx context.Context, tx *sql.Tx, a Actor, in PersonInput) (Person, error) {
 	in.normalize()
 	if err := in.validate(); err != nil {
+		return Person{}, err
+	}
+	if err := in.validateLife(); err != nil {
 		return Person{}, err
 	}
 	var p Person
@@ -221,26 +229,45 @@ func (s *Store) createPerson(ctx context.Context, tx *sql.Tx, a Actor, in Person
 		if err := s.addCitations(ctx, tx, a, "person", id, in.AddCitations); err != nil {
 			return err
 		}
-		for _, ev := range []struct {
-			typ string
-			in  *LifeEventInput
-		}{{"BIRT", in.Birth}, {"DEAT", in.Death}} {
-			if ev.in.empty() {
-				continue
-			}
-			if _, err := s.createEvent(ctx, tx, a, EventInput{PersonID: &id, Type: ev.typ, Date: ev.in.Date, PlaceID: ev.in.PlaceID}); err != nil {
-				return err
-			}
-		}
 		if err := reindexPerson(ctx, tx, id); err != nil {
 			return err
 		}
 		if p, err = s.getPerson(ctx, tx, a, id); err != nil {
 			return err
 		}
-		return s.logChange(ctx, tx, a, "person", id, "create", nil, p)
+		if err := s.logChange(ctx, tx, a, "person", id, "create", nil, p); err != nil {
+			return err
+		}
+		for _, ev := range []struct {
+			typ, field string
+			in         *LifeEventInput
+		}{{"BIRT", "birth", in.Birth}, {"DEAT", "death", in.Death}} {
+			if ev.in.empty() {
+				continue
+			}
+			if _, err := s.createEvent(ctx, tx, a, EventInput{PersonID: &id, Type: ev.typ, Date: ev.in.Date, PlaceID: ev.in.PlaceID}); err != nil {
+				return prefixFields(err, ev.field)
+			}
+		}
+		// Re-read: a death or an old birth changes whether the person is living.
+		p, err = s.getPerson(ctx, tx, a, id)
+		return err
 	}()
 	return p, err
+}
+
+// prefixFields names the form section an event error came from, so
+// "placeId" becomes "birth.placeId".
+func prefixFields(err error, prefix string) error {
+	var ve *ValidationError
+	if !errors.As(err, &ve) {
+		return err
+	}
+	fields := make(map[string]string, len(ve.Fields))
+	for k, v := range ve.Fields {
+		fields[prefix+"."+k] = v
+	}
+	return &ValidationError{Fields: fields}
 }
 
 // UpdatePerson replaces a person's own fields and alternate names.

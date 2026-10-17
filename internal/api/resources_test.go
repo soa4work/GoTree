@@ -128,9 +128,9 @@ func TestAddRelativeAndDatePreview(t *testing.T) {
 		t.Errorf("birth event: %+v", detail.Events)
 	}
 	var e errorBody
-	c.call("POST", "/api/persons", map[string]any{"givenNames": "Bad", "death": map[string]any{"date": "soon"}},
+	c.call("POST", "/api/persons", map[string]any{"givenNames": "Bad", "death": map[string]any{"placeId": 9999}},
 		http.StatusUnprocessableEntity, &e)
-	if e.Fields["death.date"] == "" {
+	if e.Fields["death.placeId"] == "" {
 		t.Errorf("fields: %+v", e)
 	}
 	c.call("POST", fmt.Sprintf("/api/persons/%d/relatives", paul.ID), map[string]any{"relation": "cousin", "person": map[string]any{}},

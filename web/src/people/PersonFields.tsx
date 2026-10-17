@@ -72,14 +72,14 @@ export function PersonFields({ value, onChange, errors, full, life }: Props) {
             legend={t('person.birth')}
             draft={life.value.birth}
             onChange={(birth) => life.onChange({ ...life.value, birth })}
-            errors={{ date: errors['birth.date'], place: errors.placeId }}
+            errors={{ date: errors['birth.date'], place: errors['birth.placeId'] }}
           />
           {value.isLiving !== true && (
             <LifeFieldset
               legend={t('person.death')}
               draft={life.value.death}
               onChange={(death) => life.onChange({ ...life.value, death })}
-              errors={{ date: errors['death.date'] ?? errors.death }}
+              errors={{ date: errors['death.date'] ?? errors.death, place: errors['death.placeId'] }}
             />
           )}
         </>

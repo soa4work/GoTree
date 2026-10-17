@@ -255,15 +255,23 @@ type UnmappedPlace struct {
 	Events int `json:"events"`
 }
 
+// UnmappedPlaces is the list of places the map cannot show.
+type UnmappedPlaces struct {
+	// Total counts all such places; Places holds only the busiest ones.
+	Total  int             `json:"total"`
+	Places []UnmappedPlace `json:"places"`
+}
+
 // maxUnmappedPlaces bounds the list; the busiest places come first.
 const maxUnmappedPlaces = 200
 
 // UnmappedPlaces lists the places used by the dated events that the map
 // cannot show for lack of coordinates, busiest first.
-func (s *Store) UnmappedPlaces(ctx context.Context, a Actor) ([]UnmappedPlace, error) {
+func (s *Store) UnmappedPlaces(ctx context.Context, a Actor) (UnmappedPlaces, error) {
+	out := UnmappedPlaces{Places: []UnmappedPlace{}}
 	coords, err := s.placeCoordinates(ctx, a)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 	args := []any{a.TreeID}
 	for _, t := range mapEventTypes {
@@ -275,34 +283,54 @@ func (s *Store) UnmappedPlaces(ctx context.Context, a Actor) ([]UnmappedPlace, e
 			AND date_sort > 0 AND place_id IS NOT NULL AND date_qualifier NOT IN ('BEF', 'AFT')
 		GROUP BY place_id ORDER BY count(*) DESC, place_id`, args...)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
-	type used struct {
-		id     int64
-		events int
-	}
-	var missing []used
+	var ids []int64
+	events := map[int64]int{}
 	for rows.Next() {
-		var u used
-		if err := rows.Scan(&u.id, &u.events); err != nil {
+		var id int64
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
 			rows.Close()
-			return nil, err
+			return out, err
 		}
-		if _, ok := coords[u.id]; !ok {
-			missing = append(missing, u)
+		if _, ok := coords[id]; !ok {
+			ids = append(ids, id)
+			events[id] = n
 		}
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return out, err
 	}
-	out := []UnmappedPlace{}
-	for _, u := range missing[:min(len(missing), maxUnmappedPlaces)] {
-		p, err := getPlace(ctx, s.DB, a, u.id)
+	out.Total = len(ids)
+	ids = ids[:min(len(ids), maxUnmappedPlaces)]
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err = s.DB.QueryContext(ctx, placeFullNameCTE+`
+		SELECT p.id, p.parent_id, p.name, p.place_type, p.lat, p.lng, p.notes, f.full_name, p.created_at, p.updated_at
+		FROM places p JOIN full_names f ON f.id = p.id
+		WHERE p.tree_id = ? AND p.id IN (`+placeholders(len(ids))+`)`, append([]any{a.TreeID, a.TreeID}, int64Args(ids)...)...)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	byID := map[int64]Place{}
+	for rows.Next() {
+		p, err := scanPlace(rows)
 		if err != nil {
-			return nil, err
+			return out, err
 		}
-		out = append(out, UnmappedPlace{Place: p, Events: u.events})
+		byID[p.ID] = p
+	}
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	for _, id := range ids {
+		if p, ok := byID[id]; ok {
+			out.Places = append(out.Places, UnmappedPlace{Place: p, Events: events[id]})
+		}
 	}
 	return out, nil
 }

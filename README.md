@@ -49,8 +49,8 @@ address, so the limit then applies to all clients together.
 Behind a reverse proxy, allow request bodies as large as the upload limit.
 
 The migration map loads its background tiles from openstreetmap.org in the browser. The "Look up
-on OpenStreetMap" button next to a place without coordinates sends that place's name to
-nominatim.openstreetmap.org, only when you click it. Everything else GoTree shows comes from your
+on OpenStreetMap" button next to a place without coordinates sends that place's name and
+your GoTree server's address (as the referrer) to nominatim.openstreetmap.org, only when you click it. Everything else GoTree shows comes from your
 own server.
 
 ### Backup and restore

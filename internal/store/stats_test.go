@@ -107,7 +107,7 @@ func TestMapData(t *testing.T) {
 
 	// Only Atlantis lacks coordinates for good; Kleindorf inherits Saxony's.
 	um, err := s.UnmappedPlaces(ctx, a)
-	if err != nil || len(um) != 1 || um[0].ID != nowhere.ID || um[0].Events != 1 || um[0].FullName != "Atlantis" {
+	if err != nil || um.Total != 1 || len(um.Places) != 1 || um.Places[0].ID != nowhere.ID || um.Places[0].Events != 1 || um.Places[0].FullName != "Atlantis" {
 		t.Errorf("unmapped places: %+v %v", um, err)
 	}
 

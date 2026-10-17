@@ -9,6 +9,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Migration map: when a GEDCOM import brought no coordinates, the map says so, lists the places
+  used by dated events that lack them and lets you enter latitude and longitude right there, or
+  look a place up on OpenStreetMap (Nominatim) with one click and pick a match (#12)
+
 - Statistics: lifespan by decade of birth, age at first and later marriages, children per family,
   the most common surnames and given names and how given names changed by decade, each chart with
   its numbers; migration map: watch the family move through their dated events on an
@@ -91,10 +95,6 @@ and the versioning [Semantic Versioning](https://semver.org/).
   scripts from its own files (#2)
 
 ### Changed
-
-- Migration map: when a GEDCOM import brought no coordinates, the map says so, lists the places
-  used by dated events that lack them and lets you enter latitude and longitude right there, or
-  look a place up on OpenStreetMap (Nominatim) with one click and pick a match (#12)
 
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so
   nothing being typed or uploaded is lost (#15)

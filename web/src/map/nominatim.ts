@@ -19,6 +19,8 @@ export async function lookupPlace(query: string, signal?: AbortSignal): Promise<
   const params = new URLSearchParams({ format: 'jsonv2', limit: '5', q: query })
   const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
     signal,
+    // The app's Referrer-Policy is same-origin; Nominatim's usage policy wants the app identified.
+    referrerPolicy: 'strict-origin-when-cross-origin',
     headers: { Accept: 'application/json' },
   })
   if (!res.ok) throw new Error(res.statusText || String(res.status))

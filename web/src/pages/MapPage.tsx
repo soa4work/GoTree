@@ -2,13 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
-import { getMapData, getUnmappedPlaces } from '../api/endpoints'
+import { getMapData } from '../api/endpoints'
 import type { PersonRef } from '../api/types'
 import { Button } from '../components/Button'
 import { SelectField } from '../components/Field'
 import { PageHeading } from '../components/PageHeading'
 import { fullName } from '../lib/people'
 import { MissingPlaces } from '../map/MissingPlaces'
+import { useUnmappedPlaces } from '../map/useUnmappedPlaces'
 import { positionsAt, yearRange } from '../map/positions'
 import { PersonPicker } from '../people/PersonPicker'
 
@@ -30,7 +31,7 @@ export function MapPage() {
     queryFn: ({ signal }) => getMapData(scope, root?.id ?? null, signal),
     enabled: ready,
   })
-  const missing = useQuery({ queryKey: ['map-unmapped-places'], queryFn: ({ signal }) => getUnmappedPlaces(signal) })
+  const missing = useUnmappedPlaces()
   const range = useMemo(() => (data.data ? yearRange(data.data, new Date().getFullYear()) : null), [data.data])
   const shown = range ? Math.min(Math.max(year ?? range[0], range[0]), range[1]) : null
   const positions = useMemo(
@@ -82,10 +83,10 @@ export function MapPage() {
       {data.data && !range && (
         <div className="space-y-2">
           <p className="font-medium">{t('map.none')}</p>
-          <p className="text-slate-700 dark:text-slate-300">{t('map.noneWhy')}</p>
-          {!!missing.data?.length && (
+          {data.data.unmapped > 0 && <p className="text-slate-700 dark:text-slate-300">{t('map.noneWhy')}</p>}
+          {!!missing.data?.total && (
             <p className="text-slate-700 dark:text-slate-300">
-              {t('map.noneMissing', { count: missing.data.length })}{' '}
+              {t('map.noneMissing', { count: missing.data.total })}{' '}
               <a href="#map-missing-places" className="text-brand-700 underline dark:text-brand-100">
                 {t('map.fixMissing')}
               </a>

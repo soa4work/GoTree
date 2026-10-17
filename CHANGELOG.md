@@ -77,6 +77,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 - A data directory whose path contains `#` or `?` no longer opens the wrong database file (#19)
 
+- The server closes idle keep-alive connections and drops uploads and imports that trickle in
+  too slowly (answered with a timeout message); on shutdown running requests get 30 seconds to
+  finish, then they are cancelled and given a few more seconds before the database is closed, and
+  a second Ctrl+C stops GoTree at once (#7)
+
 - Images over 50 megapixels are refused on upload with a clear error and get no thumbnail, so a
   small file declaring huge dimensions can no longer exhaust memory; at most two thumbnails
   are rendered at a time (#5)

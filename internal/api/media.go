@@ -49,6 +49,38 @@ func (s *Server) listMedia(w http.ResponseWriter, r *http.Request) {
 	s.respond(w, http.StatusOK, list, err)
 }
 
+// Variables so that tests can shrink the deadline.
+var (
+	// minUploadRate is the slowest client, in bytes per second, that
+	// limitUpload still serves.
+	minUploadRate int64 = 64 << 10
+	// uploadGrace is added to the transfer time of a full-size upload.
+	uploadGrace = time.Minute
+)
+
+// writeSlowUpload answers 408 and reports true when err is the read deadline
+// set by limitUpload expiring.
+func writeSlowUpload(w http.ResponseWriter, err error) bool {
+	if !errors.Is(err, os.ErrDeadlineExceeded) {
+		return false
+	}
+	writeError(w, http.StatusRequestTimeout, "the upload took too long; check the connection and try again")
+	return true
+}
+
+// limitUpload caps the request body at MaxUpload plus the multipart framing
+// and sets a read deadline sized to it (a minute plus the time to send the
+// cap at minUploadRate), so a client trickling a body cannot hold the
+// connection forever. A per-request deadline is used instead of a server-wide
+// ReadTimeout, which would also hit large downloads and other long requests.
+func (s *Server) limitUpload(w http.ResponseWriter, r *http.Request) {
+	limit := s.MaxUpload + 1<<20
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
+	d := uploadGrace + time.Duration(limit/minUploadRate)*time.Second
+	// Unsupported by some ResponseWriters (tests); the limit still applies.
+	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(d))
+}
+
 // uploadMedia streams one file ("file" part of a multipart form) to disk,
 // identifies it from its content and reads its photo metadata. An
 // optional ?entityType=&entityId= links it in the same step.
@@ -63,8 +95,7 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 		link = &store.MediaLinkInput{EntityType: t, EntityID: id}
 	}
 
-	// The multipart framing adds a little to the file itself.
-	r.Body = http.MaxBytesReader(w, r.Body, s.MaxUpload+1<<20)
+	s.limitUpload(w, r)
 	mr, err := r.MultipartReader()
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "expected a multipart upload")
@@ -78,7 +109,9 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid upload")
+			if !writeSlowUpload(w, err) {
+				writeError(w, http.StatusBadRequest, "invalid upload")
+			}
 			return
 		}
 		if part.FormName() == "file" {
@@ -112,6 +145,9 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 	}
 	if errors.Is(err, media.ErrTooLarge) {
 		writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("the file is larger than %d MB", s.MaxUpload>>20))
+		return
+	}
+	if writeSlowUpload(w, err) {
 		return
 	}
 	if err != nil {

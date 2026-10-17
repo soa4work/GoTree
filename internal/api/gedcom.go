@@ -21,7 +21,7 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 	if mode == "" {
 		mode = store.ImportIntoEmpty
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, s.MaxUpload+1<<20)
+	s.limitUpload(w, r)
 	mr, err := r.MultipartReader()
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "expected a multipart upload")
@@ -35,7 +35,9 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid upload")
+			if !writeSlowUpload(w, err) {
+				writeError(w, http.StatusBadRequest, "invalid upload")
+			}
 			return
 		}
 		if part.FormName() == "file" {
@@ -43,6 +45,9 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 			data, err = io.ReadAll(part)
 			part.Close()
 			if err != nil {
+				if writeSlowUpload(w, err) {
+					return
+				}
 				writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("the file is larger than %d MB", s.MaxUpload>>20))
 				return
 			}

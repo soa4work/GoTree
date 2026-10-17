@@ -71,6 +71,10 @@ export default function MapView({ data, positions, year }: Props) {
       const place = data.places[placeId]
       if (!place) continue
       const size = Math.round(24 + Math.sqrt(people.length) * 8)
+      // Leaflet inserts a string tooltip as HTML, and place names come from
+      // users and GEDCOM files; a DOM node with textContent stays plain text.
+      const label = document.createElement('div')
+      label.textContent = `${place.name}: ${people.length}`
       L.marker([place.lat, place.lng], {
         keyboard: false,
         zIndexOffset: people.length,
@@ -81,7 +85,7 @@ export default function MapView({ data, positions, year }: Props) {
           iconAnchor: [size / 2, size / 2],
         }),
       })
-        .bindTooltip(`${place.name}: ${people.length}`, { direction: 'top', offset: [0, -size / 2] })
+        .bindTooltip(label, { direction: 'top', offset: [0, -size / 2] })
         .addTo(group)
     }
   }, [positions, data, year])

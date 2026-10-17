@@ -12,8 +12,6 @@ import { formatDay } from '../lib/dates'
 
 type Open = { kind: 'task'; task?: ResearchTask } | { kind: 'log'; entry?: LogEntry; taskId?: number | null } | null
 
-const day = formatDay
-
 function todayISO() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -118,7 +116,7 @@ export function TaskList({
         const meta = [
           t(`research.status_${task.status}`),
           task.priority !== 'normal' ? t(`research.priority_${task.priority}`) : '',
-          task.dueOn ? t(overdue ? 'research.overdue' : 'research.due', { date: day(task.dueOn) }) : '',
+          task.dueOn ? t(overdue ? 'research.overdue' : 'research.due', { date: formatDay(task.dueOn) }) : '',
           task.logCount > 0 ? t('research.logCount', { count: task.logCount }) : '',
           task.links.map((l) => l.label).join(', '),
         ].filter(Boolean)
@@ -202,7 +200,7 @@ function LogList({
               <span className="block font-medium">{e.query}</span>
               <span className="block text-sm text-slate-600 dark:text-slate-400">
                 {[
-                  day(e.searchedOn),
+                  formatDay(e.searchedOn),
                   e.location,
                   e.taskTitle ? t('research.forTask', { title: e.taskTitle }) : '',
                   e.links.map((l) => l.label).join(', '),

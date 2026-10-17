@@ -1147,7 +1147,7 @@ func (im *importer) heirloom(ctx context.Context, r *gedcom.Node) error {
 			in.Description = c.Value
 		case "DATE":
 			text, used := eventDateText(c)
-			in.MadeDate = canonicalDate(text)
+			in.MadeDate = storedDate(text)
 			if c.First("PHRASE") != nil && !used {
 				im.tag(path+".DATE.PHRASE", TagDropped, "heirlooms have nowhere to keep it")
 			}

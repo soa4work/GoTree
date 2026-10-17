@@ -30,7 +30,7 @@ func TestHeirlooms(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if h.MadeDate != "ABT 1880" || len(h.Custody) != 2 || h.Custody[1].Person.GivenNames != "Paul" || len(h.Citations) != 1 {
+	if h.MadeDate != "abt 1880" || len(h.Custody) != 2 || h.Custody[1].Person.GivenNames != "Paul" || len(h.Citations) != 1 {
 		t.Fatalf("heirloom: %+v", h)
 	}
 

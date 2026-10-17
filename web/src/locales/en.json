@@ -235,7 +235,7 @@
     "disproven": "disproven"
   },
   "date": {
-    "hint": "e.g. 12 March 1850, about 1850, between 1850 and 1860, before 1900",
+    "hint": "e.g. 12 March 1850, 12.3.1850, about 1850, between 1850 and 1860, before 1900",
     "storedAs": "Understood as {{date}}",
     "fmt": {
       "about": "about {{date}}",

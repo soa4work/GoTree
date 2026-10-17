@@ -101,8 +101,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Dates read as plain English ("26 February 1820", "about 1850", "between 1850 and 1860") on the
-  timeline, heirlooms and in the date field preview, and can be typed that way when saving an
-  event; stored values and GEDCOM export are unchanged, and dates such as share, expiry and due
+  timeline, heirlooms and in the date field preview, and can be typed that way in events,
+  heirlooms, media and transcriptions (saved as GEDCOM when needed, so the preview matches what is
+  stored); "Tidy up dates" no longer offers dates that were just saved; share, expiry and due
   days now follow the interface language everywhere (#14)
 
 - The new-person and add-relative forms take an optional birth and death date and place, so

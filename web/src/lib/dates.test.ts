@@ -26,6 +26,11 @@ describe('formatDate', () => {
     ['@#DJULIAN@ 5 MAY 1700', '5 May 1700 (Julian calendar)'],
     ['(during the war)', '(during the war)'],
     ['sometime in spring', 'sometime in spring'],
+    ['abt 1880', 'about 1880'],
+    ['about 1880', 'about 1880'],
+    ['before 1900', 'before 1900'],
+    ['12.3.1850', '12 March 1850'],
+    ['1850-03-12', '12 March 1850'],
     ['31 FEB', '31 FEB'],
     ['ABT sometime', 'ABT sometime'],
   ])('formatDate(%j) = %j', (gedcom, want) => {
@@ -35,8 +40,8 @@ describe('formatDate', () => {
 
 describe('formatDay', () => {
   it('formats timestamps and plain days the same way', () => {
-    expect(formatDay('2026-03-05')).toBe('March 5, 2026')
-    expect(formatDay('2026-03-05T12:00:00Z')).toMatch(/^March [45], 2026$/)
+    expect(formatDay('2026-03-05')).toBe('5 March 2026')
+    expect(formatDay('2026-03-05T12:00:00Z')).toMatch(/^[45] March 2026$/)
   })
 
   it('returns text it cannot read unchanged', () => {

@@ -391,7 +391,7 @@ func (s *Store) ListMedia(ctx context.Context, a Actor, entityType string, entit
 
 // UpdateMedia replaces the descriptive fields of a medium.
 func (s *Store) UpdateMedia(ctx context.Context, a Actor, id int64, in MediaUpdate) (Media, error) {
-	in.Title, in.Date = collapse(in.Title), collapse(in.Date)
+	in.Title, in.Date = collapse(in.Title), storedDate(in.Date)
 	in.Description, in.Transcript = strings.TrimSpace(in.Description), strings.TrimSpace(in.Transcript)
 	var v validator
 	v.check(utf8.RuneCountInString(in.Title) <= 300, "title", "is too long")

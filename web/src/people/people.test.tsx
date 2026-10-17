@@ -216,7 +216,7 @@ describe('person page', () => {
     expect(death()).toBeInTheDocument()
     await user.type(within(dialog).getByLabelText('Given names'), 'Paul')
     await user.type(birth.getByLabelText('Date'), '12.3.1890')
-    expect(await birth.findByText('Stored as 12 MAR 1890')).toBeInTheDocument()
+    expect(await birth.findByText('Understood as 12 March 1890')).toBeInTheDocument()
 
     // Living people have no death fields.
     await user.selectOptions(within(dialog).getByLabelText('Living or deceased'), 'Living')

@@ -77,26 +77,16 @@ type HeirloomInput struct {
 	RemoveCitations []int64        `json:"removeCitations,omitempty"`
 }
 
-// canonicalDate keeps a date as typed unless it reads as GEDCOM, which is
-// then stored in its canonical form.
-func canonicalDate(s string) string {
-	s = strings.Join(strings.Fields(s), " ")
-	if d, err := gendate.Parse(s); err == nil {
-		return d.String()
-	}
-	return s
-}
-
 func (in *HeirloomInput) normalize() {
 	in.Name, in.Description = strings.TrimSpace(in.Name), strings.TrimSpace(in.Description)
 	in.CurrentLocation, in.Notes = strings.TrimSpace(in.CurrentLocation), strings.TrimSpace(in.Notes)
-	in.MadeDate = canonicalDate(in.MadeDate)
+	in.MadeDate = storedDate(in.MadeDate)
 	if in.Kind == "" {
 		in.Kind = "other"
 	}
 	for i := range in.Custody {
 		c := &in.Custody[i]
-		c.FromDate, c.ToDate, c.Notes = canonicalDate(c.FromDate), canonicalDate(c.ToDate), strings.TrimSpace(c.Notes)
+		c.FromDate, c.ToDate, c.Notes = storedDate(c.FromDate), storedDate(c.ToDate), strings.TrimSpace(c.Notes)
 		if c.How == "" {
 			c.How = "inherited"
 		}

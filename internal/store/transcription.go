@@ -77,7 +77,7 @@ const maxRows = 200
 
 func (in *TranscriptionInput) normalize() {
 	in.Title, in.Page, in.Notes = strings.TrimSpace(in.Title), strings.TrimSpace(in.Page), strings.TrimSpace(in.Notes)
-	in.Date = strings.Join(strings.Fields(in.Date), " ")
+	in.Date = storedDate(in.Date)
 	for i := range in.Rows {
 		r := &in.Rows[i]
 		r.Line = strings.TrimSpace(r.Line)
@@ -352,7 +352,7 @@ func age(v string) (int, bool) {
 }
 
 func recordYear(date string) int {
-	d, err := gendate.Parse(date)
+	d, err := gendate.Normalize(date)
 	if err != nil {
 		return 0
 	}

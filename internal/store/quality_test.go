@@ -71,7 +71,7 @@ func TestNormalizeDates(t *testing.T) {
 		}
 		return e
 	}
-	german := mk("12.3.1850")
+	german := mk("12.3.1850") // read by Parse, so never proposed
 	// Saving tidies loose dates itself, so legacy loose text is written directly.
 	loose := mk("1851")
 	if _, err := s.DB.Exec(`UPDATE events SET date_raw = 'March 12, 1851', date = '', date_sort = NULL, date_sort_end = NULL WHERE id = ?`, loose.ID); err != nil {
@@ -85,17 +85,17 @@ func TestNormalizeDates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(prop.Items) != 3 || prop.Unreadable != 1 {
+	if len(prop.Items) != 1 || prop.Unreadable != 1 {
 		t.Fatalf("proposals: %+v", prop)
 	}
 	byID := map[int64]DateProposal{}
 	for _, it := range prop.Items {
 		byID[it.EventID] = it
 	}
-	if g := byID[german.ID]; g.Proposed != "12 MAR 1850" || !g.WasValid || g.PersonIDs[0] != p.ID {
-		t.Errorf("german: %+v", g)
+	if _, ok := byID[german.ID]; ok {
+		t.Errorf("a date Parse reads was proposed: %+v", byID[german.ID])
 	}
-	if l := byID[loose.ID]; l.Proposed != "12 MAR 1851" || l.WasValid {
+	if l := byID[loose.ID]; l.Proposed != "12 MAR 1851" || l.WasValid || l.PersonIDs[0] != p.ID {
 		t.Errorf("loose: %+v", l)
 	}
 	if prop.Persons[p.ID].Surname != "Weber" {
@@ -106,14 +106,13 @@ func TestNormalizeDates(t *testing.T) {
 		t.Fatal(err)
 	}
 	res, err := s.ApplyDates(ctx, a, []DateChange{
-		{EventID: german.ID, Raw: "12.3.1850", Date: "12 MAR 1850"},
 		{EventID: loose.ID, Raw: "March 12, 1851", Date: "12 MAR 1851"},
 		{EventID: edited.ID, Raw: "abt 1853", Date: "ABT 1853"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Updated != 2 || res.Skipped != 1 {
+	if res.Updated != 1 || res.Skipped != 1 {
 		t.Errorf("result: %+v", res)
 	}
 	e, _ := s.GetEvent(ctx, a, loose.ID)
@@ -121,12 +120,12 @@ func TestNormalizeDates(t *testing.T) {
 		t.Errorf("loose after: %+v", e.Date)
 	}
 	var logged int
-	_ = s.DB.QueryRow(`SELECT count(*) FROM change_log WHERE entity_type = 'event' AND action = 'update' AND after_json = '{"date":"12 MAR 1850"}'`).Scan(&logged)
+	_ = s.DB.QueryRow(`SELECT count(*) FROM change_log WHERE entity_type = 'event' AND action = 'update' AND after_json = '{"date":"12 MAR 1851"}'`).Scan(&logged)
 	if logged != 1 {
 		t.Error("the change is logged")
 	}
 
-	if _, err := s.ApplyDates(ctx, a, []DateChange{{EventID: german.ID, Raw: "12 MAR 1850", Date: "12.3.1850"}}); err == nil {
+	if _, err := s.ApplyDates(ctx, a, []DateChange{{EventID: loose.ID, Raw: "12 MAR 1851", Date: "12.3.1851"}}); err == nil {
 		t.Error("non-canonical target accepted")
 	}
 }

@@ -97,6 +97,28 @@ var familyEventTypes = map[string]bool{
 	"MARC": true, "MARL": true, "MARS": true, "ANUL": true,
 }
 
+// storedDate is the one rule for the text a user-entered date is saved as
+// (events, heirlooms, media and transcriptions), the same reading the date
+// field previews:
+//   - text gendate.Parse reads ("about 1850", "12.3.1850", "1900-06-01") is
+//     kept as typed;
+//   - text only gendate.Normalize reads ("between 1850 and 1860",
+//     "March 12, 1850") is saved in its canonical GEDCOM form;
+//   - anything else is kept as typed and shown as unreadable.
+//
+// "Tidy up dates" therefore never offers a date saved this way; it only
+// repairs older or imported text that Parse cannot read.
+func storedDate(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if _, err := gendate.Parse(s); err == nil {
+		return s
+	}
+	if d, err := gendate.Normalize(s); err == nil {
+		return d.String()
+	}
+	return s
+}
+
 func parseDate(raw string) (date string, sortKey, sortEnd sql.NullInt64, qualifier string) {
 	d, err := gendate.Parse(raw)
 	if err != nil {
@@ -114,14 +136,7 @@ func parseDate(raw string) (date string, sortKey, sortEnd sql.NullInt64, qualifi
 func (in *EventInput) normalize() {
 	in.Type = strings.ToUpper(strings.TrimSpace(in.Type))
 	in.CustomLabel = strings.TrimSpace(in.CustomLabel)
-	in.Date = strings.Join(strings.Fields(in.Date), " ")
-	// Plain-language dates ("about 1850", "between 1850 and 1860", "12 March
-	// 1850") are stored as GEDCOM, so sorting, checks and export see them.
-	if _, err := gendate.Parse(in.Date); err != nil {
-		if d, err := gendate.Normalize(in.Date); err == nil {
-			in.Date = d.String()
-		}
-	}
+	in.Date = storedDate(in.Date)
 	in.Description = strings.TrimSpace(in.Description)
 	in.Notes = strings.TrimSpace(in.Notes)
 	in.Status = defaultStatus(in.Status)

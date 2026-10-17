@@ -29,7 +29,6 @@ export function CalendarFeeds() {
       void queryClient.invalidateQueries({ queryKey: ['calendar-feeds'] })
     },
   })
-  const day = formatDay
 
   return (
     <section aria-labelledby={id} className="space-y-3">
@@ -59,7 +58,7 @@ export function CalendarFeeds() {
                 <p className="text-sm text-slate-600 dark:text-slate-400">
                   {[
                     f.includeLiving ? t('calendar.withLiving') : t('calendar.deceasedOnly'),
-                    f.lastUsedAt ? t('sharing.lastUsed', { date: day(f.lastUsedAt) }) : t('sharing.neverUsed'),
+                    f.lastUsedAt ? t('sharing.lastUsed', { date: formatDay(f.lastUsedAt) }) : t('sharing.neverUsed'),
                   ].join(' · ')}
                 </p>
               </div>

@@ -228,6 +228,91 @@ func TestExportMedia(t *testing.T) {
 	}
 }
 
+// deadPerson creates a deceased person born in 1850.
+func deadPerson(t *testing.T, s *Store, a Actor, given string) Person {
+	t.Helper()
+	p := mustPerson(t, s, a, given, "Weber")
+	for _, in := range []EventInput{{Type: "BIRT", Date: "1850"}, {Type: "DEAT", Date: "1910"}} {
+		in.PersonID = &p.ID
+		if _, err := s.CreateEvent(ctx, a, in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return p
+}
+
+func TestExportExcludeLivingHidesFamilyEvents(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	old := deadPerson(t, s, a, "Old")
+	rel, err := s.AddRelative(ctx, a, old.ID, RelativeInput{Relation: RelationPartner, Person: &PersonInput{GivenNames: "Young", Surname: "Weber"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &rel.Person.ID, Type: "BIRT", Date: "1990"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{FamilyID: &rel.Family.ID, Type: "MARR", Date: "1 JAN 2015", Description: "Secret Town"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if all := exportText(t, s, a, ExportOptions{Privacy: PrivacyAll}); !strings.Contains(all, "Secret Town") {
+		t.Fatalf("full export must contain the marriage:\n%s", all)
+	}
+	for _, mode := range []string{PrivacyExcludeLiving, PrivacyLivingNameOnly} {
+		out := exportText(t, s, a, ExportOptions{Privacy: mode})
+		if strings.Contains(out, "MARR") || strings.Contains(out, "Secret Town") || strings.Contains(out, "2015") {
+			t.Errorf("%s: family event of a living partner leaked:\n%s", mode, out)
+		}
+	}
+}
+
+func TestExportExcludeLivingSkipsMedia(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	old := deadPerson(t, s, a, "Old")
+	rel, err := s.AddRelative(ctx, a, old.ID, RelativeInput{Relation: RelationChild, Person: &PersonInput{GivenNames: "Young", Surname: "Weber"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &rel.Person.ID, Type: "BIRT", Date: "1990"}); err != nil {
+		t.Fatal(err)
+	}
+	kept, _, err := s.CreateMedia(ctx, a, newMedia(1), &MediaLinkInput{EntityType: "person", EntityID: old.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, _, err := s.CreateMedia(ctx, a, newMedia(2), &MediaLinkInput{EntityType: "person", EntityID: rel.Person.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Linked to both: stays, an exported record references it.
+	shared, _, err := s.CreateMedia(ctx, a, newMedia(3), &MediaLinkInput{EntityType: "person", EntityID: old.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.LinkMedia(ctx, a, shared.ID, MediaLinkInput{EntityType: "person", EntityID: rel.Person.ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	ex, err := s.ExportGEDCOM(ctx, a, ExportOptions{Privacy: PrivacyExcludeLiving, WithMedia: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, m := range ex.Media {
+		got[m.SHA256] = true
+	}
+	if !got[kept.SHA256] || !got[shared.SHA256] || got[secret.SHA256] || len(ex.Media) != 2 {
+		t.Errorf("media files: %+v", ex.Media)
+	}
+	var buf bytes.Buffer
+	_ = gedcom.Write(&buf, ex.Records, gedcom.WriteOptions{})
+	if strings.Contains(buf.String(), secret.SHA256) || strings.Count(buf.String(), "@ OBJE") != 2 {
+		t.Errorf("media records leaked:\n%s", buf.String())
+	}
+}
+
 func TestVerifyExport(t *testing.T) {
 	s := newStore(t)
 	a := setup(t, s)

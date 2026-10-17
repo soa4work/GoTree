@@ -77,6 +77,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 - A data directory whose path contains `#` or `?` no longer opens the wrong database file (#19)
 
+- GEDCOM export without living people no longer includes photos and other media linked only to
+  them, nor the marriage and other events of a family with a living partner (#3)
+
 ### Changed
 
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so

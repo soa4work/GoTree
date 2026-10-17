@@ -133,6 +133,22 @@ func TestSPA(t *testing.T) {
 	}
 }
 
+func TestSPAContentSecurityPolicy(t *testing.T) {
+	ts := newServer(t, builtFrontend)
+	for _, path := range []string{"/", "/people/42", "/share/abc"} {
+		resp, _ := get(t, ts.URL+path)
+		csp := resp.Header.Get("Content-Security-Policy")
+		for _, want := range []string{"default-src 'self'", "script-src 'self'", "object-src 'none'", "frame-ancestors 'none'", "https://tile.openstreetmap.org"} {
+			if !strings.Contains(csp, want) {
+				t.Errorf("%s: CSP %q does not contain %q", path, csp, want)
+			}
+		}
+		if strings.Contains(csp, "unsafe-eval") || strings.Contains(csp, "script-src 'self' 'unsafe-inline'") {
+			t.Errorf("%s: CSP %q allows inline or eval scripts", path, csp)
+		}
+	}
+}
+
 func TestManifestContentType(t *testing.T) {
 	ts := newServer(t, builtFrontend)
 	resp, _ := get(t, ts.URL+"/manifest.webmanifest")

@@ -440,6 +440,10 @@ func julianToGregorian(y, m, d int) (int, int, int) {
 // keywords ("JULIAN 4 OCT 1582"), writes "BCE" and has neither INT nor
 // dual years. What 7.0 cannot express goes into phrase, to be written as a
 // DATE.PHRASE substructure; value may then be empty.
+//
+// A Date has one phrase, so two known limits apply: an INT date with a dual
+// year keeps only the INT explanation, and a range with dual years on both
+// ends keeps only the last end's.
 func (d Date) GEDCOM7() (value, phrase string) {
 	simple := func(sd *SimpleDate) string {
 		s := strings.Replace(sd.String(), "@#DJULIAN@ ", "JULIAN ", 1)

@@ -177,6 +177,11 @@ func TestExportGedcom7DatePhraseRoundTrip(t *testing.T) {
 		{"DEAT", "12 FEB 1750/51", "12 FEB 1750/51"},
 		{"BURI", "BET 1750/51 AND 1760", "BET 1750/51 AND 1760"},
 	}
+	for i, d := range dates[:3] {
+		if _, err := s.CreateHeirloom(ctx, a, HeirloomInput{Name: fmt.Sprintf("Heirloom %d", i), MadeDate: d.in}); err != nil {
+			t.Fatalf("heirloom %s: %v", d.in, err)
+		}
+	}
 	for _, d := range dates {
 		if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &p.ID, Type: d.typ, Date: d.in}); err != nil {
 			t.Fatalf("%s: %v", d.in, err)
@@ -196,6 +201,19 @@ func TestExportGedcom7DatePhraseRoundTrip(t *testing.T) {
 	for _, d := range dates {
 		if byType[d.typ].Raw != d.want {
 			t.Errorf("%s: %q came back as %q, want %q", d.typ, d.in, byType[d.typ].Raw, d.want)
+		}
+	}
+	made := map[string]string{}
+	list, err := s2.ListHeirlooms(ctx, a2, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range list {
+		made[h.Name] = h.MadeDate
+	}
+	for i, d := range dates[:3] {
+		if got := made[fmt.Sprintf("Heirloom %d", i)]; got != d.want {
+			t.Errorf("heirloom %q came back as %q, want %q", d.in, got, d.want)
 		}
 	}
 	if !byType["DEAT"].Valid || byType["BAPM"].Qualifier != "INT" {

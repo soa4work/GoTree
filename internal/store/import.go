@@ -815,9 +815,19 @@ func (im *importer) event(ctx context.Context, owner string, e *gedcom.Node, per
 	for _, c := range e.Children {
 		switch c.Tag {
 		case "DATE":
-			dateRaw = eventDateText(c)
+			var used bool
+			dateRaw, used = eventDateText(c)
 			im.mapped(path + ".DATE")
-			im.mapped(path + ".DATE.PHRASE")
+			for _, ph := range c.Children {
+				if ph.Tag != "PHRASE" {
+					continue
+				}
+				if used {
+					im.mapped(path + ".DATE.PHRASE")
+				} else {
+					im.keep(path+".DATE", ph, &kept)
+				}
+			}
 		case "PLAC":
 			id, err := im.place(ctx, c, path, &kept)
 			if err != nil {
@@ -1080,36 +1090,26 @@ func (im *importer) family(ctx context.Context, r *gedcom.Node) error {
 	return nil
 }
 
-// dateText is a DATE line as GoTree stores it: the value, or the phrase
-// a GEDCOM 7 date carries instead.
-func dateText(n *gedcom.Node) string {
-	if v := strings.TrimSpace(n.Value); v != "" {
-		return canonicalDate(v)
-	}
-	if ph := n.Text("PHRASE"); ph != "" {
-		return "(" + ph + ")"
-	}
-	return ""
-}
-
 // eventDateText reads a DATE line together with the DATE.PHRASE that
 // GoTree's 7.0 export writes beside it: the text of a date that is not a
 // date, the explanation of an INT date, or the second year of a dual date.
-func eventDateText(n *gedcom.Node) string {
+// usedPhrase says whether the phrase went into the text; when it did not,
+// the caller has to keep it elsewhere.
+func eventDateText(n *gedcom.Node) (text string, usedPhrase bool) {
 	phrase := strings.TrimSpace(n.Text("PHRASE"))
 	value := strings.TrimSpace(n.Value)
 	if value == "" {
 		if phrase == "" {
-			return ""
+			return "", false
 		}
-		return "(" + phrase + ")"
+		return "(" + phrase + ")", true
 	}
 	if phrase == "" {
-		return n.Value
+		return value, false
 	}
 	d, err := gendate.Parse(value)
 	if err != nil || d.Qualifier == gendate.QualifierPhrase || d.Qualifier == gendate.QualifierInterpreted {
-		return n.Value
+		return value, false
 	}
 	// The phrase of a dual date is the date as 5.5.1 writes it ("12 FEB 1750/51").
 	if p, err := gendate.Parse(phrase); err == nil && p.Qualifier == gendate.QualifierNone && p.Start.DualYear != 0 {
@@ -1117,15 +1117,15 @@ func eventDateText(n *gedcom.Node) string {
 			if sd != nil && sd.DualYear == 0 && sd.Calendar == p.Start.Calendar && sd.Year == p.Start.Year &&
 				sd.Month == p.Start.Month && sd.Day == p.Start.Day && sd.BC == p.Start.BC {
 				sd.DualYear = p.Start.DualYear
-				return d.String()
+				return d.String(), true
 			}
 		}
 	}
 	if d.Qualifier != gendate.QualifierNone {
-		return n.Value
+		return value, false
 	}
 	d.Qualifier, d.Phrase = gendate.QualifierInterpreted, phrase
-	return d.String()
+	return d.String(), true
 }
 
 // heirloom reads a GoTree _HEIRLOOM record (docs/gedcom-extensions.md).
@@ -1146,7 +1146,8 @@ func (im *importer) heirloom(ctx context.Context, r *gedcom.Node) error {
 		case "_DESC":
 			in.Description = c.Value
 		case "DATE":
-			in.MadeDate = dateText(c)
+			text, _ := eventDateText(c)
+			in.MadeDate = canonicalDate(text)
 		case "PLAC":
 			// Heirlooms have nowhere to keep unknown lines; place
 			// substructures GoTree does not read are lost here.

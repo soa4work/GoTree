@@ -7,6 +7,7 @@ import { mockApi, renderApp } from '../test/render'
 const stats: Stats = {
   persons: 6,
   families: 2,
+  sources: 1,
   withLifespan: 2,
   lifespans: [{ decade: 1850, count: 2, average: 74.5, min: 69, max: 80 }],
   marriages: [{ decade: 1850, firstMen: { count: 1, average: 26 }, firstWomen: { count: 2, average: 24.5 }, later: { count: 0, average: 0 } }],

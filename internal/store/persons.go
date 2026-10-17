@@ -85,10 +85,33 @@ type PersonInput struct {
 	IsLiving       *bool                `json:"isLiving"`
 	Notes          string               `json:"notes"`
 	AlternateNames []AlternateNameInput `json:"alternateNames"`
+	// Birth and Death record a BIRT or DEAT event together with a new
+	// person. Only creating a person reads them; UpdatePerson ignores them
+	// because existing events are edited as events.
+	Birth *LifeEventInput `json:"birth,omitempty"`
+	Death *LifeEventInput `json:"death,omitempty"`
 	// AddCitations cites sources for the person as a whole.
 	AddCitations []NewCitation `json:"addCitations,omitempty"`
 	// RemoveCitations detaches citations from the person.
 	RemoveCitations []int64 `json:"removeCitations,omitempty"`
+}
+
+// LifeEventInput is the date and place of a birth or death entered with a new
+// person. When both are empty no event is created.
+type LifeEventInput struct {
+	Date    string `json:"date"`
+	PlaceID *int64 `json:"placeId"`
+}
+
+func (l *LifeEventInput) dateOrEmpty() string {
+	if l == nil {
+		return ""
+	}
+	return l.Date
+}
+
+func (l *LifeEventInput) empty() bool {
+	return l == nil || (strings.TrimSpace(l.Date) == "" && l.PlaceID == nil)
 }
 
 // PersonDetail is everything the person page shows.
@@ -159,6 +182,16 @@ func (in PersonInput) validate() error {
 	return v.err()
 }
 
+// validateLife checks the birth and death entered with a new person. Dates
+// are kept as typed like event dates, so only their length is limited.
+func (in PersonInput) validateLife() error {
+	var v validator
+	v.check(utf8.RuneCountInString(collapse(in.Birth.dateOrEmpty())) <= 120, "birth.date", "is too long")
+	v.check(utf8.RuneCountInString(collapse(in.Death.dateOrEmpty())) <= 120, "death.date", "is too long")
+	v.check(in.Death.empty() || in.IsLiving == nil || !*in.IsLiving, "death", "a living person has no death")
+	return v.err()
+}
+
 // CreatePerson adds a person.
 func (s *Store) CreatePerson(ctx context.Context, a Actor, in PersonInput) (Person, error) {
 	var p Person
@@ -172,6 +205,9 @@ func (s *Store) CreatePerson(ctx context.Context, a Actor, in PersonInput) (Pers
 func (s *Store) createPerson(ctx context.Context, tx *sql.Tx, a Actor, in PersonInput) (Person, error) {
 	in.normalize()
 	if err := in.validate(); err != nil {
+		return Person{}, err
+	}
+	if err := in.validateLife(); err != nil {
 		return Person{}, err
 	}
 	var p Person
@@ -199,9 +235,39 @@ func (s *Store) createPerson(ctx context.Context, tx *sql.Tx, a Actor, in Person
 		if p, err = s.getPerson(ctx, tx, a, id); err != nil {
 			return err
 		}
-		return s.logChange(ctx, tx, a, "person", id, "create", nil, p)
+		if err := s.logChange(ctx, tx, a, "person", id, "create", nil, p); err != nil {
+			return err
+		}
+		for _, ev := range []struct {
+			typ, field string
+			in         *LifeEventInput
+		}{{"BIRT", "birth", in.Birth}, {"DEAT", "death", in.Death}} {
+			if ev.in.empty() {
+				continue
+			}
+			if _, err := s.createEvent(ctx, tx, a, EventInput{PersonID: &id, Type: ev.typ, Date: ev.in.Date, PlaceID: ev.in.PlaceID}); err != nil {
+				return prefixFields(err, ev.field)
+			}
+		}
+		// Re-read: a death or an old birth changes whether the person is living.
+		p, err = s.getPerson(ctx, tx, a, id)
+		return err
 	}()
 	return p, err
+}
+
+// prefixFields names the form section an event error came from, so
+// "placeId" becomes "birth.placeId".
+func prefixFields(err error, prefix string) error {
+	var ve *ValidationError
+	if !errors.As(err, &ve) {
+		return err
+	}
+	fields := make(map[string]string, len(ve.Fields))
+	for k, v := range ve.Fields {
+		fields[prefix+"."+k] = v
+	}
+	return &ValidationError{Fields: fields}
 }
 
 // UpdatePerson replaces a person's own fields and alternate names.

@@ -51,6 +51,9 @@ function ImportSection() {
   const [confirmReplace, setConfirmReplace] = useState(false)
   const people = useQuery({ queryKey: ['persons', 'count'], queryFn: ({ signal }) => listPersons('', 1, 0, signal) })
   const hasData = (people.data?.total ?? 0) > 0
+  const auth = useQuery({ queryKey: ['auth'], queryFn: ({ signal }) => getAuthState(signal), staleTime: Infinity })
+  // Replacing wipes the tree: only its owner may do it.
+  const replaceBlocked = hasData && auth.data?.tree?.role !== 'owner'
 
   const run = useMutation({
     mutationFn: (mode: 'empty' | 'replace') => importGedcom(file!, mode),
@@ -89,8 +92,9 @@ function ImportSection() {
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{t('transfer.fileHint')}</p>
       </div>
       {hasData && <p className="font-medium text-amber-800 dark:text-amber-300">{t('transfer.replaceWarning')}</p>}
+      {replaceBlocked && <p className="text-slate-700 dark:text-slate-300">{t('transfer.ownerOnly')}</p>}
       <Button
-        disabled={!file}
+        disabled={!file || replaceBlocked}
         busy={run.isPending && !confirmReplace}
         onClick={() => (hasData ? setConfirmReplace(true) : run.mutate('empty'))}
       >

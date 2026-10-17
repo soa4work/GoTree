@@ -79,7 +79,20 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A GEDCOM file inside a zip that unpacks to more than four times the upload limit is refused
+  (413) instead of being silently cut off and, with "Replace the tree", imported truncated after
+  wiping the tree, and a small zip can no longer use up to 1 GB of memory; replacing the tree by
+  import is now limited to its owner, and the Import page tells editors so instead of offering it (#6)
+
+- Importing a GEDCOM 7 file no longer loses the date text that GoTree's own 7.0 export keeps in
+  DATE.PHRASE: dates that are not dates, the explanation of "INT" dates and the second year of
+  dual dates such as 1750/51 come back as they were (#4)
+
 - A data directory whose path contains `#` or `?` no longer opens the wrong database file (#19)
+
+- GEDCOM export that excludes living people or reduces them to their name no longer includes the
+  marriage and other events of a family with a living partner, nor the photos and other media
+  (portraits and face tags included) that belong only to those living people (#3)
 
 - The server closes idle keep-alive connections and drops uploads and imports that trickle in
   too slowly (answered with a timeout message); on shutdown running requests get 30 seconds to
@@ -95,6 +108,18 @@ and the versioning [Semantic Versioning](https://semver.org/).
   scripts from its own files (#2)
 
 ### Changed
+
+- Home page: an empty tree now offers "Add yourself" and "Import from Ancestry, MyHeritage and
+  others" (also on the empty Tree and People pages); a filled tree shows how many people,
+  families and sources it holds, and "On this day" appears only when it has entries; the "More"
+  block is gone and the server version is shown to administrators only (#9)
+
+- The new-person and add-relative forms take an optional birth and death date and place, so
+  "born 1850" no longer needs a second dialog; the events are saved together with the person (#8)
+
+- Closing a form with Escape, the × button or Cancel after typing in it now asks "Discard changes?"
+  instead of throwing the input away; forms you have not changed still close at once, and saving
+  never asks (#10)
 
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so
   nothing being typed or uploaded is lost (#15)

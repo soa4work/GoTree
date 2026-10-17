@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { Family, LifeEvent, PersonDetail, PersonRef } from '../api/types'
@@ -192,6 +192,39 @@ describe('person page', () => {
     })
   })
 
+  it('sends birth and death from the new-person form, death only when not living', async () => {
+    const bodies: unknown[] = []
+    mockApi({
+      'GET /api/persons': [200, { items: [], total: 0 }],
+      'GET /api/dates/parse': [200, { valid: true, empty: false, normalized: '12 MAR 1890', qualifier: '' }],
+      'POST /api/persons': (body) => {
+        bodies.push(body)
+        return [201, { ...paul, id: 9 }]
+      },
+      'GET /api/persons/9': [200, { ...paul, id: 9 }],
+    })
+    const user = userEvent.setup()
+    renderApp('/people')
+    await screen.findByText(/No one is in your tree yet/)
+    await user.keyboard('n')
+    const dialog = await screen.findByRole('dialog', { name: 'New person' })
+
+    const birth = within(within(dialog).getByRole('group', { name: 'Birth (optional)' }))
+    const death = () => within(dialog).queryByRole('group', { name: 'Death (optional)' })
+    expect(death()).toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText('Given names'), 'Paul')
+    await user.type(birth.getByLabelText('Date'), '12.3.1890')
+    expect(await birth.findByText('Stored as 12 MAR 1890')).toBeInTheDocument()
+
+    // Living people have no death fields.
+    await user.selectOptions(within(dialog).getByLabelText('Living or deceased'), 'Living')
+    expect(death()).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: /^Save/ }))
+    await waitFor(() => expect(bodies).toHaveLength(1))
+    expect(bodies[0]).toMatchObject({ givenNames: 'Paul', birth: { date: '12.3.1890', placeId: null } })
+    expect(bodies[0]).not.toHaveProperty('death')
+  })
+
   it('shows server field errors in the event dialog and previews dates', async () => {
     mockApi({
       'GET /api/persons/1': [200, paul],
@@ -218,5 +251,73 @@ describe('person page', () => {
     mockApi({})
     renderApp('/people/99')
     expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument()
+  })
+})
+
+describe('discarding changes', () => {
+  const openNewPerson = async () => {
+    mockApi({
+      'GET /api/persons': [200, { items: [], total: 0 }],
+      'POST /api/persons': [201, paul],
+      'GET /api/persons/1': [200, paul],
+    })
+    const user = userEvent.setup()
+    renderApp('/people')
+    await screen.findByText(/No one is in your tree yet/)
+    await user.keyboard('n')
+    const dialog = await screen.findByRole('dialog', { name: 'New person' })
+    return { user, dialog }
+  }
+  // jsdom has no Escape-to-cancel, so fire the event the browser would.
+  const pressEscape = (dialog: HTMLElement) => fireEvent(dialog, new Event('cancel', { cancelable: true }))
+  const discardDialog = () => screen.queryByRole('dialog', { name: 'Discard changes?' })
+
+  it('closes a clean form immediately', async () => {
+    const { user, dialog } = await openNewPerson()
+    pressEscape(dialog)
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New person' })).not.toBeInTheDocument())
+    expect(discardDialog()).not.toBeInTheDocument()
+
+    await user.keyboard('n')
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog', { name: 'New person' })).not.toBeInTheDocument()
+  })
+
+  it('asks before an Escape closes a modified form, and keeps it on cancel', async () => {
+    const { user, dialog } = await openNewPerson()
+    await user.type(screen.getByLabelText('Given names'), 'Anna')
+    pressEscape(dialog)
+
+    const confirm = await screen.findByRole('dialog', { name: 'Discard changes?' })
+    // The question replaces the form's content; the form keeps its input.
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.getByLabelText('Given names')).toHaveValue('Anna')
+    // Escape on the question goes back to the form.
+    pressEscape(confirm)
+    await waitFor(() => expect(discardDialog()).not.toBeInTheDocument())
+    expect(screen.getByRole('dialog', { name: 'New person' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Given names')).toHaveValue('Anna')
+  })
+
+  it('discards the input after confirming, from Cancel and from the close button', async () => {
+    const { user } = await openNewPerson()
+    await user.type(screen.getByLabelText('Given names'), 'Anna')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Discard changes?' })).getByRole('button', { name: 'Discard' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New person' })).not.toBeInTheDocument())
+    expect(discardDialog()).not.toBeInTheDocument()
+
+    await user.keyboard('n')
+    await user.type(await screen.findByLabelText('Given names'), 'Anna')
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(await screen.findByRole('dialog', { name: 'Discard changes?' })).toBeInTheDocument()
+  })
+
+  it('does not ask after a successful save', async () => {
+    const { user } = await openNewPerson()
+    await user.type(screen.getByLabelText('Given names'), 'Anna')
+    await user.click(screen.getByRole('button', { name: /^Save/ }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New person' })).not.toBeInTheDocument())
+    expect(discardDialog()).not.toBeInTheDocument()
   })
 })

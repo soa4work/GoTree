@@ -38,11 +38,15 @@ func TestStats(t *testing.T) {
 		}
 	}
 
+	if _, err := s.CreateSource(ctx, a, SourceInput{Title: "Parish register"}); err != nil {
+		t.Fatal(err)
+	}
+
 	st, err := s.Stats(ctx, a)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.Persons != 6 || st.WithLifespan != 2 || len(st.Lifespans) != 1 {
+	if st.Persons != 6 || st.Sources != 1 || st.WithLifespan != 2 || len(st.Lifespans) != 1 {
 		t.Fatalf("stats: %+v", st)
 	}
 	if l := st.Lifespans[0]; l.Decade != 1850 || l.Min != 69 || l.Max != 80 || l.Average != 74.5 {

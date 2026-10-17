@@ -6,7 +6,7 @@ import type { Person, PersonInput } from '../api/types'
 import { Dialog } from '../components/Dialog'
 import { Form } from '../components/Form'
 import { formErrors } from '../lib/errors'
-import { emptyPerson } from '../lib/people'
+import { emptyLife, emptyPerson, lifeInput } from '../lib/people'
 import { CitationEditor, type PendingCitation } from '../sources/CitationEditor'
 import { PersonFields } from './PersonFields'
 
@@ -54,12 +54,14 @@ function PersonDialogForm({ person, onClose, onSaved }: Omit<Props, 'open'>) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [value, setValue] = useState<PersonInput>(person ? toInput(person) : emptyPerson())
+  const [life, setLife] = useState(emptyLife)
   const [addCitations, setAddCitations] = useState<PendingCitation[]>([])
   const [removeCitations, setRemoveCitations] = useState<number[]>([])
   const save = useMutation({
     mutationFn: () => {
       const input: PersonInput = {
         ...value,
+        ...(person ? {} : lifeInput(life, value.isLiving)),
         addCitations: addCitations.map(({ sourceId, page, quality, text }) => ({ sourceId, page, quality, text })),
         removeCitations,
       }
@@ -76,7 +78,7 @@ function PersonDialogForm({ person, onClose, onSaved }: Omit<Props, 'open'>) {
 
   return (
     <Form onSubmit={() => save.mutate()} onCancel={onClose} submitLabel={t('common.save')} busy={save.isPending} error={errors.form}>
-      <PersonFields value={value} onChange={setValue} errors={errors.fields} full />
+      <PersonFields value={value} onChange={setValue} errors={errors.fields} full life={person ? undefined : { value: life, onChange: setLife }} />
       <CitationEditor
         existing={person?.citations ?? []}
         removed={removeCitations}

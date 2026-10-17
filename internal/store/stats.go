@@ -48,6 +48,7 @@ type DecadeNames struct {
 type Stats struct {
 	Persons  int `json:"persons"`
 	Families int `json:"families"`
+	Sources  int `json:"sources"`
 	// Deceased with a known age at death.
 	WithLifespan int              `json:"withLifespan"`
 	Lifespans    []DecadeLifespan `json:"lifespans"`
@@ -89,6 +90,9 @@ func decadeOf(key int) int { return key / 10000 / 10 * 10 }
 func (s *Store) Stats(ctx context.Context, a Actor) (Stats, error) {
 	st := Stats{Lifespans: []DecadeLifespan{}, Marriages: []DecadeMarriage{}, Surnames: []NameCount{}, GivenNames: []NameCount{},
 		GivenNameTrends: []DecadeNames{}, ChildrenHistogram: make([]int, childrenBuckets)}
+	if err := s.DB.QueryRowContext(ctx, `SELECT count(*) FROM sources WHERE tree_id = ?`, a.TreeID).Scan(&st.Sources); err != nil {
+		return st, err
+	}
 	type person struct {
 		given, surname, sex string
 		birth, death        int

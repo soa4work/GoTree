@@ -30,11 +30,23 @@
   "dashboard": {
     "title": "Welcome to GoTree",
     "intro": "Your family tree lives on this server, in a single file you control.",
+    "summary": "Your tree",
+    "people": "People",
+    "families": "Families",
+    "sources": "Sources",
+    "also": "Also",
+    "statsFailed": "The tree summary could not be loaded.",
     "serverStatus": "Server status",
     "checking": "Checking the server…",
     "online": "Server online · version {{version}}",
-    "offline": "The server cannot be reached.",
-    "more": "More"
+    "offline": "The server cannot be reached."
+  },
+  "onboarding": {
+    "title": "No one is in your tree yet",
+    "viewerText": "Ask the owner of this tree to add people.",
+    "text": "Start with yourself or the oldest ancestor you know, or bring in a tree you already have.",
+    "addYourself": "Add yourself",
+    "import": "Import from Ancestry, MyHeritage and others"
   },
   "notFound": {
     "title": "Page not found",
@@ -62,6 +74,10 @@
   "common": {
     "close": "Close",
     "cancel": "Cancel",
+    "discard": "Discard",
+    "keepEditing": "Keep editing",
+    "discardTitle": "Discard changes?",
+    "discardMessage": "You have unsaved changes. If you close this form, they will be lost.",
     "save": "Save",
     "delete": "Delete",
     "edit": "Edit",
@@ -97,10 +113,11 @@
     "count_other": "{{count}} people",
     "found_one": "{{count}} person found",
     "found_other": "{{count}} people found",
-    "empty": "No one is in your tree yet. Start with yourself or the oldest ancestor you know.",
     "more": "Show more"
   },
   "person": {
+    "birth": "Birth (optional)",
+    "death": "Death (optional)",
     "new": "New person",
     "edit": "Edit person",
     "delete": "Delete person",
@@ -444,6 +461,7 @@
     "importButton": "Import",
     "replaceButton": "Replace the tree",
     "replaceWarning": "Your tree already has data. Importing replaces its people, families, events, places and sources. Photos stay in the media list.",
+    "ownerOnly": "Only the owner of the tree can replace it. Ask the owner to import this file.",
     "replaceTitle": "Replace the tree?",
     "replaceConfirm_one": "This deletes the {{count}} person in your tree with everything about them and imports the file instead. Consider exporting first.",
     "replaceConfirm_other": "This deletes the {{count}} people in your tree with everything about them and imports the file instead. Consider exporting first.",

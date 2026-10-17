@@ -9,7 +9,7 @@ import { Form } from '../components/Form'
 import { formErrors } from '../lib/errors'
 import { SourcePicker } from '../sources/SourcePicker'
 import { TextField } from '../components/TextField'
-import { emptyPerson, fullName } from '../lib/people'
+import { emptyLife, emptyPerson, fullName, lifeInput } from '../lib/people'
 import { parentsLabel, partnerLabel } from './familyLabel'
 import { PersonFields } from './PersonFields'
 import { PersonPicker } from './PersonPicker'
@@ -46,6 +46,7 @@ function RelativeForm({ anchor, relation, onClose, onSaved }: Omit<Props, 'open'
     // Children and siblings usually share the surname; a guess that saves typing.
     surname: relation === 'child' || relation === 'sibling' ? anchor.surname : '',
   }))
+  const [life, setLife] = useState(emptyLife)
   const [existing, setExisting] = useState<PersonRef | null>(null)
   const [familyId, setFamilyId] = useState<number | null>(families[0]?.id ?? null)
   const [unionType, setUnionType] = useState<UnionType>('married')
@@ -57,7 +58,7 @@ function RelativeForm({ anchor, relation, onClose, onSaved }: Omit<Props, 'open'
     mutationFn: () =>
       addRelative(anchor.id, {
         relation,
-        ...(mode === 'new' ? { person } : existing ? { personId: existing.id } : {}),
+        ...(mode === 'new' ? { person: { ...person, ...lifeInput(life, person.isLiving) } } : existing ? { personId: existing.id } : {}),
         ...(familyId !== null && families.length > 0 ? { familyId } : {}),
         ...(relation === 'partner' ? { unionType } : {}),
         ...(relation === 'child' || relation === 'parent' ? { childRelation } : {}),
@@ -88,7 +89,7 @@ function RelativeForm({ anchor, relation, onClose, onSaved }: Omit<Props, 'open'
       </fieldset>
 
       {mode === 'new' ? (
-        <PersonFields value={person} onChange={setPerson} errors={errors.fields} />
+        <PersonFields value={person} onChange={setPerson} errors={errors.fields} life={{ value: life, onChange: setLife }} />
       ) : (
         <PersonPicker label={t('relative.pick')} value={existing} onChange={setExisting} exclude={[anchor.id]} error={personError} />
       )}

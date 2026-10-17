@@ -77,6 +77,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 - A data directory whose path contains `#` or `?` no longer opens the wrong database file (#19)
 
+- GEDCOM export that excludes living people or reduces them to their name no longer includes the
+  marriage and other events of a family with a living partner, nor the photos and other media
+  (portraits and face tags included) that belong only to those living people (#3)
+
 - The server closes idle keep-alive connections and drops uploads and imports that trickle in
   too slowly (answered with a timeout message); on shutdown running requests get 30 seconds to
   finish, then they are cancelled and given a few more seconds before the database is closed, and

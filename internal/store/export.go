@@ -111,6 +111,8 @@ type exporter struct {
 	cites    map[string][]exportCitation // "entity:id" → citations
 	parts    map[int64][]participantRow  // event id → participants
 	media    map[string][]int64          // "entity:id" → media ids
+	linked   map[int64]bool              // media with at least one link
+	used     map[int64]bool              // media referenced by an exported record
 	xrefMap  map[string]string           // original GEDCOM xref → exported xref
 	dangling int
 }
@@ -137,7 +139,8 @@ func (s *Store) ExportGEDCOM(ctx context.Context, a Actor, opt ExportOptions) (E
 		s: s, a: a, opt: opt, now: s.Now(), out: Export{Counts: map[string]int{}},
 		included: map[int64]bool{}, nameOnly: map[int64]bool{}, names: map[int64][]exportName{},
 		places: map[int64]placeInfo{}, cites: map[string][]exportCitation{}, parts: map[int64][]participantRow{},
-		media: map[string][]int64{}, xrefMap: map[string]string{},
+		media: map[string][]int64{}, linked: map[int64]bool{}, used: map[int64]bool{},
+		xrefMap: map[string]string{},
 	}
 	if err := ex.load(ctx); err != nil {
 		return Export{}, err
@@ -325,6 +328,31 @@ func (ex *exporter) load(ctx context.Context) error {
 			}
 			key := fmt.Sprintf("%s:%d", typ, eid)
 			ex.media[key] = append(ex.media[key], mid)
+			ex.linked[mid] = true
+		}
+		rows.Close()
+
+		// Portraits and face tags tie media to a person without a link, and
+		// survive when the photo is removed from the person's gallery.
+		rows, err = db.QueryContext(ctx, `
+			SELECT p.portrait_media_id, p.id FROM persons p JOIN media m ON m.id = p.portrait_media_id
+			WHERE p.tree_id = ? AND m.tree_id = ?
+			UNION
+			SELECT r.media_id, r.person_id FROM media_regions r JOIN media m ON m.id = r.media_id
+			WHERE m.tree_id = ? AND r.person_id IS NOT NULL`, a.TreeID, a.TreeID, a.TreeID)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var mid, pid int64
+			if err := rows.Scan(&mid, &pid); err != nil {
+				rows.Close()
+				return err
+			}
+			ex.linked[mid] = true
+			if ex.included[pid] && !ex.nameOnly[pid] {
+				ex.used[mid] = true
+			}
 		}
 		rows.Close()
 	}
@@ -694,6 +722,7 @@ func (ex *exporter) citations(n *gedcom.Node, entity string, id int64) {
 
 func (ex *exporter) mediaRefs(n *gedcom.Node, entity string, id int64) {
 	for _, m := range ex.media[fmt.Sprintf("%s:%d", entity, id)] {
+		ex.used[m] = true
 		n.Children = append(n.Children, pointer("OBJE", fmt.Sprintf("O%d", m)))
 	}
 }
@@ -775,7 +804,14 @@ func (ex *exporter) familyRecord(f exportFamily, events []exportEvent) *gedcom.N
 		// Everyone in it was left out for privacy.
 		return nil
 	}
-	hidden := (f.p1.Valid && ex.nameOnly[f.p1.Int64]) || (f.p2.Valid && ex.nameOnly[f.p2.Int64])
+	// Same rule as the share view: a partner who is left out or reduced to a
+	// name takes the family's events, notes, citations and media with them.
+	hidden := false
+	for _, p := range []sql.NullInt64{f.p1, f.p2} {
+		if p.Valid && (!ex.included[p.Int64] || ex.nameOnly[p.Int64]) {
+			hidden = true
+		}
+	}
 	if !hidden {
 		for _, e := range events {
 			r.Children = append(r.Children, ex.eventNode(e))
@@ -866,6 +902,11 @@ func (ex *exporter) mediaRecords(ctx context.Context) ([]*gedcom.Node, error) {
 		var sha, mime, kind, title string
 		if err := rows.Scan(&id, &sha, &mime, &kind, &title); err != nil {
 			return nil, err
+		}
+		// Media linked only to records that were left out for privacy stay out,
+		// together with their files.
+		if ex.linked[id] && !ex.used[id] {
+			continue
 		}
 		path := "media/" + sha + mediaExt[mime]
 		file := node("FILE", path)

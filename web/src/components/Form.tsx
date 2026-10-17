@@ -23,16 +23,21 @@ export function Form({ onSubmit, onCancel, submitLabel, busy, error, children, s
     onSubmit()
   }
   const ref = useRef<HTMLFormElement>(null)
+  // Inside a Dialog, Cancel goes through its unsaved-changes guard; onCancel is the fallback outside one.
   const guard = useDialogGuard()
   const initial = useRef<string | null>(null)
   // Dirty = the fields differ from how they were when the form mounted. Read
-  // from the DOM so every dialog gets it without wiring its own state in.
+  // from the DOM so every dialog gets it without wiring its own state in; state
+  // that is not rendered as a form field is not tracked.
+  useEffect(() => {
+    if (ref.current) initial.current = fieldsSignature(ref.current)
+  }, [])
+  const register = guard?.register
   useEffect(() => {
     const form = ref.current
     if (!form) return
-    initial.current = fieldsSignature(form)
-    return guard?.register(() => initial.current !== null && fieldsSignature(form) !== initial.current)
-  }, [guard])
+    return register?.(() => initial.current !== null && fieldsSignature(form) !== initial.current)
+  }, [register])
   useEffect(() => {
     const form = ref.current
     if (!form) return
@@ -52,8 +57,7 @@ export function Form({ onSubmit, onCancel, submitLabel, busy, error, children, s
       <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
         <div>{secondary}</div>
         <div className="flex flex-col-reverse gap-2 sm:flex-row">
-          <Button type="button" variant="secondary" onClick={guard ? guard.requestClose : onCancel}>
-            {t('common.cancel')}
+          <Button type="button" variant="secondary" onClick={guard ? guard.requestClose : onCancel}>            {t('common.cancel')}
           </Button>
           <Button type="submit" busy={busy}>
             {submitLabel}

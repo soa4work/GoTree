@@ -8,6 +8,8 @@ interface Props {
   children: ReactNode
   /** Wide dialogs for forms with many fields. */
   wide?: boolean
+  /** Called after the browser closed the dialog by itself and it was opened again. */
+  onReopen?: () => void
 }
 
 /**
@@ -17,7 +19,7 @@ interface Props {
  * A modal built on the native <dialog>: the browser provides the focus trap,
  * Escape to close, an inert background and focus return to the trigger.
  */
-export function DialogShell({ open, onClose, title, children, wide }: Props) {
+export function DialogShell({ open, onClose, title, children, wide, onReopen }: Props) {
   const { t } = useTranslation()
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
@@ -41,6 +43,16 @@ export function DialogShell({ open, onClose, title, children, wide }: Props) {
       onCancel={(e) => {
         e.preventDefault()
         onClose()
+      }}
+      // Chrome does not let a second Escape without user interaction in between
+      // be cancelled, so the dialog closes natively; keep it open with its
+      // content while the open prop says it should be.
+      onClose={(e) => {
+        const el = e.currentTarget
+        if (open && !el.open) {
+          el.showModal()
+          onReopen?.()
+        }
       }}
       className={[
         'm-0 mt-auto max-h-[92dvh] w-full max-w-none rounded-t-2xl bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-950/50',

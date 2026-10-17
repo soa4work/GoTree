@@ -1,5 +1,8 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ConfirmDialog } from './ConfirmDialog'
+import { GuardContext } from './dialogGuard'
+import { DialogShell } from './DialogShell'
 
 interface Props {
   open: boolean
@@ -11,62 +14,43 @@ interface Props {
 }
 
 /**
- * A modal built on the native <dialog>: the browser provides the focus trap,
- * Escape to close, an inert background and focus return to the trigger.
+ * A modal for content and forms. Closing it by Escape, the × button or a
+ * form's Cancel asks "Discard changes?" while a Form inside has unsaved input;
+ * closing after a successful save calls onClose directly and never asks.
  */
 export function Dialog({ open, onClose, title, children, wide }: Props) {
   const { t } = useTranslation()
-  const ref = useRef<HTMLDialogElement>(null)
-  const titleId = useId()
+  const check = useRef<(() => boolean) | null>(null)
+  const [confirming, setConfirming] = useState(false)
 
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    if (open && !el.open) {
-      el.showModal()
-      // Forms start in their first field (WAI-ARIA dialog pattern); dialogs
-      // without fields keep the browser's choice, the first button.
-      el.querySelector<HTMLElement>('[data-dialog-body] :is(input, select, textarea):not([disabled])')?.focus()
+  const register = useCallback((isDirty: () => boolean) => {
+    check.current = isDirty
+    return () => {
+      if (check.current === isDirty) check.current = null
     }
-    if (!open && el.open) el.close()
-  }, [open])
+  }, [])
+  const requestClose = useCallback(() => {
+    if (check.current?.()) setConfirming(true)
+    else onClose()
+  }, [onClose])
+  const guard = useMemo(() => ({ register, requestClose }), [register, requestClose])
 
   return (
-    <dialog
-      ref={ref}
-      aria-labelledby={titleId}
-      onCancel={(e) => {
-        e.preventDefault()
-        onClose()
-      }}
-      className={[
-        'm-0 mt-auto max-h-[92dvh] w-full max-w-none rounded-t-2xl bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-950/50',
-        'sm:m-auto sm:rounded-2xl dark:bg-slate-900 dark:text-slate-100',
-        wide ? 'sm:max-w-2xl' : 'sm:max-w-lg',
-      ].join(' ')}
-    >
-      {open && (
-        <div className="flex max-h-[92dvh] flex-col">
-          <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-3 dark:border-slate-800">
-            <h2 id={titleId} className="text-lg font-semibold">
-              {title}
-            </h2>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex size-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <span aria-hidden="true" className="text-2xl leading-none">
-                ×
-              </span>
-              <span className="sr-only">{t('common.close')}</span>
-            </button>
-          </div>
-          <div data-dialog-body className="overflow-y-auto px-5 py-4">
-            {children}
-          </div>
-        </div>
-      )}
-    </dialog>
+    <>
+      <DialogShell open={open} onClose={requestClose} title={title} wide={wide}>
+        <GuardContext.Provider value={guard}>{children}</GuardContext.Provider>
+      </DialogShell>
+      <ConfirmDialog
+        open={open && confirming}
+        title={t('common.discardTitle')}
+        message={t('common.discardMessage')}
+        confirmLabel={t('common.discard')}
+        onConfirm={() => {
+          setConfirming(false)
+          onClose()
+        }}
+        onClose={() => setConfirming(false)}
+      />
+    </>
   )
 }

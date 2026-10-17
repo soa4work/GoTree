@@ -2,6 +2,7 @@ import { useEffect, useRef, type FormEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormError } from '../auth/FormError'
 import { Button } from './Button'
+import { useDialogGuard } from './dialogGuard'
 
 interface Props {
   onSubmit: () => void
@@ -22,6 +23,16 @@ export function Form({ onSubmit, onCancel, submitLabel, busy, error, children, s
     onSubmit()
   }
   const ref = useRef<HTMLFormElement>(null)
+  const guard = useDialogGuard()
+  const initial = useRef<string | null>(null)
+  // Dirty = the fields differ from how they were when the form mounted. Read
+  // from the DOM so every dialog gets it without wiring its own state in.
+  useEffect(() => {
+    const form = ref.current
+    if (!form) return
+    initial.current = fieldsSignature(form)
+    return guard?.register(() => initial.current !== null && fieldsSignature(form) !== initial.current)
+  }, [guard])
   useEffect(() => {
     const form = ref.current
     if (!form) return
@@ -41,7 +52,7 @@ export function Form({ onSubmit, onCancel, submitLabel, busy, error, children, s
       <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
         <div>{secondary}</div>
         <div className="flex flex-col-reverse gap-2 sm:flex-row">
-          <Button type="button" variant="secondary" onClick={onCancel}>
+          <Button type="button" variant="secondary" onClick={guard ? guard.requestClose : onCancel}>
             {t('common.cancel')}
           </Button>
           <Button type="submit" busy={busy}>
@@ -51,5 +62,20 @@ export function Form({ onSubmit, onCancel, submitLabel, busy, error, children, s
         </div>
       </div>
     </form>
+  )
+}
+
+/** The values of all fields, in order; adding or removing a field changes it too. */
+function fieldsSignature(form: HTMLFormElement): string {
+  return JSON.stringify(
+    Array.from(form.elements, (el) => {
+      if (el instanceof HTMLInputElement) {
+        if (el.type === 'checkbox' || el.type === 'radio') return el.checked
+        if (el.type === 'file') return el.files?.length ?? 0
+        return el.value
+      }
+      if (el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) return el.value
+      return null
+    }),
   )
 }

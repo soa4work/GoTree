@@ -97,6 +97,11 @@ func TestMediaUpload(t *testing.T) {
 	if status, body := c.upload("/api/media", "bomb.png", bomb); status != http.StatusUnprocessableEntity {
 		t.Errorf("huge image: status %d %s, want 422", status, body)
 	}
+	// A truncated JPEG whose header cannot be read is still accepted.
+	if status, body := c.upload("/api/media", "cut.jpg", jpegBytes(t, 300, 200)[:100]); status != http.StatusCreated {
+		t.Errorf("truncated jpeg: status %d %s, want 201", status, body)
+	}
+
 	// Nothing of it is kept: no stored file, no leftover upload, no record.
 	sum := sha256.Sum256(bomb)
 	if p, _ := srv.Files.Path(hex.EncodeToString(sum[:])); p != "" {

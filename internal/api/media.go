@@ -96,7 +96,14 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 	}
 	var check func(path string) error
 	if kind == media.KindImage {
-		check = media.CheckImageSize
+		// Only oversized images are refused; files whose header cannot be
+		// read are stored as before, they just get no dimensions or thumbnail.
+		check = func(path string) error {
+			if err := media.CheckImageSize(path); errors.Is(err, media.ErrImageTooLarge) {
+				return err
+			}
+			return nil
+		}
 	}
 	stored, err := s.Files.SaveChecked(buffered, s.MaxUpload, check)
 	if errors.Is(err, media.ErrImageTooLarge) {

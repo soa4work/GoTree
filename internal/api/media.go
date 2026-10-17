@@ -110,6 +110,10 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 		OriginalName: filepath.Base(part.FileName()), Orientation: 1,
 	}
 	if kind == media.KindImage {
+		if path, err := s.Files.Path(stored.SHA256); err == nil && errors.Is(media.CheckImageSize(path), media.ErrImageTooLarge) {
+			writeError(w, http.StatusUnprocessableEntity, fmt.Sprintf("the image is larger than %d megapixels", media.MaxImagePixels/1_000_000))
+			return
+		}
 		s.readImageMeta(&in)
 	}
 	m, created, err := s.Store.CreateMedia(r.Context(), actorFrom(r), in, link)
@@ -271,6 +275,10 @@ func (s *Server) mediaThumb(w http.ResponseWriter, r *http.Request) {
 	path, err := s.Files.Thumb(m.SHA256, size, m.Orientation, crop)
 	if err != nil {
 		s.Log.Warn("thumbnail", "id", id, "err", err)
+		if errors.Is(err, media.ErrImageTooLarge) {
+			writeError(w, http.StatusUnprocessableEntity, "the image is too large to render a thumbnail")
+			return
+		}
 		writeError(w, http.StatusUnprocessableEntity, "could not render a thumbnail")
 		return
 	}

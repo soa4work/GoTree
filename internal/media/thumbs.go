@@ -7,6 +7,7 @@ import (
 	"image/jpeg"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	// Decoders for the accepted image types.
 	_ "image/gif"
@@ -18,6 +19,36 @@ import (
 
 // ThumbSizes are the sizes thumbnails are rendered in (longest side).
 var ThumbSizes = []int{128, 256, 512, 1024}
+
+// MaxImagePixels is the largest image (width times height) that is decoded.
+// A decoded image takes four bytes per pixel and rotating it needs a second
+// copy, so a small file declaring huge dimensions could exhaust memory.
+const MaxImagePixels = 50_000_000
+
+// ErrImageTooLarge is returned for images with more than MaxImagePixels.
+var ErrImageTooLarge = errors.New("image has too many pixels")
+
+// thumbSlots bounds how many thumbnails are rendered at once, as each one
+// holds a fully decoded image in memory.
+var thumbSlots = make(chan struct{}, runtime.NumCPU())
+
+// CheckImageSize reads an image's dimensions from its header, without
+// decoding it, and returns ErrImageTooLarge above MaxImagePixels.
+func CheckImageSize(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	cfg, _, err := image.DecodeConfig(f)
+	if err != nil {
+		return fmt.Errorf("decode: %w", err)
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > MaxImagePixels/cfg.Height {
+		return ErrImageTooLarge
+	}
+	return nil
+}
 
 // Crop selects part of the displayed image, relative 0-1.
 type Crop struct {
@@ -43,6 +74,17 @@ func (f Files) Thumb(sha string, size, orientation int, crop *Crop) (string, err
 	dst := filepath.Join(f.Root, "thumbs", sha[:2], name+".jpg")
 	if _, err := os.Stat(dst); err == nil {
 		return dst, nil
+	}
+
+	// Wait for a free slot, then look again: another request may have
+	// rendered this thumbnail meanwhile.
+	thumbSlots <- struct{}{}
+	defer func() { <-thumbSlots }()
+	if _, err := os.Stat(dst); err == nil {
+		return dst, nil
+	}
+	if err := CheckImageSize(src); err != nil {
+		return "", err
 	}
 
 	in, err := os.Open(src)

@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/jpeg"
 	"image/png"
 	"math"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -241,6 +243,56 @@ func TestThumb(t *testing.T) {
 	}
 	if _, err := f.Thumb(stored.SHA256, 99, 1, nil); err == nil {
 		t.Error("odd sizes must be refused")
+	}
+}
+
+// hugePNG returns a valid PNG header and no pixel data, declaring w x h.
+func hugePNG(w, h uint32) []byte {
+	chunk := func(typ string, data []byte) []byte {
+		var b bytes.Buffer
+		_ = binary.Write(&b, binary.BigEndian, uint32(len(data)))
+		b.WriteString(typ)
+		b.Write(data)
+		_ = binary.Write(&b, binary.BigEndian, crc32.ChecksumIEEE(append([]byte(typ), data...)))
+		return b.Bytes()
+	}
+	ihdr := make([]byte, 13)
+	binary.BigEndian.PutUint32(ihdr, w)
+	binary.BigEndian.PutUint32(ihdr[4:], h)
+	ihdr[8], ihdr[9] = 8, 6 // 8 bit RGBA
+	return append(append([]byte("\x89PNG\r\n\x1a\n"), chunk("IHDR", ihdr)...), chunk("IDAT", nil)...)
+}
+
+func TestThumbRefusesHugeImage(t *testing.T) {
+	f := Files{Root: t.TempDir()}
+	stored, err := f.Save(bytes.NewReader(hugePNG(40000, 40000)), 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, _ := f.Path(stored.SHA256)
+	if err := CheckImageSize(path); !errors.Is(err, ErrImageTooLarge) {
+		t.Errorf("check: %v, want ErrImageTooLarge", err)
+	}
+
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	_, err = f.Thumb(stored.SHA256, 128, 6, nil)
+	runtime.ReadMemStats(&after)
+	if !errors.Is(err, ErrImageTooLarge) {
+		t.Errorf("thumb: %v, want ErrImageTooLarge", err)
+	}
+	if got := after.TotalAlloc - before.TotalAlloc; got > 50<<20 {
+		t.Errorf("refusing the image allocated %d MB", got>>20)
+	}
+
+	// Exactly at the limit still passes the check.
+	ok, err := f.Save(bytes.NewReader(hugePNG(5000, 10000)), 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	okPath, _ := f.Path(ok.SHA256)
+	if err := CheckImageSize(okPath); err != nil {
+		t.Errorf("50 megapixels: %v", err)
 	}
 }
 

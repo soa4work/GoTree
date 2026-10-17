@@ -2,8 +2,10 @@ package api
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
 	"image"
 	"image/jpeg"
 	"io"
@@ -83,6 +85,14 @@ func TestMediaUpload(t *testing.T) {
 	}
 	if status, _ := c.upload("/api/media", "big.jpg", append(jpegBytes(t, 8, 8), make([]byte, 2<<20)...)); status != http.StatusRequestEntityTooLarge {
 		t.Errorf("too large: status %d, want 413", status)
+	}
+
+	// A tiny PNG declaring 40000x40000 pixels is refused up front.
+	ihdr := append([]byte("IHDR"), 0, 0, 0x9c, 0x40, 0, 0, 0x9c, 0x40, 8, 6, 0, 0, 0)
+	bomb := append([]byte("\x89PNG\r\n\x1a\n\x00\x00\x00\x0d"), ihdr...)
+	bomb = binary.BigEndian.AppendUint32(bomb, crc32.ChecksumIEEE(ihdr))
+	if status, body := c.upload("/api/media", "bomb.png", bomb); status != http.StatusUnprocessableEntity {
+		t.Errorf("huge image: status %d %s, want 422", status, body)
 	}
 
 	// The original, with headers that keep it inert, and a range request.

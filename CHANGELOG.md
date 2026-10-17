@@ -77,6 +77,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 - A data directory whose path contains `#` or `?` no longer opens the wrong database file (#19)
 
+- Images over 50 megapixels are refused on upload with a clear error and get no thumbnail, so a
+  small file declaring huge dimensions can no longer exhaust memory; rendering thumbnails is
+  limited to one per CPU at a time (#5)
+
 ### Changed
 
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so

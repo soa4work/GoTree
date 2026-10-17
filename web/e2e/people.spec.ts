@@ -63,6 +63,19 @@ test('build a small family by keyboard and mouse', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: 'Edit person' })).toBeHidden()
   await expect(editButton).toBeFocused()
 
+  // Escape on a modified form asks first; a second Escape closes only the question.
+  await editButton.click()
+  const editDialog = page.getByRole('dialog', { name: 'Edit person' })
+  await editDialog.getByLabel('Given names').fill('Changed')
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Discard changes?' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Discard changes?' })).toBeHidden()
+  await expect(editDialog.getByLabel('Given names')).toHaveValue('Changed')
+  await editDialog.getByRole('button', { name: 'Cancel' }).click()
+  await page.getByRole('button', { name: 'Discard' }).click()
+  await expect(editDialog).toBeHidden()
+
   // The father's page shows both children.
   await parents.getByRole('link', { name: `Hans ${surname}` }).click()
   const children = page.getByRole('region', { name: 'Partners and children' })

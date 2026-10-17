@@ -82,6 +82,14 @@ and the versioning [Semantic Versioning](https://semver.org/).
   finish, then they are cancelled and given a few more seconds before the database is closed, and
   a second Ctrl+C stops GoTree at once (#7)
 
+- Images over 50 megapixels are refused on upload with a clear error and get no thumbnail, so a
+  small file declaring huge dimensions can no longer exhaust memory; at most two thumbnails
+  are rendered at a time (#5)
+
+- A place name containing HTML, typed or imported from a GEDCOM file, no longer runs script in the
+  migration map's tooltips, and the app now sends a Content-Security-Policy that only allows
+  scripts from its own files (#2)
+
 ### Changed
 
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so

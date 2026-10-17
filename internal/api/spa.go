@@ -15,6 +15,26 @@ func init() {
 	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
 }
 
+// appCSP is the Content-Security-Policy of the app shell. Scripts only come
+// from the app itself (the Vite build and theme.js are external files), which
+// makes an injected inline script or handler inert. Styles stay 'unsafe-inline'
+// because React style props and Leaflet position elements with inline styles.
+// Images may also be OpenStreetMap tiles (the migration map) and data: or
+// blob: URLs (the wall chart's SVG download embeds photos as data URIs).
+const appCSP = "default-src 'self'; " +
+	"script-src 'self'; " +
+	"style-src 'self' 'unsafe-inline'; " +
+	"img-src 'self' data: blob: https://tile.openstreetmap.org; " +
+	"font-src 'self' data:; " +
+	"media-src 'self' blob:; " +
+	"connect-src 'self'; " +
+	"manifest-src 'self'; " +
+	"worker-src 'self'; " +
+	"object-src 'none'; " +
+	"base-uri 'self'; " +
+	"form-action 'self'; " +
+	"frame-ancestors 'none'"
+
 // spaHandler serves files from the built frontend and falls back to
 // index.html for client-side routes.
 func spaHandler(dist fs.FS) http.Handler {
@@ -52,6 +72,7 @@ func spaHandler(dist fs.FS) http.Handler {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Content-Security-Policy", appCSP)
 		w.Header().Set("Cache-Control", "no-cache")
 		// A share link's address is its password; search engines must not
 		// list pages that someone posted it on.

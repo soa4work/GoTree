@@ -78,8 +78,12 @@ and the versioning [Semantic Versioning](https://semver.org/).
 - A data directory whose path contains `#` or `?` no longer opens the wrong database file (#19)
 
 - Images over 50 megapixels are refused on upload with a clear error and get no thumbnail, so a
-  small file declaring huge dimensions can no longer exhaust memory; rendering thumbnails is
-  limited to one per CPU at a time (#5)
+  small file declaring huge dimensions can no longer exhaust memory; at most two thumbnails
+  are rendered at a time (#5)
+
+- A place name containing HTML, typed or imported from a GEDCOM file, no longer runs script in the
+  migration map's tooltips, and the app now sends a Content-Security-Policy that only allows
+  scripts from its own files (#2)
 
 ### Changed
 

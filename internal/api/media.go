@@ -94,7 +94,22 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnsupportedMediaType, "this kind of file is not supported; use JPEG, PNG, GIF, WebP, PDF, MP3, M4A, OGG, WAV, MP4 or WebM")
 		return
 	}
-	stored, err := s.Files.Save(buffered, s.MaxUpload)
+	var check func(path string) error
+	if kind == media.KindImage {
+		// Only oversized images are refused; files whose header cannot be
+		// read are stored as before, they just get no dimensions or thumbnail.
+		check = func(path string) error {
+			if err := media.CheckImageSize(path); errors.Is(err, media.ErrImageTooLarge) {
+				return err
+			}
+			return nil
+		}
+	}
+	stored, err := s.Files.SaveChecked(buffered, s.MaxUpload, check)
+	if errors.Is(err, media.ErrImageTooLarge) {
+		writeError(w, http.StatusUnprocessableEntity, fmt.Sprintf("the image is larger than %d megapixels", media.MaxImagePixels/1_000_000))
+		return
+	}
 	if errors.Is(err, media.ErrTooLarge) {
 		writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("the file is larger than %d MB", s.MaxUpload>>20))
 		return
@@ -271,6 +286,10 @@ func (s *Server) mediaThumb(w http.ResponseWriter, r *http.Request) {
 	path, err := s.Files.Thumb(m.SHA256, size, m.Orientation, crop)
 	if err != nil {
 		s.Log.Warn("thumbnail", "id", id, "err", err)
+		if errors.Is(err, media.ErrImageTooLarge) {
+			writeError(w, http.StatusUnprocessableEntity, "the image is too large to render a thumbnail")
+			return
+		}
 		writeError(w, http.StatusUnprocessableEntity, "could not render a thumbnail")
 		return
 	}

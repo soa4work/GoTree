@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { GopherCredit } from './GopherCredit'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { getAuthState, logout } from '../api/client'
-import { useMediaQuery } from '../hooks/useMediaQuery'
+import { mdQuery, useMediaQuery } from '../hooks/useMediaQuery'
 import { useShortcuts } from '../hooks/useShortcuts'
 import { Button } from './Button'
 import { ShortcutsHelp } from './ShortcutsHelp'
@@ -35,7 +35,7 @@ function SideLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void
 }
 
 /** The sections as headed lists; the sidebar and the phone's More menu share it. */
-function GroupedLinks({ idPrefix, level, skipHome, onNavigate }: { idPrefix: string; level: 2 | 3; skipHome?: boolean; onNavigate?: () => void }) {
+function GroupedLinks({ idPrefix, level, onNavigate }: { idPrefix: string; level: 2 | 3; onNavigate?: () => void }) {
   const { t } = useTranslation()
   const Heading = `h${level}` as const
   return (
@@ -48,13 +48,11 @@ function GroupedLinks({ idPrefix, level, skipHome, onNavigate }: { idPrefix: str
               {t(group.key)}
             </Heading>
             <ul aria-labelledby={headingId} className="space-y-0.5">
-              {group.items
-                .filter((item) => !(skipHome && item.to === homeItem.to))
-                .map((item) => (
-                  <li key={item.to}>
-                    <SideLink item={item} onNavigate={onNavigate} />
-                  </li>
-                ))}
+              {group.items.map((item) => (
+                <li key={item.to}>
+                  <SideLink item={item} onNavigate={onNavigate} />
+                </li>
+              ))}
             </ul>
           </div>
         )
@@ -76,6 +74,7 @@ function MoreMenu({ pathname }: { pathname: string }) {
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-current={inMenu ? 'true' : undefined}
         onClick={() => setOpen(true)}
         className={[
           'flex min-h-14 w-full flex-col items-center justify-center gap-0.5 px-1 text-xs font-medium',
@@ -83,7 +82,7 @@ function MoreMenu({ pathname }: { pathname: string }) {
         ].join(' ')}
       >
         <MoreIcon />
-        <span className="leading-tight">{t('nav.more')}</span>
+        <span className={inMenu ? 'leading-tight underline underline-offset-4' : 'leading-tight'}>{t('nav.more')}</span>
       </button>
       {/* The native dialog provides Escape, the focus trap and focus return to the button. */}
       <DialogShell open={open} onClose={() => setOpen(false)} title={t('nav.more')}>
@@ -114,7 +113,7 @@ export function Layout() {
   const user = auth.data?.user
   const navigate = useNavigate()
   const [help, setHelp] = useState(false)
-  const wide = useMediaQuery('(min-width: 768px)')
+  const wide = useMediaQuery(mdQuery)
   const onPeople = location.pathname === '/people'
 
   // The people page handles "/" and "n" itself; elsewhere they go there.

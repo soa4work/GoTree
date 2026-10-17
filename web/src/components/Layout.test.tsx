@@ -10,13 +10,13 @@ const home: Parameters<typeof mockApi>[0] = {
   'GET /api/onthisday': [200, { events: [] }],
 }
 
-// jsdom has no matchMedia; the layout shows the sidebar from 768px up and the phone bar below.
+// jsdom has no matchMedia; the layout shows the sidebar from 48rem up and the phone bar below.
 async function render(path = '/', wide = true) {
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: wide, media: query, addEventListener: () => {}, removeEventListener: () => {} }))
   mockApi(home)
   const view = renderApp(path)
   const nav = await screen.findByRole('navigation', { name: 'Main navigation' })
-  return { ...view, sidebar: nav, phone: nav }
+  return { ...view, nav }
 }
 
 const names = (el: HTMLElement) => within(el).getAllByRole('link').map((a) => a.textContent)
@@ -25,7 +25,7 @@ describe('navigation', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('groups the sidebar under headings, with Home on top and the wall chart in', async () => {
-    const { sidebar } = await render()
+    const { nav: sidebar } = await render()
     expect(names(sidebar)[0]).toBe('Home')
     const expected: Record<string, string[]> = {
       Tree: ['People', 'Tree', 'Wall chart', 'Relationships'],
@@ -41,13 +41,13 @@ describe('navigation', () => {
   })
 
   it('marks the current page', async () => {
-    const { sidebar } = await render('/chart')
+    const { nav: sidebar } = await render('/chart')
     expect(within(sidebar).getByRole('link', { name: 'Wall chart' })).toHaveAttribute('aria-current', 'page')
     expect(within(sidebar).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
   })
 
   it('keeps four links and a More button on the phone bar', async () => {
-    const { phone } = await render('/', false)
+    const { nav: phone } = await render('/', false)
     expect(names(phone)).toEqual(['Home', 'People', 'Tree', 'Sources'])
     expect(within(phone).getByRole('button', { name: 'More' })).toHaveAttribute('aria-haspopup', 'dialog')
     expect(within(phone).queryByRole('link', { name: 'Import & export' })).not.toBeInTheDocument()
@@ -55,7 +55,7 @@ describe('navigation', () => {
 
   it('opens More with every other section, closes on Escape', async () => {
     const user = userEvent.setup()
-    const { phone, container } = await render('/', false)
+    const { nav: phone, container } = await render('/', false)
     const more = within(phone).getByRole('button', { name: 'More' })
     await user.click(more)
     const sheet = screen.getByRole('dialog', { name: 'More' })
@@ -72,7 +72,7 @@ describe('navigation', () => {
 
   it('closes More after choosing a section', async () => {
     const user = userEvent.setup()
-    const { phone } = await render('/', false)
+    const { nav: phone } = await render('/', false)
     await user.click(within(phone).getByRole('button', { name: 'More' }))
     await user.click(within(screen.getByRole('dialog', { name: 'More' })).getByRole('link', { name: 'Sharing' }))
     expect(screen.queryByRole('dialog', { name: 'More' })).not.toBeInTheDocument()

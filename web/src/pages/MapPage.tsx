@@ -2,12 +2,13 @@ import { useQuery } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
-import { getMapData } from '../api/endpoints'
+import { getMapData, getUnmappedPlaces } from '../api/endpoints'
 import type { PersonRef } from '../api/types'
 import { Button } from '../components/Button'
 import { SelectField } from '../components/Field'
 import { PageHeading } from '../components/PageHeading'
 import { fullName } from '../lib/people'
+import { MissingPlaces } from '../map/MissingPlaces'
 import { positionsAt, yearRange } from '../map/positions'
 import { PersonPicker } from '../people/PersonPicker'
 
@@ -29,6 +30,7 @@ export function MapPage() {
     queryFn: ({ signal }) => getMapData(scope, root?.id ?? null, signal),
     enabled: ready,
   })
+  const missing = useQuery({ queryKey: ['map-unmapped-places'], queryFn: ({ signal }) => getUnmappedPlaces(signal) })
   const range = useMemo(() => (data.data ? yearRange(data.data, new Date().getFullYear()) : null), [data.data])
   const shown = range ? Math.min(Math.max(year ?? range[0], range[0]), range[1]) : null
   const positions = useMemo(
@@ -77,7 +79,20 @@ export function MapPage() {
       </div>
 
       {data.isError && <p role="alert">{t('common.loadFailed')}</p>}
-      {data.data && !range && <p>{t('map.none')}</p>}
+      {data.data && !range && (
+        <div className="space-y-2">
+          <p className="font-medium">{t('map.none')}</p>
+          <p className="text-slate-700 dark:text-slate-300">{t('map.noneWhy')}</p>
+          {!!missing.data?.length && (
+            <p className="text-slate-700 dark:text-slate-300">
+              {t('map.noneMissing', { count: missing.data.length })}{' '}
+              <a href="#map-missing-places" className="text-brand-700 underline dark:text-brand-100">
+                {t('map.fixMissing')}
+              </a>
+            </p>
+          )}
+        </div>
+      )}
       {data.data && range && shown !== null && (
         <>
           <div className="flex flex-wrap items-end gap-4">
@@ -194,6 +209,7 @@ export function MapPage() {
           </section>
         </>
       )}
+      {data.data && data.data.unmapped > 0 && <MissingPlaces />}
     </div>
   )
 }

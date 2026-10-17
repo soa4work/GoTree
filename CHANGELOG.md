@@ -92,6 +92,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Migration map: when a GEDCOM import brought no coordinates, the map says so, lists the places
+  used by dated events that lack them and lets you enter latitude and longitude right there, or
+  look a place up on OpenStreetMap (Nominatim) with one click and pick a match (#12)
+
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so
   nothing being typed or uploaded is lost (#15)
 

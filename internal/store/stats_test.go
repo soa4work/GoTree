@@ -105,6 +105,12 @@ func TestMapData(t *testing.T) {
 		t.Errorf("persons: %+v", d.Persons)
 	}
 
+	// Only Atlantis lacks coordinates for good; Kleindorf inherits Saxony's.
+	um, err := s.UnmappedPlaces(ctx, a)
+	if err != nil || len(um) != 1 || um[0].ID != nowhere.ID || um[0].Events != 1 || um[0].FullName != "Atlantis" {
+		t.Errorf("unmapped places: %+v %v", um, err)
+	}
+
 	anc, err := s.MapData(ctx, a, MapScopeAncestors, child.Person.ID)
 	if err != nil || len(anc.Tracks) != 2 {
 		t.Errorf("ancestors of Paul include Paul and Hans: %+v %v", anc.Tracks, err)

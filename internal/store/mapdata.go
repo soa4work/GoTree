@@ -246,3 +246,63 @@ func (s *Store) ancestorsOf(ctx context.Context, a Actor, root int64) (map[int64
 	}
 	return out, nil
 }
+
+// UnmappedPlace is a place the map cannot show: neither it nor any enclosing
+// place has coordinates, yet dated events happen there.
+type UnmappedPlace struct {
+	Place
+	// Events counts the dated events the map would show there.
+	Events int `json:"events"`
+}
+
+// maxUnmappedPlaces bounds the list; the busiest places come first.
+const maxUnmappedPlaces = 200
+
+// UnmappedPlaces lists the places used by the dated events that the map
+// cannot show for lack of coordinates, busiest first.
+func (s *Store) UnmappedPlaces(ctx context.Context, a Actor) ([]UnmappedPlace, error) {
+	coords, err := s.placeCoordinates(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	args := []any{a.TreeID}
+	for _, t := range mapEventTypes {
+		args = append(args, t)
+	}
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT place_id, count(*) FROM events
+		WHERE tree_id = ? AND type IN (`+placeholders(len(mapEventTypes))+`) AND status <> 'disproven'
+			AND date_sort > 0 AND place_id IS NOT NULL AND date_qualifier NOT IN ('BEF', 'AFT')
+		GROUP BY place_id ORDER BY count(*) DESC, place_id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	type used struct {
+		id     int64
+		events int
+	}
+	var missing []used
+	for rows.Next() {
+		var u used
+		if err := rows.Scan(&u.id, &u.events); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if _, ok := coords[u.id]; !ok {
+			missing = append(missing, u)
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out := []UnmappedPlace{}
+	for _, u := range missing[:min(len(missing), maxUnmappedPlaces)] {
+		p, err := getPlace(ctx, s.DB, a, u.id)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, UnmappedPlace{Place: p, Events: u.events})
+	}
+	return out, nil
+}

@@ -61,6 +61,12 @@ if [[ -f web/package.json ]]; then
   # The end-to-end tests drive the real binary with the embedded frontend
   # in the system's Chrome at phone and desktop size, with axe on each page.
   echo "🌐 End-to-end tests"
+  # Concurrent runs (other worktrees) must not share a port: take a free one
+  # unless the caller pinned E2E_PORT.
+  if [[ -z "${E2E_PORT:-}" ]]; then
+    E2E_PORT="$(node -e 'const s=require("net").createServer();s.listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})')"
+  fi
+  export E2E_PORT
   CGO_ENABLED=0 go build -o gotree ./cmd/gotree
   (cd web && npm run e2e)
 fi

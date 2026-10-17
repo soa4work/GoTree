@@ -5,14 +5,14 @@ description: GitHub workflow for this repo — read before any code change. Crea
 
 # GitHub workflow
 
-Repo: `praetorianer777/GoTree` · default branch: `main`
+Repo: `soa4work/GoTree` (a fork of `praetorianer777/GoTree`) · default branch: `main`
 
 ## Rules
 
 - Every change needs an issue and a branch named `<type>/<issue>-<slug>`.
-- Every issue belongs to a milestone (`gh issue create --milestone "M7 …"`); the milestones follow
-  the project plan, `v2 Backlog` takes everything not yet scheduled.
   Types: `feat fix chore docs refactor test perf ci build revert`.
+- Put an issue in a milestone when one fits (`gh issue create --milestone "Ревью: исправления"`);
+  a milestone is optional.
 - Never push to `main`. Never merge yourself — that is the user's decision.
 - Agree on issues and PRs with the user before creating them.
 - Always call `gh` non-interactively: `--title` / `--body-file`, never open the editor.
@@ -20,8 +20,10 @@ Repo: `praetorianer777/GoTree` · default branch: `main`
 
 ## Language
 
-Everything in the repository is written in English: issues, pull requests, commit messages, code,
-comments, documentation and user-facing UI strings in the React app.
+Issues and pull request titles and descriptions are written in Russian.
+
+Everything in the repository stays in English: commit messages, code, comments, documentation and
+user-facing UI strings in the React app.
 
 ## Recipe
 

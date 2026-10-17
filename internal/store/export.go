@@ -642,7 +642,18 @@ func (ex *exporter) eventNode(e exportEvent) *gedcom.Node {
 	ex.status(n, e.status, e.statusReason)
 	ex.citations(n, "event", e.id)
 	ex.mediaRefs(n, "event", e.id)
-	n.Children = append(n.Children, ex.kept(e.extra)...)
+	for _, k := range ex.kept(e.extra) {
+		if k.Tag != "PHRASE" {
+			n.Children = append(n.Children, k)
+			continue
+		}
+		// A DATE.PHRASE the import could not use is kept without its DATE.
+		if dn := n.First("DATE"); dn != nil && ex.opt.Version7 && dn.First("PHRASE") == nil {
+			dn.Children = append(dn.Children, k)
+		} else {
+			add(n, "NOTE", "Date phrase: "+k.Value)
+		}
+	}
 	// 5.5.1 marks an event that happened without details with "Y".
 	if n.Value == "" && len(n.Children) == 0 && !ex.opt.Version7 {
 		n.Value = "Y"

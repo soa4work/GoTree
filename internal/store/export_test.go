@@ -164,6 +164,76 @@ func TestExportContent(t *testing.T) {
 	}
 }
 
+func TestExportGedcom7DatePhraseRoundTrip(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	p, err := s.CreatePerson(ctx, a, PersonInput{GivenNames: "Anna", Surname: "Weber", Sex: "F"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dates := []struct{ typ, in, want string }{
+		{"BIRT", "Frühjahr 1850", "(Frühjahr 1850)"},
+		{"BAPM", "INT 1850 (nach dem Kirchenbuch)", "INT 1850 (nach dem Kirchenbuch)"},
+		{"DEAT", "12 FEB 1750/51", "12 FEB 1750/51"},
+		{"BURI", "BET 1750/51 AND 1760", "BET 1750/51 AND 1760"},
+	}
+	for i, d := range dates[:3] {
+		if _, err := s.CreateHeirloom(ctx, a, HeirloomInput{Name: fmt.Sprintf("Heirloom %d", i), MadeDate: d.in}); err != nil {
+			t.Fatalf("heirloom %s: %v", d.in, err)
+		}
+	}
+	for _, d := range dates {
+		if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &p.ID, Type: d.typ, Date: d.in}); err != nil {
+			t.Fatalf("%s: %v", d.in, err)
+		}
+	}
+	text := exportText(t, s, a, ExportOptions{Version7: true})
+	if !strings.Contains(text, "3 PHRASE ") {
+		t.Fatalf("7.0 export has no DATE.PHRASE:\n%s", text)
+	}
+
+	s2, a2 := reimport(t, text)
+	got := findPerson(t, s2, a2, "anna")
+	byType := map[string]DateValue{}
+	for _, e := range got.Events {
+		byType[e.Type] = e.Date
+	}
+	for _, d := range dates {
+		if byType[d.typ].Raw != d.want {
+			t.Errorf("%s: %q came back as %q, want %q", d.typ, d.in, byType[d.typ].Raw, d.want)
+		}
+	}
+	made := map[string]string{}
+	list, err := s2.ListHeirlooms(ctx, a2, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range list {
+		made[h.Name] = h.MadeDate
+	}
+	for i, d := range dates[:3] {
+		if got := made[fmt.Sprintf("Heirloom %d", i)]; got != d.want {
+			t.Errorf("heirloom %q came back as %q, want %q", d.in, got, d.want)
+		}
+	}
+	if !byType["DEAT"].Valid || byType["BAPM"].Qualifier != "INT" {
+		t.Errorf("dates lost their meaning: %+v", byType)
+	}
+}
+
+func TestExportKeptDatePhrase(t *testing.T) {
+	src := "0 HEAD\n1 GEDC\n2 VERS 7.0\n0 @I1@ INDI\n1 NAME Anna /Weber/\n1 BIRT\n2 DATE ABT 1900\n3 PHRASE during the war\n0 TRLR\n"
+	s, a := reimport(t, src)
+	v7 := exportText(t, s, a, ExportOptions{Version7: true})
+	if !strings.Contains(v7, "2 DATE ABT 1900\n3 PHRASE during the war\n") || strings.Contains(v7, "\n2 PHRASE") {
+		t.Errorf("7.0 export:\n%s", v7)
+	}
+	v5 := exportText(t, s, a, ExportOptions{})
+	if !strings.Contains(v5, "2 NOTE Date phrase: during the war\n") || strings.Contains(v5, "PHRASE") {
+		t.Errorf("5.5.1 export:\n%s", v5)
+	}
+}
+
 func TestExportPrivacy(t *testing.T) {
 	s := newStore(t)
 	a := setup(t, s)

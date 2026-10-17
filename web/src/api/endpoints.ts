@@ -48,6 +48,7 @@ import type {
   HeirloomRef,
   MapData,
   Stats,
+  UnmappedPlaces,
 } from './types'
 
 const qs = (params: Record<string, string | number>) =>
@@ -71,6 +72,7 @@ export const deleteFamily = (id: number) => del(`/families/${id}`)
 export const removeChild = (familyId: number, childId: number) => del(`/families/${familyId}/children/${childId}`)
 
 export const listPlaces = (q: string, signal?: AbortSignal) => getJSON<Place[]>(`/places?${qs({ q, limit: 20 })}`, signal)
+export const updatePlace = (id: number, input: PlaceInput) => putJSON<Place>(`/places/${id}`, input)
 export const createPlace = (input: PlaceInput) => postJSON<Place>('/places', input)
 
 export const parseDate = (q: string, signal?: AbortSignal) => getJSON<ParsedDate>(`/dates/parse?${qs({ q })}`, signal)
@@ -191,3 +193,4 @@ export const deleteHeirloom = (id: number) => del(`/heirlooms/${id}`)
 export const getStats = (signal?: AbortSignal) => getJSON<Stats>('/stats', signal)
 export const getMapData = (scope: 'all' | 'ancestors' | 'descendants', root: number | null, signal?: AbortSignal) =>
   getJSON<MapData>(`/map?${qs({ scope, root: root ?? 0 })}`, signal)
+export const getUnmappedPlaces = (signal?: AbortSignal) => getJSON<UnmappedPlaces>('/map/unmapped-places', signal)

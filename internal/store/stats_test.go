@@ -38,11 +38,15 @@ func TestStats(t *testing.T) {
 		}
 	}
 
+	if _, err := s.CreateSource(ctx, a, SourceInput{Title: "Parish register"}); err != nil {
+		t.Fatal(err)
+	}
+
 	st, err := s.Stats(ctx, a)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.Persons != 6 || st.WithLifespan != 2 || len(st.Lifespans) != 1 {
+	if st.Persons != 6 || st.Sources != 1 || st.WithLifespan != 2 || len(st.Lifespans) != 1 {
 		t.Fatalf("stats: %+v", st)
 	}
 	if l := st.Lifespans[0]; l.Decade != 1850 || l.Min != 69 || l.Max != 80 || l.Average != 74.5 {
@@ -103,6 +107,12 @@ func TestMapData(t *testing.T) {
 	}
 	if d.Persons[child.Person.ID].GivenNames != "Paul" {
 		t.Errorf("persons: %+v", d.Persons)
+	}
+
+	// Only Atlantis lacks coordinates for good; Kleindorf inherits Saxony's.
+	um, err := s.UnmappedPlaces(ctx, a)
+	if err != nil || um.Total != 1 || len(um.Places) != 1 || um.Places[0].ID != nowhere.ID || um.Places[0].Events != 1 || um.Places[0].FullName != "Atlantis" {
+		t.Errorf("unmapped places: %+v %v", um, err)
 	}
 
 	anc, err := s.MapData(ctx, a, MapScopeAncestors, child.Person.ID)

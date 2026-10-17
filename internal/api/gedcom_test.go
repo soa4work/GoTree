@@ -60,6 +60,79 @@ func TestImportEndpoint(t *testing.T) {
 	}
 }
 
+func personCount(t *testing.T, c *client) int {
+	t.Helper()
+	var list struct {
+		Total int `json:"total"`
+	}
+	c.call("GET", "/api/persons?limit=1", nil, http.StatusOK, &list)
+	return list.Total
+}
+
+func TestImportRejectsOversizedGedcom(t *testing.T) {
+	ts := newServer(t, builtFrontend)
+	c := loggedIn(t, ts)
+	ged, _ := os.ReadFile("../store/testdata/ancestry-551.ged")
+	if status, body := c.upload("/api/import/gedcom", "tree.ged", ged); status != http.StatusOK {
+		t.Fatalf("import: %d %s", status, body)
+	}
+	before := personCount(t, c)
+
+	// A zip well within the upload limit that unpacks past the GEDCOM limit
+	// (4 x MaxUpload): must be refused, not truncated, and the tree stays.
+	var zipped bytes.Buffer
+	zw := zip.NewWriter(&zipped)
+	f, _ := zw.Create("gedcom.ged")
+	_, _ = f.Write(ged)
+	_, _ = f.Write(bytes.Repeat([]byte("1 NOTE padding\n"), 5<<20/15))
+	zw.Close()
+	if zipped.Len() > 1<<20 {
+		t.Fatalf("test zip too big: %d", zipped.Len())
+	}
+	status, body := c.upload("/api/import/gedcom?mode=replace", "bomb.zip", zipped.Bytes())
+	if status != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized zip entry: %d %s", status, body)
+	}
+	if !strings.Contains(string(body), "too large") {
+		t.Errorf("message: %s", body)
+	}
+	if got := personCount(t, c); got != before || before == 0 {
+		t.Errorf("tree changed: %d -> %d", before, got)
+	}
+}
+
+func TestImportReplaceIsOwnerOnly(t *testing.T) {
+	ts := newServer(t, builtFrontend)
+	c := loggedIn(t, ts)
+	ged, _ := os.ReadFile("../store/testdata/ancestry-551.ged")
+	if status, body := c.upload("/api/import/gedcom", "tree.ged", ged); status != http.StatusOK {
+		t.Fatalf("import: %d %s", status, body)
+	}
+	before := personCount(t, c)
+
+	if _, err := testServers[ts].Store.DB.Exec(`UPDATE tree_members SET role = 'editor'`); err != nil {
+		t.Fatal(err)
+	}
+	status, body := c.upload("/api/import/gedcom?mode=replace", "tree.ged", ged)
+	if status != http.StatusForbidden || !strings.Contains(string(body), "owner") {
+		t.Fatalf("editor replace: %d %s", status, body)
+	}
+	if got := personCount(t, c); got != before {
+		t.Errorf("tree changed: %d -> %d", before, got)
+	}
+	// Other modes stay open to editors (the tree is not empty: 409).
+	if status, _ := c.upload("/api/import/gedcom", "tree.ged", ged); status != http.StatusConflict {
+		t.Errorf("editor import into non-empty: %d", status)
+	}
+
+	if _, err := testServers[ts].Store.DB.Exec(`UPDATE tree_members SET role = 'owner'`); err != nil {
+		t.Fatal(err)
+	}
+	if status, body := c.upload("/api/import/gedcom?mode=replace", "tree.ged", ged); status != http.StatusOK {
+		t.Errorf("owner replace: %d %s", status, body)
+	}
+}
+
 func TestExportEndpoints(t *testing.T) {
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)

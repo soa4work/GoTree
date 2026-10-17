@@ -9,6 +9,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Migration map: when a GEDCOM import brought no coordinates, the map says so, lists the places
+  used by dated events that lack them and lets you enter latitude and longitude right there, or
+  look a place up on OpenStreetMap (Nominatim) with one click and pick a match (#12)
+
 - Statistics: lifespan by decade of birth, age at first and later marriages, children per family,
   the most common surnames and given names and how given names changed by decade, each chart with
   its numbers; migration map: watch the family move through their dated events on an
@@ -75,6 +79,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A GEDCOM file inside a zip that unpacks to more than four times the upload limit is refused
+  (413) instead of being silently cut off and, with "Replace the tree", imported truncated after
+  wiping the tree, and a small zip can no longer use up to 1 GB of memory; replacing the tree by
+  import is now limited to its owner, and the Import page tells editors so instead of offering it (#6)
+
 - Importing a GEDCOM 7 file no longer loses the date text that GoTree's own 7.0 export keeps in
   DATE.PHRASE: dates that are not dates, the explanation of "INT" dates and the second year of
   dual dates such as 1750/51 come back as they were (#4)
@@ -105,6 +114,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
   heirlooms, media and transcriptions (saved as GEDCOM when needed, so the preview matches what is
   stored); "Tidy up dates" no longer offers dates that were just saved; share, expiry and due
   days now follow the interface language everywhere (#14)
+
+- Home page: an empty tree now offers "Add yourself" and "Import from Ancestry, MyHeritage and
+  others" (also on the empty Tree and People pages); a filled tree shows how many people,
+  families and sources it holds, and "On this day" appears only when it has entries; the "More"
+  block is gone and the server version is shown to administrators only (#9)
 
 - The new-person and add-relative forms take an optional birth and death date and place, so
   "born 1850" no longer needs a second dialog; the events are saved together with the person (#8)

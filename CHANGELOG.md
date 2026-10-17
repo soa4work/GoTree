@@ -105,6 +105,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Home page: an empty tree now offers "Add yourself" and "Import from Ancestry, MyHeritage and
+  others" (also on the empty Tree and People pages); a filled tree shows how many people,
+  families and sources it holds, and "On this day" appears only when it has entries; the "More"
+  block is gone and the server version is shown to administrators only (#9)
+
 - The new-person and add-relative forms take an optional birth and death date and place, so
   "born 1850" no longer needs a second dialog; the events are saved together with the person (#8)
 

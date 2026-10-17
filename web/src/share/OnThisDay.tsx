@@ -9,10 +9,12 @@ import { usePersonHref } from '../lib/personHref'
 interface Props {
   queryKey: readonly unknown[]
   load: (month: number, day: number, signal: AbortSignal) => Promise<DayReport>
+  /** Render nothing unless there are entries to show. */
+  hideEmpty?: boolean
 }
 
 /** Births, marriages and deaths of deceased relatives on today's date. */
-export function OnThisDay({ queryKey, load }: Props) {
+export function OnThisDay({ queryKey, load, hideEmpty }: Props) {
   const { t, i18n } = useTranslation()
   const id = useId()
   const href = usePersonHref()
@@ -25,6 +27,8 @@ export function OnThisDay({ queryKey, load }: Props) {
     queryFn: ({ signal }) => load(month, day, signal),
   })
   const dateText = today.toLocaleDateString(i18n.language, { day: 'numeric', month: 'long' })
+
+  if (hideEmpty && (!report.data || report.data.events.length === 0)) return null
 
   return (
     <section aria-labelledby={id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">

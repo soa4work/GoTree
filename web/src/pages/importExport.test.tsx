@@ -18,6 +18,7 @@ describe('import page', () => {
   it('disables replacing for an editor and says why', async () => {
     mockApi({ ...people(3), ...asEditor })
     renderApp('/import-export')
+    await userEvent.upload(await screen.findByLabelText('GEDCOM file'), new File(['0 HEAD'], 'tree.ged'))
     expect(await screen.findByText(/Only the owner of the tree can replace it/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Replace the tree' })).toBeDisabled()
   })

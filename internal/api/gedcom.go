@@ -79,9 +79,9 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 		}
 		data = inner
 	} else if int64(len(data)) > limit {
-		// The body cap leaves room for multipart framing; the file itself
-		// gets the same limit as an unzipped one.
-		writeError(w, http.StatusRequestEntityTooLarge, errGedcomTooLarge.Error())
+		// Plain uploads are already capped by limitUpload, so this is a
+		// backstop; the limit mostly applies to zips.
+		writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("%v (over %d MB)", errGedcomTooLarge, limit>>20))
 		return
 	}
 	doc, err := gedcom.Parse(data)
@@ -138,6 +138,11 @@ func gedcomFromZip(data []byte, limit int64) ([]byte, error) {
 	case 1:
 	default:
 		return nil, errors.New("the zip file contains several .ged files; upload the one you want")
+	}
+	// The declared size can lie, so the bounded read below is the real check;
+	// this refuses an honest oversized entry without reading it.
+	if found[0].UncompressedSize64 > uint64(limit) {
+		return nil, fmt.Errorf("%w (over %d MB unzipped)", errGedcomTooLarge, limit>>20)
 	}
 	rc, err := found[0].Open()
 	if err != nil {

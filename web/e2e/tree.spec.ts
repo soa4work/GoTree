@@ -83,3 +83,31 @@ test('add a relative from the chart', async ({ page }) => {
     page.getByRole('group', { name: 'Family tree chart' }).getByRole('button', { name: new RegExp(`Tom ${surname}`) }),
   ).toBeVisible()
 })
+
+test('phone: controls are collapsed and a tapped person opens a sheet', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'phone layout')
+  await login(page)
+  const { surname, paul } = await family(page)
+  await page.goto(`/tree?root=${paul}&view=pedigree&gen=3`)
+
+  const options = page.getByRole('button', { name: /^Options/ })
+  await expect(options).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByLabel('Generations')).toBeHidden()
+  const chart = page.getByRole('group', { name: 'Family tree chart' })
+  await expect(chart).toBeVisible()
+  expect((await chart.boundingBox())!.y).toBeLessThan(400)
+  await options.click()
+  await expect(page.getByLabel('Generations')).toBeVisible()
+  await options.click()
+
+  await chart.getByRole('button', { name: new RegExp(`Paul ${surname}`) }).tap()
+  const sheet = page.getByRole('region', { name: `Paul ${surname}` })
+  await expect(sheet).toBeVisible()
+  await expect(sheet.getByRole('button', { name: '+ Parent' })).toBeInViewport()
+  await expect(sheet).toBeFocused()
+  await expectAccessible(page)
+
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  await expect(page).not.toHaveURL(/sel=/)
+})

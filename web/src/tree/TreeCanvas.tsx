@@ -4,7 +4,9 @@ import {
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
+  getViewportForBounds,
   useReactFlow,
+  useStoreApi,
   type Edge,
   type Node,
 } from '@xyflow/react'
@@ -33,6 +35,9 @@ export function TreeCanvas(props: Props) {
     </ReactFlowProvider>
   )
 }
+
+/** Below this zoom the 13px names on the cards become hard to read. */
+const readableZoom = 0.8
 
 const center = (n: LayoutNode) => ({ x: n.x + n.w / 2, y: n.y + n.h / 2 })
 
@@ -76,6 +81,7 @@ function neighbour(nodes: LayoutNode[], from: LayoutNode, key: string): LayoutNo
 function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy' }: Props) {
   const { t } = useTranslation()
   const flow = useReactFlow()
+  const store = useStoreApi()
   const dark = useDark()
   const helpId = useId()
   const rootId = index.rootId
@@ -155,11 +161,34 @@ function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy' 
   }, [layout, dark, look])
   const leafy = look === 'leafy'
 
-  // Re-frame the chart whenever a different tree is shown.
+  // Re-frame the chart whenever a different tree is shown: all of it if the
+  // names stay readable, otherwise the root at a readable zoom.
   useEffect(() => {
-    const id = requestAnimationFrame(() => void flow.fitView({ padding: 0.15, maxZoom: 1, duration: 200 }))
+    const id = requestAnimationFrame(() => {
+      const { width, height } = store.getState()
+      const person = layout.nodes.filter((n) => n.kind === 'person')
+      if (!width || !height || person.length === 0) {
+        void flow.fitView({ padding: 0.15, maxZoom: 1, duration: 200 })
+        return
+      }
+      const x1 = Math.min(...layout.nodes.map((n) => n.x))
+      const y1 = Math.min(...layout.nodes.map((n) => n.y))
+      const x2 = Math.max(...layout.nodes.map((n) => n.x + n.w))
+      const y2 = Math.max(...layout.nodes.map((n) => n.y + n.h))
+      const fit = getViewportForBounds({ x: x1, y: y1, width: x2 - x1, height: y2 - y1 }, width, height, 0.1, 1, 0.15)
+      if (fit.zoom >= readableZoom) {
+        void flow.setViewport(fit, { duration: 200 })
+        return
+      }
+      const start = byPerson.get(rootId) ?? person[0]
+      if (!start) return
+      const c = center(start)
+      void flow.setCenter(c.x, c.y, { zoom: readableZoom, duration: 200 })
+    })
     return () => cancelAnimationFrame(id)
-  }, [layout, flow])
+    // byPerson and rootId follow layout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout, flow, store])
 
   return (
     <div role="group" aria-label={t('tree.chartLabel')} aria-describedby={helpId} className="size-full">
@@ -179,6 +208,8 @@ function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy' 
         minZoom={0.1}
         maxZoom={2}
         fitView
+        fitViewOptions={{ padding: 0.15, maxZoom: 1, minZoom: readableZoom }}
+        zoomOnDoubleClick={false}
         onlyRenderVisibleElements={layout.nodes.length > 300}
         colorMode={dark ? 'dark' : 'light'}
         disableKeyboardA11y
@@ -191,12 +222,20 @@ function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy' 
         />
         <Controls showInteractive={false} position="bottom-left" />
         <MiniMap
-          className="!hidden md:!block"
+          className="!hidden lg:!block"
+          style={{
+            width: 150,
+            height: 96,
+            backgroundColor: dark ? '#1b221c' : '#faf7ef',
+            border: `1px solid ${dark ? '#463e31' : '#cdc3ad'}`,
+            borderRadius: 8,
+          }}
+          position="bottom-right"
           pannable
           zoomable
           ariaLabel={t('tree.minimap')}
           nodeBorderRadius={8}
-          nodeColor={(n) => (n.type === 'person' ? (dark ? '#5d5444' : '#cdc3ad') : 'transparent')}
+          nodeColor={(n) => (n.type === 'person' ? (dark ? '#7b715f' : '#a59a82') : 'transparent')}
           maskColor={dark ? 'rgb(15 21 16 / 0.6)' : 'rgb(242 237 224 / 0.6)'}
         />
       </ReactFlow>

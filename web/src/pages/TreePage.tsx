@@ -7,6 +7,7 @@ import type { PersonRef } from '../api/types'
 import { SelectField } from '../components/Field'
 import { OnboardingCard } from '../components/OnboardingCard'
 import { PageHeading } from '../components/PageHeading'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { fullName } from '../lib/people'
 import { PersonPicker } from '../people/PersonPicker'
 import { layoutTree, type TreeView } from '../tree/layout'
@@ -51,6 +52,9 @@ export function TreePage() {
   const genId = useId()
   const [look, setLook] = useState<TreeLook>(storedLook)
   const modeName = useId()
+  const optionsId = useId()
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const wide = useMediaQuery('(min-width: 1024px)')
 
   const view = (views.includes(params.get('view') as TreeView) ? params.get('view') : 'pedigree') as TreeView
   const generations = Math.min(10, Math.max(1, Number(params.get('gen')) || 4))
@@ -107,6 +111,21 @@ export function TreePage() {
   const centerOn = (id: number) => set({ root: String(id), sel: null }, false)
   const title = root ? t('tree.titleFor', { name: fullName(root) ?? t('person.unknown') }) : t('nav.tree')
 
+  const modeSwitch = (
+    <fieldset className="flex min-w-0 flex-1 gap-1 rounded-lg border border-slate-300 p-1 md:max-w-sm dark:border-slate-700">
+      <legend className="sr-only">{t('tree.display')}</legend>
+      {(['chart', 'list'] as const).map((m) => (
+        <label
+          key={m}
+          className="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-md font-medium has-[:checked]:bg-brand-700 has-[:checked]:text-white has-[:focus-visible]:outline has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-brand-500"
+        >
+          <input type="radio" name={modeName} className="sr-only" checked={mode === m} onChange={() => set({ mode: m === 'list' ? 'list' : null })} />
+          {t(`tree.mode.${m}`)}
+        </label>
+      ))}
+    </fieldset>
+  )
+
   if (rootId === null && !fallback.isPending) {
     return (
       <div className="max-w-3xl space-y-4">
@@ -130,7 +149,24 @@ export function TreePage() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-x-3 gap-y-4 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
+      <div className="flex items-stretch gap-2">
+        <button
+          type="button"
+          aria-expanded={optionsOpen}
+          aria-controls={optionsId}
+          onClick={() => setOptionsOpen((o) => !o)}
+          className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-slate-400 px-4 font-medium hover:bg-slate-100 md:hidden dark:border-slate-600 dark:hover:bg-slate-800"
+        >
+          {t('tree.options')}
+          <span aria-hidden="true">{optionsOpen ? '▴' : '▾'}</span>
+        </button>
+        {modeSwitch}
+      </div>
+
+      <div
+        id={optionsId}
+        className={`${optionsOpen ? 'grid' : 'hidden'} grid-cols-2 gap-x-3 gap-y-4 md:grid md:grid-cols-[1fr_1fr_1fr_auto] md:items-end`}
+      >
         <SelectField label={t('tree.view')} value={view} onChange={(e) => set({ view: e.target.value })}>
           {views.map((v) => (
             <option key={v} value={v}>
@@ -190,19 +226,6 @@ export function TreePage() {
         </div>
       </div>
 
-      <fieldset className="flex gap-1 rounded-lg border border-slate-300 p-1 dark:border-slate-700">
-        <legend className="sr-only">{t('tree.display')}</legend>
-        {(['chart', 'list'] as const).map((m) => (
-          <label
-            key={m}
-            className="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-md font-medium has-[:checked]:bg-brand-700 has-[:checked]:text-white has-[:focus-visible]:outline has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-brand-500"
-          >
-            <input type="radio" name={modeName} className="sr-only" checked={mode === m} onChange={() => set({ mode: m === 'list' ? 'list' : null })} />
-            {t(`tree.mode.${m}`)}
-          </label>
-        ))}
-      </fieldset>
-
       <p role="status" className="text-sm text-slate-600 dark:text-slate-400">
         {tree.isPending
           ? t('app.loading')
@@ -216,7 +239,7 @@ export function TreePage() {
       {index && layout && (
         <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
           {mode === 'chart' ? (
-            <div className="h-[65dvh] min-h-[420px] overflow-hidden rounded-xl border border-slate-200 md:h-[calc(100dvh-20rem)] dark:border-slate-800">
+            <div className="relative h-[65dvh] min-h-[420px] overflow-hidden rounded-xl border border-slate-200 md:h-[calc(100dvh-20rem)] dark:border-slate-800">
               <TreeCanvas
                 layout={layout}
                 index={index}
@@ -225,11 +248,20 @@ export function TreePage() {
                 onCenter={centerOn}
                 look={look}
               />
+              {selected && !wide && (
+                <PersonPanel
+                  sheet
+                  person={selected}
+                  isRoot={selected.id === index.rootId}
+                  onCenter={centerOn}
+                  onClose={() => set({ sel: null })}
+                />
+              )}
             </div>
           ) : (
             <TreeList index={index} view={view} generations={generations} bloodOnly={bloodOnly} />
           )}
-          {selected && (
+          {selected && (wide || mode === 'list') && (
             <PersonPanel person={selected} isRoot={selected.id === index.rootId} onCenter={centerOn} onClose={() => set({ sel: null })} />
           )}
         </div>

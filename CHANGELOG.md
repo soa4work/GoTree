@@ -120,6 +120,12 @@ and the versioning [Semantic Versioning](https://semver.org/).
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so
   nothing being typed or uploaded is lost (#15)
 
+- Tree page on phones: the controls collapse behind an "Options" button so the chart is visible
+  at once, the selected person's actions open as a bottom sheet over the chart (Escape closes
+  it), zoom buttons are 44px, names open at a readable zoom, and double-click no longer zooms
+  the chart (use "Center tree here" in the sheet); the minimap is themed, smaller and shown on
+  wide screens only (#11)
+
 - Sources and archives: record where facts come from, cite a source with page and reliability
   on events, people and relationships, and see on each source what it supports (#13)
 

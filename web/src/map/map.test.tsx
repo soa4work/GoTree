@@ -26,19 +26,8 @@ const data: MapData = {
   },
   persons: { 7: person(7, 'Hans'), 8: person(8, 'Paul') },
   tracks: [
-    {
-      personId: 7,
-      points: [
-        { key: 18500000, placeId: 1, type: 'BIRT' },
-        { key: 18800000, placeId: 2, type: 'RESI' },
-      ],
-      death: 19200000,
-    },
-    {
-      personId: 8,
-      points: [{ key: 18850301, placeId: 2, type: 'BIRT' }],
-      death: 0,
-    },
+    { personId: 7, points: [{ key: 18500000, placeId: 1, type: 'BIRT' }, { key: 18800000, placeId: 2, type: 'RESI' }], death: 19200000 },
+    { personId: 8, points: [{ key: 18850301, placeId: 2, type: 'BIRT' }], death: 0 },
   ],
   unmapped: 3,
 }

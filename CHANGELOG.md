@@ -75,6 +75,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A GEDCOM file inside a zip that unpacks to more than four times the upload limit is refused
+  (413) instead of being silently cut off and, with "Replace the tree", imported truncated after
+  wiping the tree, and a small zip can no longer use up to 1 GB of memory; replacing the tree by
+  import is now limited to its owner, and the Import page tells editors so instead of offering it (#6)
+
 - Importing a GEDCOM 7 file no longer loses the date text that GoTree's own 7.0 export keeps in
   DATE.PHRASE: dates that are not dates, the explanation of "INT" dates and the second year of
   dual dates such as 1750/51 come back as they were (#4)

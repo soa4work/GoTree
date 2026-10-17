@@ -21,6 +21,12 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 	if mode == "" {
 		mode = store.ImportIntoEmpty
 	}
+	// Replace wipes the tree, so it is the owner's call, as with share links.
+	// Checked before the upload is read.
+	if mode == store.ImportReplace && actorFrom(r).Role != store.RoleOwner {
+		writeError(w, http.StatusForbidden, "only the owner of the tree can replace it; editors can import into an empty tree")
+		return
+	}
 	s.limitUpload(w, r)
 	mr, err := r.MultipartReader()
 	if err != nil {
@@ -60,13 +66,23 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	limit := s.maxGedcom()
 	if bytes.HasPrefix(data, []byte("PK\x03\x04")) {
-		inner, err := gedcomFromZip(data)
+		inner, err := gedcomFromZip(data, limit)
+		if errors.Is(err, errGedcomTooLarge) {
+			writeError(w, http.StatusRequestEntityTooLarge, err.Error())
+			return
+		}
 		if err != nil {
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}
 		data = inner
+	} else if int64(len(data)) > limit {
+		// The body cap leaves room for multipart framing; the file itself
+		// gets the same limit as an unzipped one.
+		writeError(w, http.StatusRequestEntityTooLarge, errGedcomTooLarge.Error())
+		return
 	}
 	doc, err := gedcom.Parse(data)
 	if err != nil {
@@ -86,9 +102,22 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, report)
 }
 
+// errGedcomTooLarge is returned when a GEDCOM file exceeds the size limit.
+var errGedcomTooLarge = errors.New("the GEDCOM file is too large")
+
+// maxGedcom is the largest GEDCOM file, unzipped, that an import accepts:
+// four times the upload limit. Text GEDCOM zips well (typically 5-10x), so a
+// legitimate zip within the upload limit fits, while a zip bomb is stopped
+// long before it can exhaust memory. The limit follows GOTREE_MAX_UPLOAD_MB
+// instead of being a fixed cap.
+func (s *Server) maxGedcom() int64 {
+	return 4 * s.MaxUpload
+}
+
 // gedcomFromZip returns the GEDCOM file inside a zip: gedcom.ged as
-// GEDZIP names it, else the only .ged file.
-func gedcomFromZip(data []byte) ([]byte, error) {
+// GEDZIP names it, else the only .ged file. A file larger than limit bytes
+// unzipped is refused with errGedcomTooLarge.
+func gedcomFromZip(data []byte, limit int64) ([]byte, error) {
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("the zip file cannot be read: %w", err)
@@ -115,7 +144,14 @@ func gedcomFromZip(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	defer rc.Close()
-	// Guard against zip bombs: the GEDCOM may not be larger than 1 GB.
-	out, err := io.ReadAll(io.LimitReader(rc, 1<<30))
-	return out, err
+	// Guard against zip bombs. Read one byte past the limit so an oversized
+	// file is refused instead of silently truncated.
+	out, err := io.ReadAll(io.LimitReader(rc, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(out)) > limit {
+		return nil, fmt.Errorf("%w (over %d MB unzipped)", errGedcomTooLarge, limit>>20)
+	}
+	return out, nil
 }

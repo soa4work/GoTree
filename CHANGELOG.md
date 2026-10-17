@@ -109,6 +109,12 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Navigation: the sidebar groups its sections under Tree, Records, Explore, Work and Settings
+  and now lists the wall chart; the phone bar keeps Home, People, Tree and Sources and a "More"
+  menu opens every section, grouped the same way (replacing the "Also" links on the home page);
+  person pages link to "View in tree"; the relationship calculator, migration map and "Ancestors
+  and descendants" chart use one name in menus, headings and default chart titles (#13)
+
 - Home page: an empty tree now offers "Add yourself" and "Import from Ancestry, MyHeritage and
   others" (also on the empty Tree and People pages); a filled tree shows how many people,
   families and sources it holds, and "On this day" appears only when it has entries; the "More"

@@ -122,3 +122,18 @@ export const ChartIcon = () => (
     <path d="M4 20V10M10 20V4M16 20v-7M21 20H3" />
   </Icon>
 )
+
+export const WallChartIcon = () => (
+  <Icon>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M12 8v8M7 16v-5h10v5" />
+  </Icon>
+)
+
+export const MoreIcon = () => (
+  <Icon>
+    <circle cx="5" cy="12" r="1.2" />
+    <circle cx="12" cy="12" r="1.2" />
+    <circle cx="19" cy="12" r="1.2" />
+  </Icon>
+)

@@ -1,4 +1,4 @@
-import type { PersonInput, PersonRef } from '../api/types'
+import type { PersonInput, PersonRef, PlaceRef } from '../api/types'
 
 type Named = Pick<PersonRef, 'givenNames' | 'surname'>
 
@@ -44,3 +44,24 @@ export const emptyPerson = (): PersonInput => ({
   notes: '',
   alternateNames: [],
 })
+
+/** What is typed for a birth or death in the create forms. */
+export interface LifeDraft {
+  date: string
+  place: PlaceRef | null
+}
+
+export interface LifeDrafts {
+  birth: LifeDraft
+  death: LifeDraft
+}
+
+export const emptyLife = (): LifeDrafts => ({ birth: { date: '', place: null }, death: { date: '', place: null } })
+
+/** The birth and death to send; empty ones are left out, and no death for someone living. */
+export function lifeInput(life: LifeDrafts, isLiving: boolean | null): Pick<PersonInput, 'birth' | 'death'> {
+  const of = (d: LifeDraft) => (d.date.trim() || d.place ? { date: d.date.trim(), placeId: d.place?.id ?? null } : undefined)
+  const birth = of(life.birth)
+  const death = isLiving === true ? undefined : of(life.death)
+  return { ...(birth ? { birth } : {}), ...(death ? { death } : {}) }
+}

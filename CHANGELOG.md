@@ -105,6 +105,13 @@ and the versioning [Semantic Versioning](https://semver.org/).
   event; stored values and GEDCOM export are unchanged, and dates such as share, expiry and due
   days now follow the interface language everywhere (#14)
 
+- The new-person and add-relative forms take an optional birth and death date and place, so
+  "born 1850" no longer needs a second dialog; the events are saved together with the person (#8)
+
+- Closing a form with Escape, the × button or Cancel after typing in it now asks "Discard changes?"
+  instead of throwing the input away; forms you have not changed still close at once, and saving
+  never asks (#10)
+
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so
   nothing being typed or uploaded is lost (#15)
 

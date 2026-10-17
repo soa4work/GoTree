@@ -62,6 +62,10 @@
   "common": {
     "close": "Close",
     "cancel": "Cancel",
+    "discard": "Discard",
+    "keepEditing": "Keep editing",
+    "discardTitle": "Discard changes?",
+    "discardMessage": "You have unsaved changes. If you close this form, they will be lost.",
     "save": "Save",
     "delete": "Delete",
     "edit": "Edit",
@@ -101,6 +105,8 @@
     "more": "Show more"
   },
   "person": {
+    "birth": "Birth (optional)",
+    "death": "Death (optional)",
     "new": "New person",
     "edit": "Edit person",
     "delete": "Delete person",

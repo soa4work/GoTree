@@ -142,6 +142,12 @@ export interface AlternateNameInput {
   statusReason: string
 }
 
+/** Date and place of a birth or death entered together with a new person. */
+export interface LifeEventInput {
+  date: string
+  placeId: number | null
+}
+
 export interface PersonInput {
   givenNames: string
   surname: string
@@ -152,6 +158,9 @@ export interface PersonInput {
   isLiving: boolean | null
   notes: string
   alternateNames: AlternateNameInput[]
+  /** Only used when creating a person. */
+  birth?: LifeEventInput
+  death?: LifeEventInput
   addCitations?: NewCitation[]
   removeCitations?: number[]
 }

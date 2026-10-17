@@ -91,3 +91,59 @@ describe('tree page', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Tree of Paul Weber' })).toBeInTheDocument()
   })
 })
+
+describe('tree page on narrow screens', () => {
+  it('collapses the controls behind an Options button', async () => {
+    mockApi({ 'GET /api/tree/1': [200, graph] })
+    renderApp('/tree?root=1&view=hourglass&gen=2')
+    const options = await screen.findByRole('button', { name: /^Options/ })
+    expect(options).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(options)
+    expect(options).toHaveAttribute('aria-expanded', 'true')
+    expect(document.getElementById(options.getAttribute('aria-controls')!)).toHaveClass('grid')
+  })
+
+  it('shows the selected person as a sheet that Escape closes', async () => {
+    mockApi({ 'GET /api/tree/1': [200, graph] })
+    renderApp('/tree?root=1&view=hourglass&gen=2&sel=4')
+    const sheet = await screen.findByRole('region', { name: 'Eva Weber' })
+    expect(sheet).toHaveClass('absolute')
+    await waitFor(() => expect(sheet).toHaveFocus())
+    fireEvent.keyDown(sheet, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Eva Weber' })).toBeNull())
+  })
+
+  it('keeps the sheet open when Escape is pressed inside the add-relative dialog', async () => {
+    mockApi({
+      'GET /api/tree/1': [200, graph],
+      'GET /api/persons/4': [
+        200,
+        {
+          ...graph.persons['4'],
+          namePrefix: '',
+          nameSuffix: '',
+          nickname: '',
+          isLiving: null,
+          notes: '',
+          alternateNames: [],
+          citations: [],
+          createdAt: '',
+          updatedAt: '',
+          events: [],
+          parentFamilies: [],
+          partnerFamilies: [],
+        },
+      ],
+    })
+    renderApp('/tree?root=1&view=hourglass&gen=2&sel=4')
+    const sheet = await screen.findByRole('region', { name: 'Eva Weber' })
+    const add = within(sheet).getByRole('button', { name: '+ Parent' })
+    await waitFor(() => expect(add).toBeEnabled())
+    fireEvent.click(add)
+    const field = await screen.findByLabelText('Given names')
+    fireEvent.change(field, { target: { value: 'Ida' } })
+    fireEvent.keyDown(field, { key: 'Escape' })
+    expect(screen.getByRole('region', { name: 'Eva Weber' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Given names')).toHaveValue('Ida')
+  })
+})

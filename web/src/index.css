@@ -73,3 +73,16 @@
 .gt-marker-approx {
   border-style: dashed;
 }
+
+/* React Flow's zoom buttons are 26px; touch needs 44px. */
+@media (pointer: coarse), (width < 64rem) {
+  .react-flow__controls-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .react-flow__controls-button svg {
+    max-width: 18px;
+    max-height: 18px;
+  }
+}

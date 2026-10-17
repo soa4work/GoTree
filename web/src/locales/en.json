@@ -450,6 +450,7 @@
     "importButton": "Import",
     "replaceButton": "Replace the tree",
     "replaceWarning": "Your tree already has data. Importing replaces its people, families, events, places and sources. Photos stay in the media list.",
+    "ownerOnly": "Only the owner of the tree can replace it. Ask the owner to import this file.",
     "replaceTitle": "Replace the tree?",
     "replaceConfirm_one": "This deletes the {{count}} person in your tree with everything about them and imports the file instead. Consider exporting first.",
     "replaceConfirm_other": "This deletes the {{count}} people in your tree with everything about them and imports the file instead. Consider exporting first.",

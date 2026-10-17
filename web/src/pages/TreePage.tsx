@@ -5,6 +5,7 @@ import { Link, useSearchParams } from 'react-router'
 import { getTree, listPersons } from '../api/endpoints'
 import type { PersonRef } from '../api/types'
 import { SelectField } from '../components/Field'
+import { OnboardingCard } from '../components/OnboardingCard'
 import { PageHeading } from '../components/PageHeading'
 import { fullName } from '../lib/people'
 import { PersonPicker } from '../people/PersonPicker'
@@ -110,7 +111,7 @@ export function TreePage() {
     return (
       <div className="max-w-3xl space-y-4">
         <PageHeading title={t('nav.tree')}>{t('nav.tree')}</PageHeading>
-        <p>{t('tree.empty')}</p>
+        <OnboardingCard />
       </div>
     )
   }

@@ -30,11 +30,21 @@
   "dashboard": {
     "title": "Welcome to GoTree",
     "intro": "Your family tree lives on this server, in a single file you control.",
+    "summary": "Your tree",
+    "people": "People",
+    "families": "Families",
+    "sources": "Sources",
+    "also": "Also",
     "serverStatus": "Server status",
     "checking": "Checking the server…",
     "online": "Server online · version {{version}}",
-    "offline": "The server cannot be reached.",
-    "more": "More"
+    "offline": "The server cannot be reached."
+  },
+  "onboarding": {
+    "title": "No one is in your tree yet",
+    "text": "Start with yourself or the oldest ancestor you know, or bring in a tree you already have.",
+    "addYourself": "Add yourself",
+    "import": "Import from Ancestry, MyHeritage and others"
   },
   "notFound": {
     "title": "Page not found",

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { listPersons } from '../api/endpoints'
 import { Button } from '../components/Button'
+import { OnboardingCard } from '../components/OnboardingCard'
 import { PageHeading } from '../components/PageHeading'
 import { useDebounced } from '../hooks/useDebounced'
 import { useShortcuts } from '../hooks/useShortcuts'
@@ -98,9 +99,7 @@ export function PeoplePage() {
         </ul>
       )}
       {!people.isPending && total === 0 && !q && (
-        <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center dark:border-slate-700">
-          <p>{t('people.empty')}</p>
-        </div>
+        <OnboardingCard />
       )}
       {people.hasNextPage && (
         <Button variant="secondary" onClick={() => void people.fetchNextPage()} busy={people.isFetchingNextPage}>

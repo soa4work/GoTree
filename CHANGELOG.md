@@ -87,6 +87,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Home page: an empty tree now offers "Add yourself" and "Import from Ancestry, MyHeritage and
+  others" (also on the empty Tree and People pages); a filled tree shows how many people,
+  families and sources it holds, and "On this day" appears only when it has entries; the "More"
+  block is gone and the server version is shown to administrators only (#9)
+
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so
   nothing being typed or uploaded is lost (#15)
 

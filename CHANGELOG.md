@@ -77,6 +77,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 - A data directory whose path contains `#` or `?` no longer opens the wrong database file (#19)
 
+- The server closes idle keep-alive connections and drops uploads and imports that trickle in
+  too slowly, and on shutdown the database stays open until running requests have finished (#7)
+
 ### Changed
 
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so

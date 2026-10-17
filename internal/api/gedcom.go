@@ -21,7 +21,7 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 	if mode == "" {
 		mode = store.ImportIntoEmpty
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, s.MaxUpload+1<<20)
+	s.limitUpload(w, r)
 	mr, err := r.MultipartReader()
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "expected a multipart upload")

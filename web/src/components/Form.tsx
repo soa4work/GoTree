@@ -57,7 +57,8 @@ export function Form({ onSubmit, onCancel, submitLabel, busy, error, children, s
       <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
         <div>{secondary}</div>
         <div className="flex flex-col-reverse gap-2 sm:flex-row">
-          <Button type="button" variant="secondary" onClick={guard ? guard.requestClose : onCancel}>            {t('common.cancel')}
+          <Button type="button" variant="secondary" onClick={guard ? guard.requestClose : onCancel}>
+            {t('common.cancel')}
           </Button>
           <Button type="submit" busy={busy}>
             {submitLabel}

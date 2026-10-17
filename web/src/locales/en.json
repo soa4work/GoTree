@@ -63,6 +63,7 @@
     "close": "Close",
     "cancel": "Cancel",
     "discard": "Discard",
+    "keepEditing": "Keep editing",
     "discardTitle": "Discard changes?",
     "discardMessage": "You have unsaved changes. If you close this form, they will be lost.",
     "save": "Save",

@@ -32,7 +32,6 @@ describe('Dialog unsaved-changes guard', () => {
     await user.click(screen.getByRole('button', { name: 'Rerender' }))
     fireEvent(screen.getByRole('dialog', { name: 'Edit' }), new Event('cancel', { cancelable: true }))
     expect(await screen.findByRole('dialog', { name: 'Discard changes?' })).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Edit' })).toBeInTheDocument()
     expect(screen.getByLabelText('Name')).toHaveValue('Anna')
   })
 })

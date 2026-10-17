@@ -256,8 +256,10 @@ describe('discarding changes', () => {
     pressEscape(dialog)
 
     const confirm = await screen.findByRole('dialog', { name: 'Discard changes?' })
-    expect(screen.getByRole('dialog', { name: 'New person' })).toBeInTheDocument()
-    // Escape in the confirmation closes only the confirmation.
+    // The question replaces the form's content; the form keeps its input.
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.getByLabelText('Given names')).toHaveValue('Anna')
+    // Escape on the question goes back to the form.
     pressEscape(confirm)
     await waitFor(() => expect(discardDialog()).not.toBeInTheDocument())
     expect(screen.getByRole('dialog', { name: 'New person' })).toBeInTheDocument()

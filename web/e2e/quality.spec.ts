@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { expectAccessible, login, openSection, unique } from './helpers'
 
-test('find contradictions, tidy dates and name a relationship', async ({ page }) => {
+test('find contradictions, unreadable dates and name a relationship', async ({ page }) => {
   await login(page)
   const surname = unique('Quality', page)
   const api = page.request
@@ -19,7 +19,7 @@ test('find contradictions, tidy dates and name a relationship', async ({ page })
   ).json()
   await api.post('/api/events', { data: { personId: anna.id, type: 'BIRT', date: '1900' } })
   await api.post('/api/events', { data: { personId: anna.id, type: 'DEAT', date: '1890' } })
-  await api.post('/api/events', { data: { personId: anna.id, type: 'RESI', date: 'ca. 1895' } })
+  await api.post('/api/events', { data: { personId: anna.id, type: 'RESI', date: 'sometime in 1895' } })
 
   // The person page shows its own problems.
   await page.goto(`/people/${anna.id}`)
@@ -27,22 +27,16 @@ test('find contradictions, tidy dates and name a relationship', async ({ page })
   await expect(problems.getByText(`Anna ${surname} was born after they died.`, { exact: true })).toBeVisible()
   await expectAccessible(page)
 
-  // The data quality page offers the loose date in GEDCOM form; only this
-  // test's row is rewritten.
+  // The data quality page lists the unreadable date.
   await page.goto('/')
   await openSection(page, 'Data quality')
   await expect(page.getByRole('heading', { level: 1, name: 'Data quality' })).toBeVisible()
   await expect(page.getByText(`Anna ${surname} was born after they died.`, { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Select none' }).click()
   const unreadable = page.getByText(`Anna ${surname}’s Residence has a date GoTree cannot read.`, { exact: true })
   await expect(unreadable).toBeVisible()
-  const row = page.getByRole('listitem').filter({ hasText: `Anna ${surname}` }).filter({ hasText: 'ca. 1895' })
-  await row.getByRole('checkbox', { name: 'ca. 1895 becomes ABT 1895' }).check()
+  // Dates typed as "ca. 1895" are saved as GEDCOM, so nothing is left to tidy here;
+  // rewriting older text is covered by the Go and component tests.
   await expectAccessible(page)
-  await page.getByRole('button', { name: 'Rewrite 1 date' }).click()
-  await expect(page.getByText('1 date rewritten.')).toBeVisible()
-  await expect(row).toBeHidden()
-  await expect(unreadable).toBeHidden()
 
   // From Carl's page to the calculator, then pick Anna.
   await page.goto(`/people/${nephew.person.id}`)

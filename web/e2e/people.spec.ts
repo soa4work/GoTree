@@ -28,7 +28,7 @@ test('build a small family by keyboard and mouse', async ({ page }) => {
   await page.getByRole('button', { name: /^\+ Event/ }).click()
   const eventDialog = page.getByRole('dialog', { name: 'New life event' })
   await eventDialog.getByLabel('Date').fill('12.3.1890')
-  await expect(eventDialog.getByText('Stored as 12 MAR 1890')).toBeVisible()
+  await expect(eventDialog.getByText('Understood as 12 March 1890')).toBeVisible()
   const place = `Leipzig${surname}, Saxony, Germany`
   await eventDialog.getByRole('searchbox', { name: 'Place' }).fill(place)
   await eventDialog.getByRole('button', { name: `Create “${place}”` }).click()
@@ -36,7 +36,7 @@ test('build a small family by keyboard and mouse', async ({ page }) => {
   await expectAccessible(page)
   await eventDialog.getByRole('button', { name: /^Save/ }).click()
   await expect(eventDialog).toBeHidden()
-  await expect(page.getByText(`12 MAR 1890 · ${place}`)).toBeVisible()
+  await expect(page.getByText(`12 March 1890 · ${place}`)).toBeVisible()
 
   // A parent before anything else is known, then a sibling.
   await page.getByRole('button', { name: /^\+ Parent/ }).click()
@@ -55,7 +55,7 @@ test('build a small family by keyboard and mouse', async ({ page }) => {
   // Birth and death are filled in the same dialog; no second dialog needed.
   const birth = siblingDialog.getByRole('group', { name: 'Birth (optional)' })
   await birth.getByLabel('Date').fill('1850')
-  await expect(birth.getByText('Stored as 1850')).toBeVisible()
+  await expect(birth.getByText('Understood as 1850')).toBeVisible()
   await siblingDialog.getByRole('button', { name: /^Add/ }).click()
   await expect(parents.getByRole('link', { name: `Lena ${surname}` })).toBeVisible()
   await parents.getByRole('link', { name: `Lena ${surname}` }).click()

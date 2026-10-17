@@ -144,6 +144,10 @@ func TestAddRelativeAndDatePreview(t *testing.T) {
 	if !d.Valid || d.Normalized != "ABT 12 MAR 1850" || d.Qualifier != "ABT" {
 		t.Errorf("parse: %+v", d)
 	}
+	c.call("GET", "/api/dates/parse?q=between+1850+and+1860", nil, http.StatusOK, &d)
+	if !d.Valid || d.Normalized != "BET 1850 AND 1860" {
+		t.Errorf("plain-language parse: %+v", d)
+	}
 	c.call("GET", "/api/dates/parse?q=31+FEB+1850", nil, http.StatusOK, &d)
 	if d.Valid || d.Error == "" {
 		t.Errorf("invalid date: %+v", d)

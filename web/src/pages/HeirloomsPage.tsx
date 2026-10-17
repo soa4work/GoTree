@@ -8,6 +8,7 @@ import { PageHeading } from '../components/PageHeading'
 import { HeirloomDialog } from '../heirlooms/HeirloomDialog'
 import { useDebounced } from '../hooks/useDebounced'
 import { fullName } from '../lib/people'
+import { formatDate } from '../lib/dates'
 
 export function HeirloomsPage() {
   const { t } = useTranslation()
@@ -64,7 +65,7 @@ export function HeirloomsPage() {
                   <span className="block text-sm text-slate-600 dark:text-slate-400">
                     {[
                       t(`heirloom.kinds.${h.kind}`),
-                      h.madeDate,
+                      formatDate(h.madeDate),
                       h.holder ? t('heirloom.heldBy', { name: fullName(h.holder) ?? t('person.unknown') }) : '',
                     ]
                       .filter(Boolean)

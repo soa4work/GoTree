@@ -1212,7 +1212,7 @@ func (im *importer) heirloom(ctx context.Context, r *gedcom.Node) error {
 	if strings.TrimSpace(in.Name) == "" {
 		in.Name = "?"
 	}
-	in.normalize()
+	in.normalizeWith(canonicalDate)
 	now := im.s.now()
 	res, err := im.tx.ExecContext(ctx, `
 		INSERT INTO heirlooms (tree_id, name, kind, description, made_date_raw, made_date_sort, origin_place_id, current_location, notes,

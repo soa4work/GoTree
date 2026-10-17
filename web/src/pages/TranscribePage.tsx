@@ -8,6 +8,7 @@ import { Button } from '../components/Button'
 import { PageHeading } from '../components/PageHeading'
 import { templateName } from '../transcribe/labels'
 import { TemplateDialog } from '../transcribe/TemplateDialog'
+import { formatDate } from '../lib/dates'
 
 export function TranscribePage() {
   const { t } = useTranslation()
@@ -65,7 +66,7 @@ export function TranscribePage() {
                   <Link to={`/transcribe/${tr.id}`} className="block min-h-11 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-900">
                     <span className="block font-medium">{tr.title || t('transcribe.untitled', { template: kind })}</span>
                     <span className="block text-sm text-slate-600 dark:text-slate-400">
-                      {[kind, tr.source?.title, tr.date, t('transcribe.rowsCount', { count: tr.rows.length }), t(`transcribe.${tr.status}`)]
+                      {[kind, tr.source?.title, formatDate(tr.date), t('transcribe.rowsCount', { count: tr.rows.length }), t(`transcribe.${tr.status}`)]
                         .filter(Boolean)
                         .join(' · ')}
                     </span>

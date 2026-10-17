@@ -109,6 +109,12 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Dates read as plain English ("26 February 1820", "about 1850", "between 1850 and 1860") on the
+  timeline, heirlooms and in the date field preview, and can be typed that way in events,
+  heirlooms, media and transcriptions (saved as GEDCOM when needed, so the preview matches what is
+  stored); "Tidy up dates" no longer offers dates that were just saved; share, expiry and due
+  days now follow the interface language everywhere (#14)
+
 - Navigation: the sidebar groups its sections under Tree, Records, Explore, Work and Settings
   and now lists the wall chart; the phone bar keeps Home, People, Tree and Sources and a "More"
   menu opens every section, grouped the same way (replacing the "Also" links on the home page);

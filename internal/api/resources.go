@@ -266,7 +266,7 @@ type parsedDate struct {
 // parseDate lets the UI preview how a date will be stored, using the same
 // parser as the server instead of a second implementation in JavaScript.
 func parseDate(w http.ResponseWriter, r *http.Request) {
-	d, err := gendate.Parse(r.URL.Query().Get("q"))
+	d, err := gendate.Normalize(r.URL.Query().Get("q"))
 	switch {
 	case errors.Is(err, gendate.ErrEmpty):
 		writeJSON(w, http.StatusOK, parsedDate{Empty: true})

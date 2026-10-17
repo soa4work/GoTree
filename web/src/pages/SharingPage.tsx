@@ -15,6 +15,7 @@ import { TextField } from '../components/TextField'
 import { fullName } from '../lib/people'
 import { PersonPicker } from '../people/PersonPicker'
 import { CalendarFeeds } from '../share/CalendarFeeds'
+import { formatDay } from '../lib/dates'
 
 const shareUrl = (token: string) => `${window.location.origin}/share/${token}`
 
@@ -106,7 +107,6 @@ export function SharingPage() {
 }
 
 function describe(t: TFunction, l: ShareLink): string {
-  const day = (iso: string) => new Date(iso).toLocaleDateString()
   const scope =
     l.scope === 'tree'
       ? t('sharing.scopeTree')
@@ -115,11 +115,11 @@ function describe(t: TFunction, l: ShareLink): string {
     scope,
     t(`sharing.privacy_${l.privacy}`),
     l.revokedAt
-      ? t('sharing.revokedOn', { date: day(l.revokedAt) })
+      ? t('sharing.revokedOn', { date: formatDay(l.revokedAt) })
       : l.expiresAt
-        ? t('sharing.expires', { date: day(new Date(new Date(l.expiresAt).getTime() - 1).toISOString()) })
+        ? t('sharing.expires', { date: formatDay(new Date(new Date(l.expiresAt).getTime() - 1).toISOString()) })
         : t('sharing.noExpiry'),
-    l.lastUsedAt ? t('sharing.lastUsed', { date: day(l.lastUsedAt) }) : t('sharing.neverUsed'),
+    l.lastUsedAt ? t('sharing.lastUsed', { date: formatDay(l.lastUsedAt) }) : t('sharing.neverUsed'),
   ].join(' · ')
 }
 

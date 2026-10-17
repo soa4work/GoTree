@@ -255,8 +255,22 @@
     "disproven": "disproven"
   },
   "date": {
-    "hint": "e.g. 12 MAR 1850, 12.3.1850, ABT 1850, BET 1850 AND 1860",
-    "storedAs": "Stored as {{date}}",
+    "hint": "e.g. 12 March 1850, 12.3.1850, about 1850, between 1850 and 1860, before 1900",
+    "storedAs": "Understood as {{date}}",
+    "fmt": {
+      "about": "about {{date}}",
+      "calculated": "calculated {{date}}",
+      "estimated": "estimated {{date}}",
+      "before": "before {{date}}",
+      "after": "after {{date}}",
+      "from": "from {{date}}",
+      "to": "until {{date}}",
+      "between": "between {{start}} and {{end}}",
+      "fromTo": "from {{start}} to {{end}}",
+      "interpreted": "{{date}} ({{phrase}})",
+      "bc": "{{date}} BC",
+      "julian": "{{date}} (Julian calendar)"
+    },
     "unrecognized": "Not a recognized date. It is kept as typed and flagged for review.",
     "unrecognizedShort": "unrecognized date"
   },

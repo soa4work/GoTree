@@ -26,7 +26,7 @@ const checks: CheckReport = {
 
 const proposals: DateProposals = {
   items: [
-    { eventId: 10, type: 'BIRT', customLabel: '', personId: 1, familyId: null, personIds: [1], raw: '12.3.1850', proposed: '12 MAR 1850', wasValid: true },
+    { eventId: 10, type: 'BIRT', customLabel: '', personId: 1, familyId: null, personIds: [1], raw: 'March 12, 1850', proposed: '12 MAR 1850', wasValid: false },
     { eventId: 11, type: 'MARR', customLabel: '', personId: null, familyId: 5, personIds: [1, 2], raw: 'ca. 1870', proposed: 'ABT 1870', wasValid: false },
   ],
   unreadable: 1,
@@ -54,7 +54,7 @@ describe('data quality page', () => {
     expect(screen.queryByText('Anna Weber was born after they died.')).not.toBeInTheDocument()
 
     const marriage = await screen.findByRole('checkbox', { name: /ca\. 1870 becomes ABT 1870/ })
-    expect(screen.getByRole('checkbox', { name: /12\.3\.1850 becomes 12 MAR 1850/ })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /March 12, 1850 becomes 12 MAR 1850/ })).toBeChecked()
     expect(screen.getByText(/family of Anna Weber & Paul Weber/)).toBeInTheDocument()
     expect(screen.getByText(/1 date cannot be read at all/)).toBeInTheDocument()
     expect(await axeViolations(container)).toEqual([])
@@ -62,7 +62,7 @@ describe('data quality page', () => {
     fireEvent.click(marriage)
     fireEvent.click(screen.getByRole('button', { name: 'Rewrite 1 date' }))
     expect(await screen.findByText('1 date rewritten.')).toBeInTheDocument()
-    expect(sent).toEqual({ changes: [{ eventId: 10, raw: '12.3.1850', date: '12 MAR 1850' }] })
+    expect(sent).toEqual({ changes: [{ eventId: 10, raw: 'March 12, 1850', date: '12 MAR 1850' }] })
   })
 })
 

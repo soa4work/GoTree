@@ -44,6 +44,13 @@ func (f Files) Path(sha string) (string, error) {
 // Save streams r to disk, at most limit bytes. A file that is already
 // stored is kept as is.
 func (f Files) Save(r io.Reader, limit int64) (Stored, error) {
+	return f.SaveChecked(r, limit, nil)
+}
+
+// SaveChecked is Save with a check that runs on the finished temporary file
+// before it reaches the store. When check returns an error, nothing is
+// stored, not even if an identical upload races with this one.
+func (f Files) SaveChecked(r io.Reader, limit int64, check func(path string) error) (Stored, error) {
 	tmpDir := filepath.Join(f.Root, "tmp")
 	if err := os.MkdirAll(tmpDir, 0o750); err != nil {
 		return Stored{}, err
@@ -68,6 +75,12 @@ func (f Files) Save(r io.Reader, limit int64) (Stored, error) {
 	}
 	if err := tmp.Close(); err != nil {
 		return Stored{}, err
+	}
+
+	if check != nil {
+		if err := check(tmp.Name()); err != nil {
+			return Stored{}, err
+		}
 	}
 
 	sha := hex.EncodeToString(h.Sum(nil))

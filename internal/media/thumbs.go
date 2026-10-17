@@ -22,15 +22,17 @@ var ThumbSizes = []int{128, 256, 512, 1024}
 
 // MaxImagePixels is the largest image (width times height) that is decoded.
 // A decoded image takes four bytes per pixel and rotating it needs a second
-// copy, so a small file declaring huge dimensions could exhaust memory.
+// copy (8 bytes per pixel for 16-bit PNGs), so a small file declaring huge
+// dimensions could exhaust memory.
 const MaxImagePixels = 50_000_000
 
 // ErrImageTooLarge is returned for images with more than MaxImagePixels.
 var ErrImageTooLarge = errors.New("image has too many pixels")
 
-// thumbSlots bounds how many thumbnails are rendered at once, as each one
-// holds a fully decoded image in memory.
-var thumbSlots = make(chan struct{}, runtime.NumCPU())
+// thumbSlots bounds how many thumbnails are rendered at once. Each holds a
+// fully decoded image and its rotated copy, up to about 600 MB at the pixel
+// limit, so the bound stays low even on machines with many CPUs.
+var thumbSlots = make(chan struct{}, min(runtime.NumCPU(), 2))
 
 // CheckImageSize reads an image's dimensions from its header, without
 // decoding it, and returns ErrImageTooLarge above MaxImagePixels.
@@ -44,7 +46,10 @@ func CheckImageSize(path string) error {
 	if err != nil {
 		return fmt.Errorf("decode: %w", err)
 	}
-	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > MaxImagePixels/cfg.Height {
+	if cfg.Width <= 0 || cfg.Height <= 0 {
+		return fmt.Errorf("invalid image size %dx%d", cfg.Width, cfg.Height)
+	}
+	if cfg.Width > MaxImagePixels/cfg.Height {
 		return ErrImageTooLarge
 	}
 	return nil

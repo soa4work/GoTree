@@ -94,7 +94,15 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnsupportedMediaType, "this kind of file is not supported; use JPEG, PNG, GIF, WebP, PDF, MP3, M4A, OGG, WAV, MP4 or WebM")
 		return
 	}
-	stored, err := s.Files.Save(buffered, s.MaxUpload)
+	var check func(path string) error
+	if kind == media.KindImage {
+		check = media.CheckImageSize
+	}
+	stored, err := s.Files.SaveChecked(buffered, s.MaxUpload, check)
+	if errors.Is(err, media.ErrImageTooLarge) {
+		writeError(w, http.StatusUnprocessableEntity, fmt.Sprintf("the image is larger than %d megapixels", media.MaxImagePixels/1_000_000))
+		return
+	}
 	if errors.Is(err, media.ErrTooLarge) {
 		writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("the file is larger than %d MB", s.MaxUpload>>20))
 		return
@@ -110,10 +118,6 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 		OriginalName: filepath.Base(part.FileName()), Orientation: 1,
 	}
 	if kind == media.KindImage {
-		if path, err := s.Files.Path(stored.SHA256); err == nil && errors.Is(media.CheckImageSize(path), media.ErrImageTooLarge) {
-			writeError(w, http.StatusUnprocessableEntity, fmt.Sprintf("the image is larger than %d megapixels", media.MaxImagePixels/1_000_000))
-			return
-		}
 		s.readImageMeta(&in)
 	}
 	m, created, err := s.Store.CreateMedia(r.Context(), actorFrom(r), in, link)

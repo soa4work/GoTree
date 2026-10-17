@@ -350,7 +350,7 @@ func (ex *exporter) load(ctx context.Context) error {
 				return err
 			}
 			ex.linked[mid] = true
-			if ex.included[pid] {
+			if ex.included[pid] && !ex.nameOnly[pid] {
 				ex.used[mid] = true
 			}
 		}

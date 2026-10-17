@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { getAuthState, getHealth } from '../api/client'
-import { getOnThisDay, getStats, listSources, listTasks } from '../api/endpoints'
+import { getOnThisDay, getStats, listTasks } from '../api/endpoints'
 import { OnboardingCard } from '../components/OnboardingCard'
 import { PageHeading } from '../components/PageHeading'
 import { TaskList } from '../research/ResearchPanel'
@@ -20,7 +20,6 @@ export function Dashboard() {
     enabled: isAdmin,
   })
   const stats = useQuery({ queryKey: ['stats'], queryFn: ({ signal }) => getStats(signal) })
-  const sources = useQuery({ queryKey: ['sources', 'dashboard'], queryFn: ({ signal }) => listSources('', signal) })
   const tasks = useQuery({
     queryKey: ['research', 'tasks', 'dashboard'],
     queryFn: ({ signal }) => listTasks({ status: 'active', limit: 5 }, signal),
@@ -38,6 +37,7 @@ export function Dashboard() {
     <div className="max-w-3xl space-y-6">
       <PageHeading title={t('app.name')}>{t('dashboard.title')}</PageHeading>
       <p className="text-slate-700 dark:text-slate-300">{t('dashboard.intro')}</p>
+      {stats.isError && <p role="alert">{t('dashboard.statsFailed')}</p>}
       {empty && <OnboardingCard />}
       {filled && (
         <section aria-labelledby="tree-summary" className="space-y-2">
@@ -49,7 +49,7 @@ export function Dashboard() {
               [
                 ['dashboard.people', '/people', stats.data.persons],
                 ['dashboard.families', null, stats.data.families],
-                ['dashboard.sources', '/sources', sources.data?.length],
+                ['dashboard.sources', '/sources', stats.data.sources],
               ] as const
             ).map(([key, to, count]) => (
               <div key={key} className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
@@ -62,7 +62,7 @@ export function Dashboard() {
                     t(key)
                   )}
                 </dt>
-                <dd className="mt-1 text-2xl font-semibold">{count ?? '–'}</dd>
+                <dd className="mt-1 text-2xl font-semibold">{count}</dd>
               </div>
             ))}
           </dl>

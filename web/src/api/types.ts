@@ -746,6 +746,7 @@ export interface NameCount {
 export interface Stats {
   persons: number
   families: number
+  sources: number
   withLifespan: number
   lifespans: { decade: number; count: number; average: number; min: number; max: number }[]
   marriages: { decade: number; firstMen: Average; firstWomen: Average; later: Average }[]

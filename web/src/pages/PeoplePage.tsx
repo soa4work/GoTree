@@ -98,7 +98,7 @@ export function PeoplePage() {
           ))}
         </ul>
       )}
-      {!people.isPending && total === 0 && !q && (
+      {!people.isPending && total === 0 && !q && !creating && (
         <OnboardingCard />
       )}
       {people.hasNextPage && (

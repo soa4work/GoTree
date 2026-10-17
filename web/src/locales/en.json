@@ -35,6 +35,7 @@
     "families": "Families",
     "sources": "Sources",
     "also": "Also",
+    "statsFailed": "The tree summary could not be loaded.",
     "serverStatus": "Server status",
     "checking": "Checking the server…",
     "online": "Server online · version {{version}}",
@@ -42,6 +43,7 @@
   },
   "onboarding": {
     "title": "No one is in your tree yet",
+    "viewerText": "Ask the owner of this tree to add people.",
     "text": "Start with yourself or the oldest ancestor you know, or bring in a tree you already have.",
     "addYourself": "Add yourself",
     "import": "Import from Ancestry, MyHeritage and others"
@@ -107,7 +109,6 @@
     "count_other": "{{count}} people",
     "found_one": "{{count}} person found",
     "found_other": "{{count}} people found",
-    "empty": "No one is in your tree yet. Start with yourself or the oldest ancestor you know.",
     "more": "Show more"
   },
   "person": {

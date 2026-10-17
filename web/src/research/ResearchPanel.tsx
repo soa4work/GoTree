@@ -8,10 +8,11 @@ import { Button } from '../components/Button'
 import { SelectField } from '../components/Field'
 import { LogDialog } from './LogDialog'
 import { TaskDialog } from './TaskDialog'
+import { formatDay } from '../lib/dates'
 
 type Open = { kind: 'task'; task?: ResearchTask } | { kind: 'log'; entry?: LogEntry; taskId?: number | null } | null
 
-const day = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString()
+const day = formatDay
 
 function todayISO() {
   const d = new Date()

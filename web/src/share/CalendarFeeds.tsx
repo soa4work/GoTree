@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Dialog } from '../components/Dialog'
 import { Form } from '../components/Form'
 import { TextField } from '../components/TextField'
+import { formatDay } from '../lib/dates'
 
 const feedUrl = (token: string) => `${window.location.origin}/ical/${token}.ics`
 
@@ -28,7 +29,7 @@ export function CalendarFeeds() {
       void queryClient.invalidateQueries({ queryKey: ['calendar-feeds'] })
     },
   })
-  const day = (iso: string) => new Date(iso).toLocaleDateString()
+  const day = formatDay
 
   return (
     <section aria-labelledby={id} className="space-y-3">

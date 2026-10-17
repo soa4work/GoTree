@@ -140,6 +140,8 @@ describe('person page', () => {
       'Marriage',
       'Deathdisputed',
     ])
+    // GEDCOM dates are shown as plain English.
+    expect(within(events[0]!).getByText('12 March 1890')).toBeInTheDocument()
     expect(screen.getByText('as child')).toBeInTheDocument()
     expect(screen.getByText('with Eva Weber')).toBeInTheDocument()
     expect(screen.getByText('Reason: Only family tradition')).toBeInTheDocument()
@@ -205,7 +207,7 @@ describe('person page', () => {
     await user.keyboard('a')
     const dialog = await screen.findByRole('dialog', { name: 'New life event' })
     await user.type(within(dialog).getByLabelText('Date'), 'abt 1850')
-    expect(await within(dialog).findByText('Stored as ABT 1850')).toBeInTheDocument()
+    expect(await within(dialog).findByText('Understood as about 1850')).toBeInTheDocument()
 
     await user.selectOptions(within(dialog).getByLabelText('Event'), 'Other event')
     await user.click(within(dialog).getByRole('button', { name: /^Save/ }))

@@ -15,6 +15,7 @@ import { TextField } from '../components/TextField'
 import { fullName } from '../lib/people'
 import { PersonPicker } from '../people/PersonPicker'
 import { CalendarFeeds } from '../share/CalendarFeeds'
+import { formatDay } from '../lib/dates'
 
 const shareUrl = (token: string) => `${window.location.origin}/share/${token}`
 
@@ -106,7 +107,7 @@ export function SharingPage() {
 }
 
 function describe(t: TFunction, l: ShareLink): string {
-  const day = (iso: string) => new Date(iso).toLocaleDateString()
+  const day = formatDay
   const scope =
     l.scope === 'tree'
       ? t('sharing.scopeTree')

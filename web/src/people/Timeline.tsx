@@ -3,6 +3,7 @@ import type { TimelineItem } from './timelineItems'
 import { Button } from '../components/Button'
 import { partnerLabel } from './familyLabel'
 import { CitationText } from '../sources/CitationEditor'
+import { formatDate } from '../lib/dates'
 
 interface Props {
   items: TimelineItem[]
@@ -42,7 +43,7 @@ export function Timeline({ items, personId, onEdit }: Props) {
                 )}
               </p>
               <p className="text-sm text-slate-700 dark:text-slate-300">
-                {e.date.raw ? (e.date.valid ? e.date.normalized : e.date.raw) : t('event.noDate')}
+                {e.date.raw ? (e.date.valid ? formatDate(e.date.normalized) : e.date.raw) : t('event.noDate')}
                 {e.date.raw && !e.date.valid && <span className="ml-1 italic">({t('date.unrecognizedShort')})</span>}
                 {e.place && <> · {e.place.fullName}</>}
               </p>

@@ -115,6 +115,13 @@ func (in *EventInput) normalize() {
 	in.Type = strings.ToUpper(strings.TrimSpace(in.Type))
 	in.CustomLabel = strings.TrimSpace(in.CustomLabel)
 	in.Date = strings.Join(strings.Fields(in.Date), " ")
+	// Plain-language dates ("about 1850", "between 1850 and 1860", "12 March
+	// 1850") are stored as GEDCOM, so sorting, checks and export see them.
+	if _, err := gendate.Parse(in.Date); err != nil {
+		if d, err := gendate.Normalize(in.Date); err == nil {
+			in.Date = d.String()
+		}
+	}
 	in.Description = strings.TrimSpace(in.Description)
 	in.Notes = strings.TrimSpace(in.Notes)
 	in.Status = defaultStatus(in.Status)

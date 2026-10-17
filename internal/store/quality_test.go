@@ -72,7 +72,11 @@ func TestNormalizeDates(t *testing.T) {
 		return e
 	}
 	german := mk("12.3.1850")
-	loose := mk("March 12, 1851")
+	// Saving tidies loose dates itself, so legacy loose text is written directly.
+	loose := mk("1851")
+	if _, err := s.DB.Exec(`UPDATE events SET date_raw = 'March 12, 1851', date = '', date_sort = NULL, date_sort_end = NULL WHERE id = ?`, loose.ID); err != nil {
+		t.Fatal(err)
+	}
 	mk("ABT 1852")
 	mk("whenever")
 	edited := mk("abt 1853")

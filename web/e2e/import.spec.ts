@@ -30,7 +30,7 @@ test('import a GEDCOM file and read the report', async ({ page }) => {
   await page.getByRole('searchbox', { name: 'Search people' }).fill('johann')
   await page.getByRole('link', { name: /Johann Weber/ }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Johann Weber' })).toBeVisible()
-  await expect(page.getByText('3 FEB 1855 · Leipzig, Sachsen, Deutschland')).toBeVisible()
+  await expect(page.getByText('3 February 1855 · Leipzig, Sachsen, Deutschland')).toBeVisible()
   await expect(page.getByRole('list', { name: 'Sources for Birth' })).toContainText('Kirchenbuch St. Thomas, Taufen 1880-1900, S. 12, Nr. 34')
   // A GEDCOM date the importer could not read is shown as written.
   await expect(page.getByText('12 Dezember 1920')).toBeVisible()

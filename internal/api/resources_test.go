@@ -118,7 +118,21 @@ func TestAddRelativeAndDatePreview(t *testing.T) {
 	if res.Person.GivenNames != "Eva" || len(res.Family.Events) != 1 {
 		t.Errorf("relative: %+v", res)
 	}
+	var withBirth store.RelativeResult
+	c.call("POST", fmt.Sprintf("/api/persons/%d/relatives", paul.ID), map[string]any{
+		"relation": "child", "person": map[string]any{"givenNames": "Mia", "birth": map[string]any{"date": "1850"}},
+	}, http.StatusCreated, &withBirth)
+	var detail store.PersonDetail
+	c.call("GET", fmt.Sprintf("/api/persons/%d", withBirth.Person.ID), nil, http.StatusOK, &detail)
+	if len(detail.Events) != 1 || detail.Events[0].Type != "BIRT" || detail.Events[0].Date.Raw != "1850" {
+		t.Errorf("birth event: %+v", detail.Events)
+	}
 	var e errorBody
+	c.call("POST", "/api/persons", map[string]any{"givenNames": "Bad", "death": map[string]any{"date": "soon"}},
+		http.StatusUnprocessableEntity, &e)
+	if e.Fields["death.date"] == "" {
+		t.Errorf("fields: %+v", e)
+	}
 	c.call("POST", fmt.Sprintf("/api/persons/%d/relatives", paul.ID), map[string]any{"relation": "cousin", "person": map[string]any{}},
 		http.StatusUnprocessableEntity, &e)
 	if e.Fields["relation"] == "" {

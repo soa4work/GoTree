@@ -87,6 +87,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The new-person and add-relative forms take an optional birth and death date and place, so
+  "born 1850" no longer needs a second dialog; the events are saved together with the person (#8)
+
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so
   nothing being typed or uploaded is lost (#15)
 

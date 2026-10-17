@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/praetorianer777/gotree/internal/gendate"
 )
 
 // AlternateName is a further name of a person: birth name, married name, …
@@ -85,10 +87,26 @@ type PersonInput struct {
 	IsLiving       *bool                `json:"isLiving"`
 	Notes          string               `json:"notes"`
 	AlternateNames []AlternateNameInput `json:"alternateNames"`
+	// Birth and Death record a BIRT or DEAT event together with a new
+	// person. Only creating a person reads them; UpdatePerson ignores them
+	// because existing events are edited as events.
+	Birth *LifeEventInput `json:"birth,omitempty"`
+	Death *LifeEventInput `json:"death,omitempty"`
 	// AddCitations cites sources for the person as a whole.
 	AddCitations []NewCitation `json:"addCitations,omitempty"`
 	// RemoveCitations detaches citations from the person.
 	RemoveCitations []int64 `json:"removeCitations,omitempty"`
+}
+
+// LifeEventInput is the date and place of a birth or death entered with a new
+// person. When both are empty no event is created.
+type LifeEventInput struct {
+	Date    string `json:"date"`
+	PlaceID *int64 `json:"placeId"`
+}
+
+func (l *LifeEventInput) empty() bool {
+	return l == nil || (strings.TrimSpace(l.Date) == "" && l.PlaceID == nil)
 }
 
 // PersonDetail is everything the person page shows.
@@ -149,6 +167,16 @@ func (in PersonInput) validate() error {
 	long("notes", in.Notes, 100_000)
 	v.check(oneOf(in.Sex, "M", "F", "U", "X"), "sex", "must be M, F, U or X")
 	v.check(len(in.AlternateNames) <= 50, "alternateNames", "too many names")
+	for field, l := range map[string]*LifeEventInput{"birth": in.Birth, "death": in.Death} {
+		if l == nil {
+			continue
+		}
+		date := collapse(l.Date)
+		_, err := gendate.Parse(date)
+		v.check(date == "" || err == nil, field+".date", "is not a recognized date")
+		v.check(utf8.RuneCountInString(date) <= 120, field+".date", "is too long")
+	}
+	v.check(in.Death.empty() || in.IsLiving == nil || !*in.IsLiving, "death", "a living person has no death")
 	for _, n := range in.AlternateNames {
 		v.check(oneOf(n.Type, nameTypes...), "alternateNames", "unknown name type "+n.Type)
 		v.check(n.GivenNames != "" || n.Surname != "" || n.Nickname != "", "alternateNames", "a name needs at least a given name, surname or nickname")
@@ -192,6 +220,17 @@ func (s *Store) createPerson(ctx context.Context, tx *sql.Tx, a Actor, in Person
 		}
 		if err := s.addCitations(ctx, tx, a, "person", id, in.AddCitations); err != nil {
 			return err
+		}
+		for _, ev := range []struct {
+			typ string
+			in  *LifeEventInput
+		}{{"BIRT", in.Birth}, {"DEAT", in.Death}} {
+			if ev.in.empty() {
+				continue
+			}
+			if _, err := s.createEvent(ctx, tx, a, EventInput{PersonID: &id, Type: ev.typ, Date: ev.in.Date, PlaceID: ev.in.PlaceID}); err != nil {
+				return err
+			}
 		}
 		if err := reindexPerson(ctx, tx, id); err != nil {
 			return err

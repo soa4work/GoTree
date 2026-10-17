@@ -101,6 +101,8 @@
     "more": "Show more"
   },
   "person": {
+    "birth": "Birth (optional)",
+    "death": "Death (optional)",
     "new": "New person",
     "edit": "Edit person",
     "delete": "Delete person",

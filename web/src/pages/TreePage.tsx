@@ -247,6 +247,7 @@ export function TreePage() {
                 onSelect={(id) => set({ sel: String(id) })}
                 onCenter={centerOn}
                 look={look}
+                sheetOpen={selected !== null && !wide}
               />
               {selected && !wide && (
                 <PersonPanel

@@ -112,4 +112,38 @@ describe('tree page on narrow screens', () => {
     fireEvent.keyDown(sheet, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Eva Weber' })).toBeNull())
   })
+
+  it('keeps the sheet open when Escape is pressed inside the add-relative dialog', async () => {
+    mockApi({
+      'GET /api/tree/1': [200, graph],
+      'GET /api/persons/4': [
+        200,
+        {
+          ...graph.persons['4'],
+          namePrefix: '',
+          nameSuffix: '',
+          nickname: '',
+          isLiving: null,
+          notes: '',
+          alternateNames: [],
+          citations: [],
+          createdAt: '',
+          updatedAt: '',
+          events: [],
+          parentFamilies: [],
+          partnerFamilies: [],
+        },
+      ],
+    })
+    renderApp('/tree?root=1&view=hourglass&gen=2&sel=4')
+    const sheet = await screen.findByRole('region', { name: 'Eva Weber' })
+    const add = within(sheet).getByRole('button', { name: '+ Parent' })
+    await waitFor(() => expect(add).toBeEnabled())
+    fireEvent.click(add)
+    const field = await screen.findByLabelText('Given names')
+    fireEvent.change(field, { target: { value: 'Ida' } })
+    fireEvent.keyDown(field, { key: 'Escape' })
+    expect(screen.getByRole('region', { name: 'Eva Weber' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Given names')).toHaveValue('Ida')
+  })
 })

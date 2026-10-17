@@ -34,13 +34,13 @@ export function PersonPanel({ person, isRoot, sheet = false, onCenter, onClose }
     return () => document.querySelector<HTMLElement>(`[data-tree-person="${id}"]`)?.focus()
   }, [sheet, person.id])
 
-  // A native listener: keys pressed in the add-relative dialog (a React child
-  // through a portal) never reach it, so that dialog keeps its own Escape.
   useEffect(() => {
     const el = ref.current
     if (!sheet || !el) return
     const onKeyDown = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.defaultPrevented) onClose()
+      // The add-relative dialog lives inside the sheet and handles its own Escape
+      // (including the discard prompt), so keys from inside any dialog are ignored.
+      if (e.key === 'Escape' && !e.defaultPrevented && !(e.target as Element).closest('dialog')) onClose()
     }
     el.addEventListener('keydown', onKeyDown)
     return () => el.removeEventListener('keydown', onKeyDown)

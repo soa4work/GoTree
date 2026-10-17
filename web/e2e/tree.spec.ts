@@ -105,6 +105,13 @@ test('phone: controls are collapsed and a tapped person opens a sheet', async ({
   await expect(sheet).toBeVisible()
   await expect(sheet.getByRole('button', { name: '+ Parent' })).toBeInViewport()
   await expect(sheet).toBeFocused()
+  // The selected card moves up so the sheet does not cover it.
+  await expect
+    .poll(async () => {
+      const card = (await chart.getByRole('button', { name: new RegExp(`Paul ${surname}`) }).boundingBox())!
+      return card.y + card.height <= (await sheet.boundingBox())!.y + 1
+    })
+    .toBe(true)
   await expectAccessible(page)
 
   await page.keyboard.press('Escape')

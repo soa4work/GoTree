@@ -26,6 +26,8 @@ interface Props {
   onSelect: (id: number) => void
   onCenter: (id: number) => void
   look?: TreeLook
+  /** A bottom sheet covers the lower part of the canvas. */
+  sheetOpen?: boolean
 }
 
 export function TreeCanvas(props: Props) {
@@ -78,7 +80,7 @@ function neighbour(nodes: LayoutNode[], from: LayoutNode, key: string): LayoutNo
   return best
 }
 
-function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy' }: Props) {
+function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy', sheetOpen = false }: Props) {
   const { t } = useTranslation()
   const flow = useReactFlow()
   const store = useStoreApi()
@@ -190,6 +192,22 @@ function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy' 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout, flow, store])
 
+  // The sheet hides the lower part of the canvas: move the selected card up
+  // into the visible part.
+  useEffect(() => {
+    const n = selectedId === null ? undefined : byPerson.get(selectedId)
+    if (!sheetOpen || !n) return
+    const id = requestAnimationFrame(() => {
+      const sheet = document.getElementById('tree-panel-title')?.closest('section')
+      const zoom = Math.max(flow.getZoom(), readableZoom)
+      const c = center(n)
+      void flow.setCenter(c.x, c.y + (sheet ? sheet.offsetHeight / 2 : 0) / zoom, { zoom, duration: 250 })
+    })
+    return () => cancelAnimationFrame(id)
+    // byPerson follows layout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, sheetOpen, flow])
+
   return (
     <div role="group" aria-label={t('tree.chartLabel')} aria-describedby={helpId} className="size-full">
       <p id={helpId} className="sr-only">
@@ -207,8 +225,6 @@ function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy' 
         elementsSelectable={false}
         minZoom={0.1}
         maxZoom={2}
-        fitView
-        fitViewOptions={{ padding: 0.15, maxZoom: 1, minZoom: readableZoom }}
         zoomOnDoubleClick={false}
         onlyRenderVisibleElements={layout.nodes.length > 300}
         colorMode={dark ? 'dark' : 'light'}

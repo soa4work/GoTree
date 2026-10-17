@@ -1146,8 +1146,11 @@ func (im *importer) heirloom(ctx context.Context, r *gedcom.Node) error {
 		case "_DESC":
 			in.Description = c.Value
 		case "DATE":
-			text, _ := eventDateText(c)
+			text, used := eventDateText(c)
 			in.MadeDate = canonicalDate(text)
+			if c.First("PHRASE") != nil && !used {
+				im.tag(path+".DATE.PHRASE", TagDropped, "heirlooms have nowhere to keep it")
+			}
 		case "PLAC":
 			// Heirlooms have nowhere to keep unknown lines; place
 			// substructures GoTree does not read are lost here.

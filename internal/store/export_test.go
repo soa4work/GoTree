@@ -221,6 +221,19 @@ func TestExportGedcom7DatePhraseRoundTrip(t *testing.T) {
 	}
 }
 
+func TestExportKeptDatePhrase(t *testing.T) {
+	src := "0 HEAD\n1 GEDC\n2 VERS 7.0\n0 @I1@ INDI\n1 NAME Anna /Weber/\n1 BIRT\n2 DATE ABT 1900\n3 PHRASE during the war\n0 TRLR\n"
+	s, a := reimport(t, src)
+	v7 := exportText(t, s, a, ExportOptions{Version7: true})
+	if !strings.Contains(v7, "2 DATE ABT 1900\n3 PHRASE during the war\n") || strings.Contains(v7, "\n2 PHRASE") {
+		t.Errorf("7.0 export:\n%s", v7)
+	}
+	v5 := exportText(t, s, a, ExportOptions{})
+	if !strings.Contains(v5, "2 NOTE Date phrase: during the war\n") || strings.Contains(v5, "PHRASE") {
+		t.Errorf("5.5.1 export:\n%s", v5)
+	}
+}
+
 func TestExportPrivacy(t *testing.T) {
 	s := newStore(t)
 	a := setup(t, s)

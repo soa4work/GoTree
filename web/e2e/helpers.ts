@@ -20,3 +20,15 @@ export function unique(base: string, page: Page) {
   const viewport = page.viewportSize()?.width ?? 0
   return `${base}${viewport < 600 ? 'm' : 'd'}${Date.now().toString(36)}`
 }
+
+/** Opens a section from the navigation: the sidebar on desktop, the bar or its More menu on a phone. */
+export async function openSection(page: Page, name: string) {
+  const nav = page.getByRole('navigation', { name: 'Main navigation' })
+  const link = nav.getByRole('link', { name, exact: true })
+  if ((page.viewportSize()?.width ?? 0) >= 768 || (await link.count()) > 0) {
+    await link.click()
+    return
+  }
+  await nav.getByRole('button', { name: 'More' }).click()
+  await page.getByRole('navigation', { name: 'More sections' }).getByRole('link', { name, exact: true }).click()
+}

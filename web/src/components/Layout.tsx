@@ -4,31 +4,96 @@ import { useTranslation } from 'react-i18next'
 import { GopherCredit } from './GopherCredit'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { getAuthState, logout } from '../api/client'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useShortcuts } from '../hooks/useShortcuts'
 import { Button } from './Button'
 import { ShortcutsHelp } from './ShortcutsHelp'
 import { ThemeSwitch } from './ThemeSwitch'
 import { UpdateNotice } from './UpdateNotice'
-import { ChartIcon, CheckIcon, HeirloomIcon, MapIcon, HomeIcon, LinkIcon, PeopleIcon, PhotoIcon, ResearchIcon, ShareIcon, TranscribeIcon, SourceIcon, TransferIcon, TreeIcon } from './icons'
+import { DialogShell } from './DialogShell'
+import { MoreIcon } from './icons'
+import { homeItem, navGroups, phoneItems, type NavItem } from './navGroups'
 
-// The phone bar has room for five; the rest appear from md up and are
-// reachable on phones through the pages that use them.
-const navItems = [
-  { to: '/', key: 'nav.dashboard', Icon: HomeIcon, end: true, phone: true },
-  { to: '/people', key: 'nav.people', Icon: PeopleIcon, end: false, phone: true },
-  { to: '/tree', key: 'nav.tree', Icon: TreeIcon, end: false, phone: true },
-  { to: '/sources', key: 'nav.sources', Icon: SourceIcon, end: false, phone: true },
-  { to: '/media', key: 'nav.media', Icon: PhotoIcon, end: false, phone: false },
-  { to: '/heirlooms', key: 'nav.heirlooms', Icon: HeirloomIcon, end: false, phone: false },
-  { to: '/map', key: 'nav.map', Icon: MapIcon, end: false, phone: false },
-  { to: '/stats', key: 'nav.stats', Icon: ChartIcon, end: false, phone: false },
-  { to: '/transcribe', key: 'nav.transcribe', Icon: TranscribeIcon, end: false, phone: false },
-  { to: '/research', key: 'nav.research', Icon: ResearchIcon, end: false, phone: false },
-  { to: '/relationship', key: 'nav.relationship', Icon: LinkIcon, end: false, phone: false },
-  { to: '/quality', key: 'nav.quality', Icon: CheckIcon, end: false, phone: false },
-  { to: '/sharing', key: 'nav.sharing', Icon: ShareIcon, end: false, phone: false },
-  { to: '/import-export', key: 'nav.importExport', Icon: TransferIcon, end: false, phone: true },
-] as const
+function sideLinkClass({ isActive }: { isActive: boolean }) {
+  return [
+    'flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium',
+    isActive
+      ? 'bg-brand-50 text-brand-700 dark:bg-slate-800 dark:text-brand-100'
+      : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white',
+  ].join(' ')
+}
+
+function SideLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
+  const { t } = useTranslation()
+  const { to, key, Icon, end } = item
+  return (
+    <NavLink to={to} end={end} onClick={onNavigate} className={sideLinkClass}>
+      <Icon />
+      <span className="leading-tight">{t(key)}</span>
+    </NavLink>
+  )
+}
+
+/** The sections as headed lists; the sidebar and the phone's More menu share it. */
+function GroupedLinks({ idPrefix, level, skipHome, onNavigate }: { idPrefix: string; level: 2 | 3; skipHome?: boolean; onNavigate?: () => void }) {
+  const { t } = useTranslation()
+  const Heading = `h${level}` as const
+  return (
+    <>
+      {navGroups.map((group) => {
+        const headingId = `${idPrefix}-${group.id}`
+        return (
+          <div key={group.id} className="mt-3">
+            <Heading id={headingId} className="px-3 pb-1 text-xs font-semibold tracking-wide text-slate-600 uppercase dark:text-slate-400">
+              {t(group.key)}
+            </Heading>
+            <ul aria-labelledby={headingId} className="space-y-0.5">
+              {group.items
+                .filter((item) => !(skipHome && item.to === homeItem.to))
+                .map((item) => (
+                  <li key={item.to}>
+                    <SideLink item={item} onNavigate={onNavigate} />
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
+/** The phone bar's fifth slot: a sheet with every section, grouped like the sidebar. */
+function MoreMenu({ pathname }: { pathname: string }) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const inMenu = navGroups.some((g) =>
+    g.items.some((i) => !i.phone && (pathname === i.to || pathname.startsWith(`${i.to}/`))),
+  )
+  return (
+    <>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+        className={[
+          'flex min-h-14 w-full flex-col items-center justify-center gap-0.5 px-1 text-xs font-medium',
+          inMenu ? 'text-brand-700 dark:text-brand-100' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white',
+        ].join(' ')}
+      >
+        <MoreIcon />
+        <span className="leading-tight">{t('nav.more')}</span>
+      </button>
+      {/* The native dialog provides Escape, the focus trap and focus return to the button. */}
+      <DialogShell open={open} onClose={() => setOpen(false)} title={t('nav.more')}>
+        <nav aria-label={t('nav.moreNavigation')}>
+          <GroupedLinks idPrefix="more" level={3} onNavigate={() => setOpen(false)} />
+        </nav>
+      </DialogShell>
+    </>
+  )
+}
 
 export function Layout() {
   const { t } = useTranslation()
@@ -49,6 +114,7 @@ export function Layout() {
   const user = auth.data?.user
   const navigate = useNavigate()
   const [help, setHelp] = useState(false)
+  const wide = useMediaQuery('(min-width: 768px)')
   const onPeople = location.pathname === '/people'
 
   // The people page handles "/" and "n" itself; elsewhere they go there.
@@ -106,33 +172,44 @@ export function Layout() {
       </header>
 
       <div className="md:flex">
-        <nav
-          aria-label={t('app.mainNavigation')}
-          className="fixed inset-x-0 bottom-0 z-30 print:hidden border-t border-slate-200 bg-slate-100 pb-[env(safe-area-inset-bottom)] dark:border-slate-800 dark:bg-slate-950 md:sticky md:top-14 md:h-[calc(100dvh-3.5rem)] md:w-60 md:shrink-0 md:border-t-0 md:border-r md:pb-0"
-        >
-          <ul className="grid grid-cols-5 md:flex md:flex-col md:gap-1 md:p-3">
-            {navItems.map(({ to, key, Icon, end, phone }) => (
-              <li key={to} className={phone ? undefined : 'hidden md:block'}>
-                <NavLink
-                  to={to}
-                  end={end}
-                  className={({ isActive }) =>
-                    [
-                      'flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-xs font-medium md:min-h-11 md:flex-row md:justify-start md:gap-3 md:rounded-lg md:px-3 md:text-sm',
-                      isActive
-                        ? 'text-brand-700 md:bg-brand-50 dark:text-brand-100 md:dark:bg-slate-800'
-                        : 'text-slate-600 hover:text-slate-900 md:hover:bg-slate-200 dark:text-slate-300 dark:hover:text-white md:dark:hover:bg-slate-900',
-                    ].join(' ')
-                  }
-                >
-                  <Icon />
-                  <span className="text-center leading-tight">{t(key)}</span>
-                </NavLink>
+        {wide ? (
+          <nav
+            aria-label={t('app.mainNavigation')}
+            className="sticky top-14 h-[calc(100dvh-3.5rem)] w-60 shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-100 p-3 print:hidden dark:border-slate-800 dark:bg-slate-950"
+          >
+            <SideLink item={homeItem} />
+            <GroupedLinks idPrefix="side" level={2} />
+            <GopherCredit className="px-3 pt-4 pb-3" />
+          </nav>
+        ) : (
+          <nav
+            aria-label={t('app.mainNavigation')}
+            className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-slate-100 pb-[env(safe-area-inset-bottom)] print:hidden dark:border-slate-800 dark:bg-slate-950"
+          >
+            <ul className="grid grid-cols-5">
+              {phoneItems.map(({ to, key, Icon, end }) => (
+                <li key={to}>
+                  <NavLink
+                    to={to}
+                    end={end}
+                    className={({ isActive }) =>
+                      [
+                        'flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-xs font-medium',
+                        isActive ? 'text-brand-700 dark:text-brand-100' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white',
+                      ].join(' ')
+                    }
+                  >
+                    <Icon />
+                    <span className="text-center leading-tight">{t(key)}</span>
+                  </NavLink>
+                </li>
+              ))}
+              <li>
+                <MoreMenu pathname={location.pathname} />
               </li>
-            ))}
-          </ul>
-          <GopherCredit className="hidden px-6 pt-4 pb-6 md:block" />
-        </nav>
+            </ul>
+          </nav>
+        )}
 
         <main
           id="main"

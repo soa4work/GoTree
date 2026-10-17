@@ -75,7 +75,20 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Importing a GEDCOM 7 file no longer loses the date text that GoTree's own 7.0 export keeps in
+  DATE.PHRASE: dates that are not dates, the explanation of "INT" dates and the second year of
+  dual dates such as 1750/51 come back as they were (#4)
+
 - A data directory whose path contains `#` or `?` no longer opens the wrong database file (#19)
+
+- GEDCOM export that excludes living people or reduces them to their name no longer includes the
+  marriage and other events of a family with a living partner, nor the photos and other media
+  (portraits and face tags included) that belong only to those living people (#3)
+
+- The server closes idle keep-alive connections and drops uploads and imports that trickle in
+  too slowly (answered with a timeout message); on shutdown running requests get 30 seconds to
+  finish, then they are cancelled and given a few more seconds before the database is closed, and
+  a second Ctrl+C stops GoTree at once (#7)
 
 - Images over 50 megapixels are refused on upload with a clear error and get no thumbnail, so a
   small file declaring huge dimensions can no longer exhaust memory; at most two thumbnails
@@ -89,6 +102,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 - The new-person and add-relative forms take an optional birth and death date and place, so
   "born 1850" no longer needs a second dialog; the events are saved together with the person (#8)
+
+- Closing a form with Escape, the × button or Cancel after typing in it now asks "Discard changes?"
+  instead of throwing the input away; forms you have not changed still close at once, and saving
+  never asks (#10)
 
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so
   nothing being typed or uploaded is lost (#15)

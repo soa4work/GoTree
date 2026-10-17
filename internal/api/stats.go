@@ -10,6 +10,12 @@ import (
 func (s *Server) statsRoutes(r chi.Router) {
 	r.Get("/stats", s.stats)
 	r.Get("/map", s.mapData)
+	r.Get("/map/unmapped-places", s.unmappedPlaces)
+}
+
+func (s *Server) unmappedPlaces(w http.ResponseWriter, r *http.Request) {
+	places, err := s.Store.UnmappedPlaces(r.Context(), actorFrom(r))
+	s.respond(w, http.StatusOK, places, err)
 }
 
 func (s *Server) stats(w http.ResponseWriter, r *http.Request) {

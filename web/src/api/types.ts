@@ -773,6 +773,15 @@ export interface MapPlace {
   approximate: boolean
 }
 
+export interface UnmappedPlace extends Place {
+  events: number
+}
+
+export interface UnmappedPlaces {
+  total: number
+  places: UnmappedPlace[]
+}
+
 export interface MapTrack {
   personId: number
   points: { key: number; placeId: number; type: string }[]

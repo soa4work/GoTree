@@ -20,4 +20,13 @@ func TestStatsAndMapEndpoints(t *testing.T) {
 	c.call("GET", "/api/map", nil, http.StatusOK, &d)
 	c.call("GET", "/api/map?scope=sideways", nil, http.StatusBadRequest, nil)
 	c.call("GET", "/api/map?scope=ancestors&root=999", nil, http.StatusNotFound, nil)
+
+	var atlantis store.Place
+	c.call("POST", "/api/places", map[string]any{"name": "Atlantis"}, http.StatusCreated, &atlantis)
+	c.call("POST", "/api/events", map[string]any{"personId": 1, "type": "RESI", "date": "1890", "placeId": atlantis.ID}, http.StatusCreated, nil)
+	var missing store.UnmappedPlaces
+	c.call("GET", "/api/map/unmapped-places", nil, http.StatusOK, &missing)
+	if missing.Total != 1 || len(missing.Places) != 1 || missing.Places[0].FullName != "Atlantis" || missing.Places[0].Events != 1 {
+		t.Errorf("unmapped places: %+v", missing)
+	}
 }

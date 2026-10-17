@@ -43,3 +43,33 @@ test('statistics and the migration map', async ({ page }) => {
   // The emigration is drawn as a trail from Bremen to New York.
   await expect(page.locator('.leaflet-overlay-pane path')).toHaveCount(1)
 })
+
+test('places without coordinates are fixed from the map page', async ({ page }) => {
+  // The lookup only happens on a click, and never reaches the real service.
+  let lookups = 0
+  await page.route('https://nominatim.openstreetmap.org/**', (route) => {
+    lookups++
+    return route.fulfill({ json: [{ display_name: 'Stettin, Poland', lat: '53.43', lon: '14.55' }] })
+  })
+  await page.route('https://tile.openstreetmap.org/**', (route) => route.fulfill({ contentType: 'image/png', body: tile }))
+  await login(page)
+  const name = unique('Stettin', page)
+  const place = await (await page.request.post('/api/places', { data: { name } })).json()
+  const anna = await (await page.request.post('/api/persons', { data: { givenNames: 'Anna', surname: name, sex: 'F' } })).json()
+  await page.request.post('/api/events', { data: { personId: anna.id, type: 'BIRT', date: '1870', placeId: place.id } })
+
+  await page.goto('/map')
+  const row = page.getByRole('listitem').filter({ hasText: name })
+  await expect(row).toBeVisible()
+  expect(lookups).toBe(0)
+  await expectAccessible(page)
+
+  await row.getByRole('button', { name: /Look up on OpenStreetMap/ }).click()
+  await row.getByRole('button', { name: /Use these coordinates/ }).click()
+  expect(lookups).toBe(1)
+  await expect(row.getByLabel('Latitude')).toHaveValue('53.43')
+  await row.getByRole('button', { name: /Save coordinates/ }).click()
+  await expect(row).toBeHidden()
+  const saved = await (await page.request.get(`/api/places/${place.id}`)).json()
+  expect([saved.lat, saved.lng]).toEqual([53.43, 14.55])
+})

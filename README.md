@@ -7,27 +7,44 @@
 A lightweight, self-hosted family tree app. One Go binary with an embedded React UI and a single
 SQLite file — no database server, no cloud account.
 
-**Status:** early development.
+**Status:** usable, pre-1.0 — there is no tagged release yet, so expect changes.
 
-## Planned features
+## Features
 
-- People, families, events, places, sources and citations
-- Photos and documents attached to people and events
-- Pedigree, descendant, hourglass and family-group views with pan & zoom
-- GEDCOM 5.5.1 and 7.0 import and export
-- Relationship calculator ("how is A related to B?")
-- Single user today, data model ready for multiple users and trees
+**Tree and people**
+- People, families, events, places, sources and citations, with GEDCOM dates, alternate names,
+  shared events with roles and disputed or disproven facts
+- Pedigree, descendant, hourglass and family-group charts with pan & zoom, also as lists for
+  screen readers and small screens
+- Relationship calculator ("how is A related to B?") and a print-ready wall chart (A4 to A0, PDF
+  or SVG)
+
+**Records and evidence**
+- Photos, documents and recordings attached to people, with face tags and portraits
+- Source-first transcription of census, baptism, marriage and other records into the tree
+- Research tasks and a research log; data-quality checks and "Tidy up dates"
+
+**Places and history**
+- Migration map with a year slider, place coordinates and OpenStreetMap lookup
+- Statistics, heirlooms and an "On this day" list
+
+**Sharing and data**
+- Read-only share links (whole tree or one branch, living people hidden) and a calendar feed of
+  birthdays and anniversaries
+- GEDCOM 5.5, 5.5.1 and 7.0 import and export, also zipped with media; backup as one zip
+- Light, dark or system theme and a first-run onboarding
+- Single user today, data model ready for multiple users and trees (there is no multi-user UI yet)
 
 ## Stack
 
 - Backend: Go, chi, SQLite (`modernc.org/sqlite`, no CGO), goose, sqlc
 - Frontend: React, TypeScript, Vite, Tailwind CSS, React Flow
-- Deployment: single binary (`go:embed`) or Docker image (`ghcr.io/praetorianer777/gotree`)
+- Deployment: single binary (`go:embed`) or Docker image (`ghcr.io/soa4work/gotree`)
 
 ## Running
 
 ```bash
-docker run -d -p 8080:8080 -v gotree-data:/data ghcr.io/praetorianer777/gotree
+docker run -d -p 8080:8080 -v gotree-data:/data ghcr.io/soa4work/gotree
 ```
 
 or download a binary from the releases page and run `./gotree`. Open http://localhost:8080.
@@ -48,8 +65,10 @@ address, so the limit then applies to all clients together.
 
 Behind a reverse proxy, allow request bodies as large as the upload limit.
 
-The migration map loads its background tiles from openstreetmap.org in the browser; everything
-else GoTree shows comes from your own server.
+The migration map loads its background tiles from openstreetmap.org in the browser. The "Look up
+on OpenStreetMap" button next to a place without coordinates sends that place's name and
+your GoTree server's address (as the referrer) to nominatim.openstreetmap.org, only when you click it. Everything else GoTree shows comes from your
+own server.
 
 ### Backup and restore
 

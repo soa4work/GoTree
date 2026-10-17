@@ -77,8 +77,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 - A data directory whose path contains `#` or `?` no longer opens the wrong database file (#19)
 
-- GEDCOM export without living people no longer includes photos and other media linked only to
-  them, nor the marriage and other events of a family with a living partner (#3)
+- GEDCOM export that excludes living people or reduces them to their name no longer includes the
+  marriage and other events of a family with a living partner; excluding them also leaves out
+  photos and other media (portraits and face tags included) that belong only to them (#3)
 
 ### Changed
 

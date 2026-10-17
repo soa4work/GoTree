@@ -313,6 +313,60 @@ func TestExportExcludeLivingSkipsMedia(t *testing.T) {
 	}
 }
 
+func TestExportExcludeLivingSkipsPortraitAndEventMedia(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	old := deadPerson(t, s, a, "Old")
+	rel, err := s.AddRelative(ctx, a, old.ID, RelativeInput{Relation: RelationChild, Person: &PersonInput{GivenNames: "Young", Surname: "Weber"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	young := rel.Person.ID
+	birth, err := s.CreateEvent(ctx, a, EventInput{PersonID: &young, Type: "BIRT", Date: "1990"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A portrait that was removed from the gallery but is still the portrait.
+	portrait, _, err := s.CreateMedia(ctx, a, newMedia(1), &MediaLinkInput{EntityType: "person", EntityID: young})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetPortrait(ctx, a, young, PortraitInput{MediaID: &portrait.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UnlinkMedia(ctx, a, portrait.ID, "person", young); err != nil {
+		t.Fatal(err)
+	}
+	// Media of an event of the living person.
+	scan, _, err := s.CreateMedia(ctx, a, newMedia(2), &MediaLinkInput{EntityType: "event", EntityID: birth.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Media of the deceased person's portrait stays.
+	kept, _, err := s.CreateMedia(ctx, a, newMedia(3), &MediaLinkInput{EntityType: "person", EntityID: old.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetPortrait(ctx, a, old.ID, PortraitInput{MediaID: &kept.ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	ex, err := s.ExportGEDCOM(ctx, a, ExportOptions{Privacy: PrivacyExcludeLiving, WithMedia: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ex.Media) != 1 || ex.Media[0].SHA256 != kept.SHA256 {
+		t.Errorf("media files: %+v", ex.Media)
+	}
+	all, err := s.ExportGEDCOM(ctx, a, ExportOptions{Privacy: PrivacyAll, WithMedia: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all.Media) != 3 {
+		t.Errorf("full export media: %+v (portrait %s, scan %s)", all.Media, portrait.SHA256, scan.SHA256)
+	}
+}
+
 func TestVerifyExport(t *testing.T) {
 	s := newStore(t)
 	a := setup(t, s)

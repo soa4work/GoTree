@@ -137,9 +137,10 @@ func (s *Store) ExportGEDCOM(ctx context.Context, a Actor, opt ExportOptions) (E
 	}
 	ex := &exporter{
 		s: s, a: a, opt: opt, now: s.Now(), out: Export{Counts: map[string]int{}},
-		included: map[int64]bool{}, linked: map[int64]bool{}, used: map[int64]bool{}, nameOnly: map[int64]bool{}, names: map[int64][]exportName{},
+		included: map[int64]bool{}, nameOnly: map[int64]bool{}, names: map[int64][]exportName{},
 		places: map[int64]placeInfo{}, cites: map[string][]exportCitation{}, parts: map[int64][]participantRow{},
-		media: map[string][]int64{}, xrefMap: map[string]string{},
+		media: map[string][]int64{}, linked: map[int64]bool{}, used: map[int64]bool{},
+		xrefMap: map[string]string{},
 	}
 	if err := ex.load(ctx); err != nil {
 		return Export{}, err
@@ -328,6 +329,30 @@ func (ex *exporter) load(ctx context.Context) error {
 			key := fmt.Sprintf("%s:%d", typ, eid)
 			ex.media[key] = append(ex.media[key], mid)
 			ex.linked[mid] = true
+		}
+		rows.Close()
+
+		// Portraits and face tags tie media to a person without a link, and
+		// survive when the photo is removed from the person's gallery.
+		rows, err = db.QueryContext(ctx, `
+			SELECT p.portrait_media_id, p.id FROM persons p JOIN media m ON m.id = p.portrait_media_id
+			WHERE p.tree_id = ? AND m.tree_id = ?
+			UNION
+			SELECT r.media_id, r.person_id FROM media_regions r JOIN media m ON m.id = r.media_id
+			WHERE m.tree_id = ? AND r.person_id IS NOT NULL`, a.TreeID, a.TreeID, a.TreeID)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var mid, pid int64
+			if err := rows.Scan(&mid, &pid); err != nil {
+				rows.Close()
+				return err
+			}
+			ex.linked[mid] = true
+			if ex.included[pid] {
+				ex.used[mid] = true
+			}
 		}
 		rows.Close()
 	}

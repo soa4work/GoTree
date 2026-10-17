@@ -77,6 +77,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 - A data directory whose path contains `#` or `?` no longer opens the wrong database file (#19)
 
+- A place name containing HTML, typed or imported from a GEDCOM file, no longer runs script in the
+  migration map's tooltips, and the app now sends a Content-Security-Policy that only allows
+  scripts from its own files (#2)
+
 ### Changed
 
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so

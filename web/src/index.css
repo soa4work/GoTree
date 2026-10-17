@@ -75,7 +75,7 @@
 }
 
 /* React Flow's zoom buttons are 26px; touch needs 44px. */
-@media (pointer: coarse), (max-width: 1023px) {
+@media (pointer: coarse), (width < 64rem) {
   .react-flow__controls-button {
     width: 44px;
     height: 44px;

@@ -138,7 +138,7 @@ func TestSPAContentSecurityPolicy(t *testing.T) {
 	for _, path := range []string{"/", "/people/42", "/share/abc"} {
 		resp, _ := get(t, ts.URL+path)
 		csp := resp.Header.Get("Content-Security-Policy")
-		for _, want := range []string{"default-src 'self'", "script-src 'self'", "object-src 'none'", "frame-ancestors 'none'", "https://tile.openstreetmap.org"} {
+		for _, want := range []string{"default-src 'self'", "script-src 'self'", "object-src 'none'", "frame-ancestors 'none'", "https://tile.openstreetmap.org", "connect-src 'self' https://nominatim.openstreetmap.org;"} {
 			if !strings.Contains(csp, want) {
 				t.Errorf("%s: CSP %q does not contain %q", path, csp, want)
 			}

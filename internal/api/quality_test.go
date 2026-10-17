@@ -28,14 +28,22 @@ func TestQualityEndpoints(t *testing.T) {
 		t.Errorf("ABT 1855 may be 1857, when Anna was 12: %+v", rep.Findings)
 	}
 
+	// A date saved from the form is never offered; older loose text is.
 	var prop store.DateProposals
+	c.call("GET", "/api/dates/proposals", nil, http.StatusOK, &prop)
+	if len(prop.Items) != 0 {
+		t.Fatalf("a just-saved date was proposed: %+v", prop)
+	}
+	if _, err := testServers[ts].Store.DB.Exec(`UPDATE events SET date_raw = 'ca. 1855', date = '', date_sort = NULL WHERE id = ?`, birth.ID); err != nil {
+		t.Fatal(err)
+	}
 	c.call("GET", "/api/dates/proposals", nil, http.StatusOK, &prop)
 	if len(prop.Items) != 1 || prop.Items[0].Proposed != "ABT 1855" {
 		t.Fatalf("proposals: %+v", prop)
 	}
 	var res store.DateChangeResult
 	c.call("POST", "/api/dates/normalize", map[string]any{"changes": []map[string]any{
-		{"eventId": birth.ID, "raw": "about 1855", "date": "ABT 1855"},
+		{"eventId": birth.ID, "raw": "ca. 1855", "date": "ABT 1855"},
 	}}, http.StatusOK, &res)
 	if res.Updated != 1 {
 		t.Errorf("result: %+v", res)

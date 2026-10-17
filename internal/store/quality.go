@@ -189,8 +189,8 @@ type DateProposal struct {
 	PersonIDs []int64 `json:"personIds"`
 	Raw       string  `json:"raw"`
 	Proposed  string  `json:"proposed"`
-	// WasValid tells a reformatting of a date that already parsed (such as
-	// "12.3.1850") from a repair of one that did not ("March 12, 1850").
+	// WasValid is false for every proposal now: dates Parse reads are not
+	// offered. It stays so older clients keep reading the response.
 	WasValid bool `json:"wasValid"`
 }
 
@@ -202,8 +202,10 @@ type DateProposals struct {
 	Persons    map[int64]PersonRef `json:"persons"`
 }
 
-// ProposeDates lists every event date whose text differs from its
-// canonical GEDCOM form, with that form.
+// ProposeDates lists the event dates that gendate.Parse cannot read but
+// gendate.Normalize can (older or imported text such as "March 12, 1850"),
+// with their canonical GEDCOM form. Dates Parse reads are stored, sorted and
+// exported correctly as typed, so they are not offered.
 func (s *Store) ProposeDates(ctx context.Context, a Actor) (DateProposals, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT e.id, e.type, e.custom_label, e.person_id, e.family_id, coalesce(f.partner1_id, 0), coalesce(f.partner2_id, 0),
@@ -230,10 +232,10 @@ func (s *Store) ProposeDates(ctx context.Context, a Actor) (DateProposals, error
 			out.Unreadable++
 			continue
 		}
-		p.Proposed, p.WasValid = d.String(), norm != ""
-		if p.Proposed == p.Raw {
+		if norm != "" || d.String() == p.Raw {
 			continue
 		}
+		p.Proposed = d.String()
 		p.PersonID, p.FamilyID = ptrID(person), ptrID(family)
 		if person.Valid {
 			p.PersonIDs = []int64{person.Int64}

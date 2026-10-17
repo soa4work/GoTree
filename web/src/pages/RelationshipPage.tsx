@@ -57,7 +57,7 @@ export function RelationshipPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div className="space-y-3">
-        <PageHeading title={t('relationship.title')}>{t('relationship.title')}</PageHeading>
+        <PageHeading title={t('nav.relationship')}>{t('nav.relationship')}</PageHeading>
         <p className="text-slate-700 dark:text-slate-300">{t('relationship.intro')}</p>
       </div>
       <div className="grid gap-4 sm:grid-cols-[1fr_auto_1fr] sm:items-end">

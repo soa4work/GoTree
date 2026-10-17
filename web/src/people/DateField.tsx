@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { parseDate } from '../api/endpoints'
 import { TextField } from '../components/TextField'
 import { useDebounced } from '../hooks/useDebounced'
+import { formatDate } from '../lib/dates'
 
 interface Props {
   value: string
@@ -23,7 +24,7 @@ export function DateField({ value, onChange, error }: Props) {
 
   let preview: string = t('date.hint')
   if (q !== '' && parsed.data) {
-    preview = parsed.data.valid ? t('date.storedAs', { date: parsed.data.normalized }) : t('date.unrecognized')
+    preview = parsed.data.valid ? t('date.storedAs', { date: formatDate(parsed.data.normalized) }) : t('date.unrecognized')
   }
 
   return (

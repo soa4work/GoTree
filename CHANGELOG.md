@@ -9,6 +9,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Migration map: when a GEDCOM import brought no coordinates, the map says so, lists the places
+  used by dated events that lack them and lets you enter latitude and longitude right there, or
+  look a place up on OpenStreetMap (Nominatim) with one click and pick a match (#12)
+
 - Statistics: lifespan by decade of birth, age at first and later marriages, children per family,
   the most common surnames and given names and how given names changed by decade, each chart with
   its numbers; migration map: watch the family move through their dated events on an
@@ -104,6 +108,18 @@ and the versioning [Semantic Versioning](https://semver.org/).
   scripts from its own files (#2)
 
 ### Changed
+
+- Dates read as plain English ("26 February 1820", "about 1850", "between 1850 and 1860") on the
+  timeline, heirlooms and in the date field preview, and can be typed that way in events,
+  heirlooms, media and transcriptions (saved as GEDCOM when needed, so the preview matches what is
+  stored); "Tidy up dates" no longer offers dates that were just saved; share, expiry and due
+  days now follow the interface language everywhere (#14)
+
+- Navigation: the sidebar groups its sections under Tree, Records, Explore, Work and Settings
+  and now lists the wall chart; the phone bar keeps Home, People, Tree and Sources and a "More"
+  menu opens every section, grouped the same way (replacing the "Also" links on the home page);
+  person pages link to "View in tree"; the relationship calculator, migration map and "Ancestors
+  and descendants" chart use one name in menus, headings and default chart titles (#13)
 
 - Home page: an empty tree now offers "Add yourself" and "Import from Ancestry, MyHeritage and
   others" (also on the empty Tree and People pages); a filled tree shows how many people,

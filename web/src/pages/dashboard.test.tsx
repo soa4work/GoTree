@@ -45,7 +45,6 @@ describe('home page', () => {
     expect(await screen.findByText('3')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Add yourself' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /On this day/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Wall chart' })).toHaveAttribute('href', '/chart')
     expect(await axeViolations(container)).toEqual([])
   })
 

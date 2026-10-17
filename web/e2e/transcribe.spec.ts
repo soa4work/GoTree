@@ -54,7 +54,7 @@ test('transcribe a census household and cite each line', async ({ page }) => {
 
   await expect(page.getByRole('heading', { level: 1, name: `${wife} ${surname}` })).toBeVisible()
   const events = page.getByRole('region', { name: 'Life events' })
-  await expect(events.getByText('BET 1864 AND 1865')).toBeVisible()
+  await expect(events.getByText('between 1864 and 1865')).toBeVisible()
   await expect(events.getByText(`p. 4, line 13 (for the date)`)).toBeVisible()
   await expect(events.getByText('as spouse')).toBeVisible()
   await expectAccessible(page)

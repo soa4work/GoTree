@@ -30,7 +30,7 @@ test('record an heirloom from a person and pass it on', async ({ page }) => {
 
   await section.getByRole('link', { name: `Watch ${surname}` }).click()
   await expect(page.getByRole('heading', { level: 1, name: `Watch ${surname}` })).toBeVisible()
-  await expect(page.getByText('ABT 1880')).toBeVisible()
+  await expect(page.getByText('about 1880')).toBeVisible()
   const timeline = page.getByRole('region', { name: 'Who held it' })
   await expect(timeline.getByRole('listitem')).toHaveCount(2)
   await expect(timeline.getByText('since 1965 · as a gift')).toBeVisible()

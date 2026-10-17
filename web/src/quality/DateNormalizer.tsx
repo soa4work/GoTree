@@ -6,6 +6,7 @@ import { getDateProposals, normalizeDates } from '../api/endpoints'
 import type { DateProposal, DateProposals } from '../api/types'
 import { Button } from '../components/Button'
 import { fullName } from '../lib/people'
+import { formatDate } from '../lib/dates'
 
 export function DateNormalizer() {
   const { t } = useTranslation()
@@ -103,9 +104,9 @@ function ProposalRow(props: {
         <label htmlFor={id} className="block">
           <span className="sr-only">{t('quality.dateRow', { raw: p.raw, proposed: p.proposed })}</span>
           <span aria-hidden="true">
-            <span className="font-mono">{p.raw}</span> → <span className="font-mono font-semibold">{p.proposed}</span>
+            <span className="font-mono">{p.raw}</span> → <span className="font-semibold">{formatDate(p.proposed)}</span>
           </span>
-          {!p.wasValid && <span className="ml-2 text-sm text-slate-600 dark:text-slate-400">({t('quality.dateRepair')})</span>}
+          <span className="ml-2 text-sm text-slate-600 dark:text-slate-400">({t('quality.dateRepair')})</span>
         </label>
         <p className="text-sm text-slate-600 dark:text-slate-400">
           {event} ·{' '}

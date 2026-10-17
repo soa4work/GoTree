@@ -7,7 +7,7 @@ import type { PersonRef } from '../api/types'
 import { SelectField } from '../components/Field'
 import { OnboardingCard } from '../components/OnboardingCard'
 import { PageHeading } from '../components/PageHeading'
-import { useMediaQuery } from '../hooks/useMediaQuery'
+import { lgQuery, useMediaQuery } from '../hooks/useMediaQuery'
 import { fullName } from '../lib/people'
 import { PersonPicker } from '../people/PersonPicker'
 import { layoutTree, type TreeView } from '../tree/layout'
@@ -54,7 +54,7 @@ export function TreePage() {
   const modeName = useId()
   const optionsId = useId()
   const [optionsOpen, setOptionsOpen] = useState(false)
-  const wide = useMediaQuery('(min-width: 1024px)')
+  const wide = useMediaQuery(lgQuery)
 
   const view = (views.includes(params.get('view') as TreeView) ? params.get('view') : 'pedigree') as TreeView
   const generations = Math.min(10, Math.max(1, Number(params.get('gen')) || 4))

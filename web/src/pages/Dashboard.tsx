@@ -82,34 +82,6 @@ export function Dashboard() {
           <TaskList tasks={tasks.data} pending={false} />
         </section>
       )}
-      {/* The wall chart is in no navigation; phones also lack room for the rest of the sidebar. */}
-      <nav aria-labelledby="dashboard-also">
-        <h2 id="dashboard-also" className="text-sm font-semibold text-slate-600 dark:text-slate-400">
-          {t('dashboard.also')}
-        </h2>
-        <ul className="flex flex-wrap gap-x-5">
-          {(
-            [
-              ['/chart', 'nav.chart', ''],
-              ['/media', 'nav.media', 'md:hidden'],
-              ['/heirlooms', 'nav.heirlooms', 'md:hidden'],
-              ['/map', 'nav.map', 'md:hidden'],
-              ['/stats', 'nav.stats', 'md:hidden'],
-              ['/transcribe', 'nav.transcribe', 'md:hidden'],
-              ['/research', 'nav.research', 'md:hidden'],
-              ['/relationship', 'nav.relationship', 'md:hidden'],
-              ['/quality', 'nav.quality', 'md:hidden'],
-              ['/sharing', 'nav.sharing', 'md:hidden'],
-            ] as const
-          ).map(([to, key, cls]) => (
-            <li key={to} className={cls}>
-              <Link to={to} className={linkClass}>
-                {t(key)}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
       {isAdmin && (
         <p role="status" className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
           <span className="sr-only">{t('dashboard.serverStatus')}: </span>

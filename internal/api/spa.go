@@ -21,13 +21,15 @@ func init() {
 // because React style props and Leaflet position elements with inline styles.
 // Images may also be OpenStreetMap tiles (the migration map) and data: or
 // blob: URLs (the wall chart's SVG download embeds photos as data URIs).
+// The browser may ask Nominatim (OpenStreetMap geocoding) for a place's
+// coordinates when someone clicks the lookup button on the migration map.
 const appCSP = "default-src 'self'; " +
 	"script-src 'self'; " +
 	"style-src 'self' 'unsafe-inline'; " +
 	"img-src 'self' data: blob: https://tile.openstreetmap.org; " +
 	"font-src 'self' data:; " +
 	"media-src 'self' blob:; " +
-	"connect-src 'self'; " +
+	"connect-src 'self' https://nominatim.openstreetmap.org; " +
 	"manifest-src 'self'; " +
 	"worker-src 'self'; " +
 	"object-src 'none'; " +

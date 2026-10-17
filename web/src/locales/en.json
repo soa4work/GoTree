@@ -25,7 +25,16 @@
     "chart": "Wall chart",
     "heirlooms": "Heirlooms",
     "stats": "Statistics",
-    "map": "Migration map"
+    "map": "Migration map",
+    "more": "More",
+    "moreNavigation": "More sections",
+    "groups": {
+      "tree": "Tree",
+      "records": "Records",
+      "explore": "Explore",
+      "work": "Work",
+      "settings": "Settings"
+    }
   },
   "dashboard": {
     "title": "Welcome to GoTree",
@@ -34,7 +43,6 @@
     "people": "People",
     "families": "Families",
     "sources": "Sources",
-    "also": "Also",
     "statsFailed": "The tree summary could not be loaded.",
     "serverStatus": "Server status",
     "checking": "Checking the server…",
@@ -154,7 +162,8 @@
     "noPartners": "No partners recorded.",
     "noChildren": "No children recorded.",
     "pickerHint": "Type a name to search the tree.",
-    "relationshipLink": "Relationship to…"
+    "relationshipLink": "Relationship to…",
+    "viewInTree": "View in tree"
   },
   "sex": {
     "M": "Male",
@@ -246,8 +255,22 @@
     "disproven": "disproven"
   },
   "date": {
-    "hint": "e.g. 12 MAR 1850, 12.3.1850, ABT 1850, BET 1850 AND 1860",
-    "storedAs": "Stored as {{date}}",
+    "hint": "e.g. 12 March 1850, 12.3.1850, about 1850, between 1850 and 1860, before 1900",
+    "storedAs": "Understood as {{date}}",
+    "fmt": {
+      "about": "about {{date}}",
+      "calculated": "calculated {{date}}",
+      "estimated": "estimated {{date}}",
+      "before": "before {{date}}",
+      "after": "after {{date}}",
+      "from": "from {{date}}",
+      "to": "until {{date}}",
+      "between": "between {{start}} and {{end}}",
+      "fromTo": "from {{start}} to {{end}}",
+      "interpreted": "{{date}} ({{phrase}})",
+      "bc": "{{date}} BC",
+      "julian": "{{date}} (Julian calendar)"
+    },
     "unrecognized": "Not a recognized date. It is kept as typed and flagged for review.",
     "unrecognizedShort": "unrecognized date"
   },
@@ -543,7 +566,6 @@
     }
   },
   "relationship": {
-    "title": "How are they related?",
     "intro": "Pick two people to see how the second is related to the first, and the line of people that connects them.",
     "personA": "First person",
     "personB": "Second person",
@@ -988,7 +1010,7 @@
     "defaultTitle": {
       "pedigree": "Ancestors of {{name}}",
       "descendants": "Descendants of {{name}}",
-      "hourglass": "Family of {{name}}"
+      "hourglass": "Ancestors and descendants of {{name}}"
     },
     "printChart": "Print as wall chart",
     "chartSubtitle": "Line under the title",
@@ -1112,6 +1134,30 @@
     "place": "Place",
     "people": "People",
     "none": "No dated events at places with coordinates yet.",
+    "noneWhy": "GEDCOM files rarely carry coordinates and GoTree does not look them up by itself, so places need coordinates before they can appear on the map.",
+    "noneMissing_one": "{{count}} place used by dated events has no coordinates.",
+    "noneMissing_other": "{{count}} places used by dated events have no coordinates.",
+    "missingTruncated": "{{total}} places lack coordinates; showing the {{shown}} busiest.",
+    "saved": "Saved: {{name}} now has coordinates.",
+    "viewerNote": "Only editors can add coordinates.",
+    "fixMissing": "Add coordinates",
+    "missingTitle": "Places without coordinates",
+    "missingIntro": "Enter latitude and longitude for a place, or look it up. Places inside a place with coordinates are shown there, approximately. The busiest places come first.",
+    "lookupPrivacy": "\"Look up on OpenStreetMap\" sends the name of that one place and the address of this server to nominatim.openstreetmap.org when you click it. Nothing is looked up automatically.",
+    "placeEvents_one": "{{count}} dated event",
+    "placeEvents_other": "{{count}} dated events",
+    "lat": "Latitude",
+    "lng": "Longitude",
+    "coordsBoth": "Enter both latitude and longitude as numbers.",
+    "latRange": "Latitude must be between -90 and 90.",
+    "lngRange": "Longitude must be between -180 and 180.",
+    "saveCoords": "Save coordinates",
+    "saveFailed": "Could not save the coordinates: {{message}}",
+    "lookup": "Look up on OpenStreetMap",
+    "lookupFailed": "OpenStreetMap could not be reached. Enter the coordinates by hand instead.",
+    "lookupNone": "OpenStreetMap found no match for this place.",
+    "useCandidate": "Use these coordinates",
+    "lookupAttribution": "Results © OpenStreetMap contributors (Nominatim). Check that the match is the right place, then save.",
     "attribution": "Map tiles © OpenStreetMap contributors; loading them sends a request to openstreetmap.org.",
     "mapLabel": "Map of where people lived in {{year}}",
     "status_one": "{{count}} person on the map in {{year}}.",

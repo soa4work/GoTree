@@ -447,6 +447,7 @@ export interface DateProposal {
   personIds: number[]
   raw: string
   proposed: string
+  /** @deprecated Always false: dates the server can already read are not proposed. */
   wasValid: boolean
 }
 
@@ -771,6 +772,15 @@ export interface MapPlace {
   lat: number
   lng: number
   approximate: boolean
+}
+
+export interface UnmappedPlace extends Place {
+  events: number
+}
+
+export interface UnmappedPlaces {
+  total: number
+  places: UnmappedPlace[]
 }
 
 export interface MapTrack {

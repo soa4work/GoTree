@@ -14,6 +14,7 @@ import { Gallery } from '../media/Gallery'
 import { UploadButton } from '../media/UploadButton'
 import { CitationText } from '../sources/CitationEditor'
 import { NotFound } from './NotFound'
+import { formatDate } from '../lib/dates'
 
 export function HeirloomPage() {
   const { t } = useTranslation()
@@ -36,7 +37,7 @@ export function HeirloomPage() {
   if (heirloom.isPending) return <p role="status">{t('app.loading')}</p>
   const h = heirloom.data
   const facts = [
-    [t('heirloom.madeDate'), h.madeDate],
+    [t('heirloom.madeDate'), formatDate(h.madeDate)],
     [t('heirloom.origin'), h.originPlace?.fullName ?? ''],
     [t('heirloom.currentLocation'), h.currentLocation],
   ].filter(([, v]) => v)

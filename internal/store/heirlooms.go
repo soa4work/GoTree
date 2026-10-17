@@ -77,16 +77,30 @@ type HeirloomInput struct {
 	RemoveCitations []int64        `json:"removeCitations,omitempty"`
 }
 
-func (in *HeirloomInput) normalize() {
+// canonicalDate is the strict rule for imported dates: text gendate.Parse
+// reads is stored canonically, anything else is kept as written. Loose
+// text is never reinterpreted on import (see storedDate for user input).
+func canonicalDate(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if d, err := gendate.Parse(s); err == nil {
+		return d.String()
+	}
+	return s
+}
+
+func (in *HeirloomInput) normalize() { in.normalizeWith(storedDate) }
+
+// normalizeWith tidies the input, saving its dates with date.
+func (in *HeirloomInput) normalizeWith(date func(string) string) {
 	in.Name, in.Description = strings.TrimSpace(in.Name), strings.TrimSpace(in.Description)
 	in.CurrentLocation, in.Notes = strings.TrimSpace(in.CurrentLocation), strings.TrimSpace(in.Notes)
-	in.MadeDate = storedDate(in.MadeDate)
+	in.MadeDate = date(in.MadeDate)
 	if in.Kind == "" {
 		in.Kind = "other"
 	}
 	for i := range in.Custody {
 		c := &in.Custody[i]
-		c.FromDate, c.ToDate, c.Notes = storedDate(c.FromDate), storedDate(c.ToDate), strings.TrimSpace(c.Notes)
+		c.FromDate, c.ToDate, c.Notes = date(c.FromDate), date(c.ToDate), strings.TrimSpace(c.Notes)
 		if c.How == "" {
 			c.How = "inherited"
 		}

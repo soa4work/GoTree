@@ -25,6 +25,26 @@ func TestEventPlainLanguageDates(t *testing.T) {
 	}
 }
 
+// Imports stay strict: loose heirloom dates are kept as written and only
+// text Parse reads is made canonical, as before storedDate existed.
+func TestHeirloomImportDatesStayStrict(t *testing.T) {
+	text := "0 HEAD\n1 GEDC\n2 VERS 5.5.1\n1 CHAR UTF-8\n" +
+		"0 @H1@ _HEIRLOOM\n1 NAME Loose\n1 DATE March 12, 1850\n" +
+		"0 @H2@ _HEIRLOOM\n1 NAME Abbreviated\n1 DATE abt 1880\n" +
+		"0 @H3@ _HEIRLOOM\n1 NAME Between\n1 DATE between 1850 and 1860\n0 TRLR\n"
+	s, a := reimport(t, text)
+	list, err := s.ListHeirlooms(ctx, a, "", 0)
+	if err != nil || len(list) != 3 {
+		t.Fatalf("heirlooms: %+v %v", list, err)
+	}
+	want := map[string]string{"Loose": "March 12, 1850", "Abbreviated": "ABT 1880", "Between": "between 1850 and 1860"}
+	for _, h := range list {
+		if h.MadeDate != want[h.Name] {
+			t.Errorf("%s: made date %q, want %q", h.Name, h.MadeDate, want[h.Name])
+		}
+	}
+}
+
 func TestStoredDateEverywhere(t *testing.T) {
 	s := newStore(t)
 	a := setup(t, s)

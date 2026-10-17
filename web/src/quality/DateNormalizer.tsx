@@ -106,7 +106,7 @@ function ProposalRow(props: {
           <span aria-hidden="true">
             <span className="font-mono">{p.raw}</span> → <span className="font-semibold">{formatDate(p.proposed)}</span>
           </span>
-          {!p.wasValid && <span className="ml-2 text-sm text-slate-600 dark:text-slate-400">({t('quality.dateRepair')})</span>}
+          <span className="ml-2 text-sm text-slate-600 dark:text-slate-400">({t('quality.dateRepair')})</span>
         </label>
         <p className="text-sm text-slate-600 dark:text-slate-400">
           {event} ·{' '}

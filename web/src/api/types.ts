@@ -447,6 +447,7 @@ export interface DateProposal {
   personIds: number[]
   raw: string
   proposed: string
+  /** @deprecated Always false: dates the server can already read are not proposed. */
   wasValid: boolean
 }
 

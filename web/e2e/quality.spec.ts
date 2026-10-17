@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { expectAccessible, login, unique } from './helpers'
+import { expectAccessible, login, openSection, unique } from './helpers'
 
 test('find contradictions, unreadable dates and name a relationship', async ({ page }) => {
   await login(page)
@@ -29,7 +29,7 @@ test('find contradictions, unreadable dates and name a relationship', async ({ p
 
   // The data quality page lists the unreadable date.
   await page.goto('/')
-  await page.getByRole('link', { name: 'Data quality' }).last().click()
+  await openSection(page, 'Data quality')
   await expect(page.getByRole('heading', { level: 1, name: 'Data quality' })).toBeVisible()
   await expect(page.getByText(`Anna ${surname} was born after they died.`, { exact: true })).toBeVisible()
   const unreadable = page.getByText(`Anna ${surname}’s Residence has a date GoTree cannot read.`, { exact: true })
@@ -41,7 +41,7 @@ test('find contradictions, unreadable dates and name a relationship', async ({ p
   // From Carl's page to the calculator, then pick Anna.
   await page.goto(`/people/${nephew.person.id}`)
   await page.getByRole('link', { name: 'Relationship to…' }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'How are they related?' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Relationships' })).toBeVisible()
   await page.getByRole('searchbox', { name: 'Second person' }).fill(`Anna ${surname}`)
   await page.getByRole('button', { name: new RegExp(`^Anna ${surname}`) }).click()
   await expect(page.getByText(`Anna ${surname} is Carl ${surname}’s aunt.`)).toBeVisible()

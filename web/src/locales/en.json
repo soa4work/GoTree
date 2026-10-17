@@ -25,7 +25,16 @@
     "chart": "Wall chart",
     "heirlooms": "Heirlooms",
     "stats": "Statistics",
-    "map": "Migration map"
+    "map": "Migration map",
+    "more": "More",
+    "moreNavigation": "More sections",
+    "groups": {
+      "tree": "Tree",
+      "records": "Records",
+      "explore": "Explore",
+      "work": "Work",
+      "settings": "Settings"
+    }
   },
   "dashboard": {
     "title": "Welcome to GoTree",
@@ -34,7 +43,6 @@
     "people": "People",
     "families": "Families",
     "sources": "Sources",
-    "also": "Also",
     "statsFailed": "The tree summary could not be loaded.",
     "serverStatus": "Server status",
     "checking": "Checking the server…",
@@ -154,7 +162,8 @@
     "noPartners": "No partners recorded.",
     "noChildren": "No children recorded.",
     "pickerHint": "Type a name to search the tree.",
-    "relationshipLink": "Relationship to…"
+    "relationshipLink": "Relationship to…",
+    "viewInTree": "View in tree"
   },
   "sex": {
     "M": "Male",
@@ -556,7 +565,6 @@
     }
   },
   "relationship": {
-    "title": "How are they related?",
     "intro": "Pick two people to see how the second is related to the first, and the line of people that connects them.",
     "personA": "First person",
     "personB": "Second person",
@@ -1001,7 +1009,7 @@
     "defaultTitle": {
       "pedigree": "Ancestors of {{name}}",
       "descendants": "Descendants of {{name}}",
-      "hourglass": "Family of {{name}}"
+      "hourglass": "Ancestors and descendants of {{name}}"
     },
     "printChart": "Print as wall chart",
     "chartSubtitle": "Line under the title",

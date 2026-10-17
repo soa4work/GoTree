@@ -98,6 +98,12 @@ export function PersonPage() {
               <span className="sr-only"> ({t('shortcuts.key', { key: 'e' })})</span>
             </Button>
             <Link
+              to={`/tree?root=${p.id}`}
+              className="inline-flex min-h-11 items-center rounded-lg px-3 font-medium text-brand-700 underline dark:text-brand-100"
+            >
+              {t('person.viewInTree')}
+            </Link>
+            <Link
               to={`/relationship?a=${p.id}`}
               className="inline-flex min-h-11 items-center rounded-lg px-3 font-medium text-brand-700 underline dark:text-brand-100"
             >

@@ -105,6 +105,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Closing a form with Escape, the × button or Cancel after typing in it now asks "Discard changes?"
+  instead of throwing the input away; forms you have not changed still close at once, and saving
+  never asks (#10)
+
 - A new version of GoTree no longer reloads open pages by itself; a notice offers to reload, so
   nothing being typed or uploaded is lost (#15)
 

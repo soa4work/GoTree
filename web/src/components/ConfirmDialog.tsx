@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Button } from './Button'
-import { Dialog } from './Dialog'
+import { DialogShell } from './DialogShell'
 
 interface Props {
   open: boolean
@@ -16,7 +16,7 @@ interface Props {
 export function ConfirmDialog({ open, title, message, confirmLabel, busy, error, onConfirm, onClose }: Props) {
   const { t } = useTranslation()
   return (
-    <Dialog open={open} onClose={onClose} title={title}>
+    <DialogShell open={open} onClose={onClose} title={title}>
       <p className="text-slate-700 dark:text-slate-300">{message}</p>
       {error && (
         <p role="alert" className="mt-3 font-medium text-red-700 dark:text-red-400">
@@ -31,6 +31,6 @@ export function ConfirmDialog({ open, title, message, confirmLabel, busy, error,
           {confirmLabel}
         </Button>
       </div>
-    </Dialog>
+    </DialogShell>
   )
 }

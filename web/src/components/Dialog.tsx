@@ -1,5 +1,8 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Button } from './Button'
+import { GuardContext } from './dialogGuard'
+import { DialogShell } from './DialogShell'
 
 interface Props {
   open: boolean
@@ -11,62 +14,89 @@ interface Props {
 }
 
 /**
- * A modal built on the native <dialog>: the browser provides the focus trap,
- * Escape to close, an inert background and focus return to the trigger.
+ * A modal for content and forms. Closing it by Escape, the × button or a
+ * form's Cancel asks "Discard changes?" while a Form inside has unsaved input;
+ * closing after a successful save calls onClose directly and never asks.
+ *
+ * The question replaces the dialog's content instead of opening a second
+ * <dialog>, so the browser only ever has one close watcher to deal with. The
+ * form stays mounted (hidden) and keeps its input.
  */
 export function Dialog({ open, onClose, title, children, wide }: Props) {
   const { t } = useTranslation()
-  const ref = useRef<HTMLDialogElement>(null)
-  const titleId = useId()
-
+  const check = useRef<(() => boolean) | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const confirmingRef = useRef(false)
+  const questionRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  // Callers pass a new onClose every render; the guard must stay the same object.
+  const onCloseRef = useRef(onClose)
   useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    if (open && !el.open) {
-      el.showModal()
-      // Forms start in their first field (WAI-ARIA dialog pattern); dialogs
-      // without fields keep the browser's choice, the first button.
-      el.querySelector<HTMLElement>('[data-dialog-body] :is(input, select, textarea):not([disabled])')?.focus()
+    onCloseRef.current = onClose
+  })
+  // Closed from outside (e.g. after saving): forget a pending question.
+  if (!open && confirming) setConfirming(false)
+
+  const register = useCallback((isDirty: () => boolean) => {
+    check.current = isDirty
+    return () => {
+      if (check.current === isDirty) check.current = null
     }
-    if (!open && el.open) el.close()
-  }, [open])
+  }, [])
+  const ask = (value: boolean) => {
+    confirmingRef.current = value
+    setConfirming(value)
+  }
+  const requestClose = useCallback(() => {
+    if (confirmingRef.current) {
+      // Escape or × on the question means "keep editing".
+      confirmingRef.current = false
+      setConfirming(false)
+    } else if (check.current?.()) {
+      confirmingRef.current = true
+      setConfirming(true)
+    } else {
+      onCloseRef.current()
+    }
+  }, [])
+  const guard = useMemo(() => ({ register, requestClose }), [register, requestClose])
+
+  // Focus moves to the question, and back to the form when it is dismissed.
+  const wasConfirming = useRef(false)
+  useEffect(() => {
+    if (confirming) questionRef.current?.querySelector('button')?.focus()
+    else if (wasConfirming.current) {
+      bodyRef.current?.querySelector<HTMLElement>(':is(input, select, textarea):not([disabled])')?.focus()
+    }
+    wasConfirming.current = confirming
+  }, [confirming])
 
   return (
-    <dialog
-      ref={ref}
-      aria-labelledby={titleId}
-      onCancel={(e) => {
-        e.preventDefault()
-        onClose()
-      }}
-      className={[
-        'm-0 mt-auto max-h-[92dvh] w-full max-w-none rounded-t-2xl bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-950/50',
-        'sm:m-auto sm:rounded-2xl dark:bg-slate-900 dark:text-slate-100',
-        wide ? 'sm:max-w-2xl' : 'sm:max-w-lg',
-      ].join(' ')}
-    >
-      {open && (
-        <div className="flex max-h-[92dvh] flex-col">
-          <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-3 dark:border-slate-800">
-            <h2 id={titleId} className="text-lg font-semibold">
-              {title}
-            </h2>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex size-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+    <DialogShell open={open} onClose={requestClose} title={confirming ? t('common.discardTitle') : title} wide={wide}>
+      <GuardContext.Provider value={guard}>
+        <div ref={bodyRef} hidden={confirming}>
+          {children}
+        </div>
+      </GuardContext.Provider>
+      {confirming && (
+        <div ref={questionRef}>
+          <p className="text-slate-700 dark:text-slate-300">{t('common.discardMessage')}</p>
+          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={requestClose}>
+              {t('common.keepEditing')}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                ask(false)
+                onCloseRef.current()
+              }}
             >
-              <span aria-hidden="true" className="text-2xl leading-none">
-                ×
-              </span>
-              <span className="sr-only">{t('common.close')}</span>
-            </button>
-          </div>
-          <div data-dialog-body className="overflow-y-auto px-5 py-4">
-            {children}
+              {t('common.discard')}
+            </Button>
           </div>
         </div>
       )}
-    </dialog>
+    </DialogShell>
   )
 }

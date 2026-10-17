@@ -164,6 +164,76 @@ func TestExportContent(t *testing.T) {
 	}
 }
 
+func TestExportGedcom7DatePhraseRoundTrip(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	p, err := s.CreatePerson(ctx, a, PersonInput{GivenNames: "Anna", Surname: "Weber", Sex: "F"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dates := []struct{ typ, in, want string }{
+		{"BIRT", "Frühjahr 1850", "(Frühjahr 1850)"},
+		{"BAPM", "INT 1850 (nach dem Kirchenbuch)", "INT 1850 (nach dem Kirchenbuch)"},
+		{"DEAT", "12 FEB 1750/51", "12 FEB 1750/51"},
+		{"BURI", "BET 1750/51 AND 1760", "BET 1750/51 AND 1760"},
+	}
+	for i, d := range dates[:3] {
+		if _, err := s.CreateHeirloom(ctx, a, HeirloomInput{Name: fmt.Sprintf("Heirloom %d", i), MadeDate: d.in}); err != nil {
+			t.Fatalf("heirloom %s: %v", d.in, err)
+		}
+	}
+	for _, d := range dates {
+		if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &p.ID, Type: d.typ, Date: d.in}); err != nil {
+			t.Fatalf("%s: %v", d.in, err)
+		}
+	}
+	text := exportText(t, s, a, ExportOptions{Version7: true})
+	if !strings.Contains(text, "3 PHRASE ") {
+		t.Fatalf("7.0 export has no DATE.PHRASE:\n%s", text)
+	}
+
+	s2, a2 := reimport(t, text)
+	got := findPerson(t, s2, a2, "anna")
+	byType := map[string]DateValue{}
+	for _, e := range got.Events {
+		byType[e.Type] = e.Date
+	}
+	for _, d := range dates {
+		if byType[d.typ].Raw != d.want {
+			t.Errorf("%s: %q came back as %q, want %q", d.typ, d.in, byType[d.typ].Raw, d.want)
+		}
+	}
+	made := map[string]string{}
+	list, err := s2.ListHeirlooms(ctx, a2, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range list {
+		made[h.Name] = h.MadeDate
+	}
+	for i, d := range dates[:3] {
+		if got := made[fmt.Sprintf("Heirloom %d", i)]; got != d.want {
+			t.Errorf("heirloom %q came back as %q, want %q", d.in, got, d.want)
+		}
+	}
+	if !byType["DEAT"].Valid || byType["BAPM"].Qualifier != "INT" {
+		t.Errorf("dates lost their meaning: %+v", byType)
+	}
+}
+
+func TestExportKeptDatePhrase(t *testing.T) {
+	src := "0 HEAD\n1 GEDC\n2 VERS 7.0\n0 @I1@ INDI\n1 NAME Anna /Weber/\n1 BIRT\n2 DATE ABT 1900\n3 PHRASE during the war\n0 TRLR\n"
+	s, a := reimport(t, src)
+	v7 := exportText(t, s, a, ExportOptions{Version7: true})
+	if !strings.Contains(v7, "2 DATE ABT 1900\n3 PHRASE during the war\n") || strings.Contains(v7, "\n2 PHRASE") {
+		t.Errorf("7.0 export:\n%s", v7)
+	}
+	v5 := exportText(t, s, a, ExportOptions{})
+	if !strings.Contains(v5, "2 NOTE Date phrase: during the war\n") || strings.Contains(v5, "PHRASE") {
+		t.Errorf("5.5.1 export:\n%s", v5)
+	}
+}
+
 func TestExportPrivacy(t *testing.T) {
 	s := newStore(t)
 	a := setup(t, s)
@@ -225,6 +295,186 @@ func TestExportMedia(t *testing.T) {
 	}
 	if plain := exportText(t, s, a, ExportOptions{}); strings.Contains(plain, "OBJE") {
 		t.Error("a plain GEDCOM file has no media records")
+	}
+}
+
+// deadPerson creates a deceased person born in 1850.
+func deadPerson(t *testing.T, s *Store, a Actor, given string) Person {
+	t.Helper()
+	p := mustPerson(t, s, a, given, "Weber")
+	for _, in := range []EventInput{{Type: "BIRT", Date: "1850"}, {Type: "DEAT", Date: "1910"}} {
+		in.PersonID = &p.ID
+		if _, err := s.CreateEvent(ctx, a, in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return p
+}
+
+func TestExportExcludeLivingHidesFamilyEvents(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	old := deadPerson(t, s, a, "Old")
+	rel, err := s.AddRelative(ctx, a, old.ID, RelativeInput{Relation: RelationPartner, Person: &PersonInput{GivenNames: "Young", Surname: "Weber"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &rel.Person.ID, Type: "BIRT", Date: "1990"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{FamilyID: &rel.Family.ID, Type: "MARR", Date: "1 JAN 2015", Description: "Secret Town"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if all := exportText(t, s, a, ExportOptions{Privacy: PrivacyAll}); !strings.Contains(all, "Secret Town") {
+		t.Fatalf("full export must contain the marriage:\n%s", all)
+	}
+	for _, mode := range []string{PrivacyExcludeLiving, PrivacyLivingNameOnly} {
+		out := exportText(t, s, a, ExportOptions{Privacy: mode})
+		if strings.Contains(out, "MARR") || strings.Contains(out, "Secret Town") || strings.Contains(out, "2015") {
+			t.Errorf("%s: family event of a living partner leaked:\n%s", mode, out)
+		}
+	}
+}
+
+func TestExportExcludeLivingSkipsMedia(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	old := deadPerson(t, s, a, "Old")
+	rel, err := s.AddRelative(ctx, a, old.ID, RelativeInput{Relation: RelationChild, Person: &PersonInput{GivenNames: "Young", Surname: "Weber"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &rel.Person.ID, Type: "BIRT", Date: "1990"}); err != nil {
+		t.Fatal(err)
+	}
+	kept, _, err := s.CreateMedia(ctx, a, newMedia(1), &MediaLinkInput{EntityType: "person", EntityID: old.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, _, err := s.CreateMedia(ctx, a, newMedia(2), &MediaLinkInput{EntityType: "person", EntityID: rel.Person.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Linked to both: stays, an exported record references it.
+	shared, _, err := s.CreateMedia(ctx, a, newMedia(3), &MediaLinkInput{EntityType: "person", EntityID: old.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.LinkMedia(ctx, a, shared.ID, MediaLinkInput{EntityType: "person", EntityID: rel.Person.ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	ex, err := s.ExportGEDCOM(ctx, a, ExportOptions{Privacy: PrivacyExcludeLiving, WithMedia: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, m := range ex.Media {
+		got[m.SHA256] = true
+	}
+	if !got[kept.SHA256] || !got[shared.SHA256] || got[secret.SHA256] || len(ex.Media) != 2 {
+		t.Errorf("media files: %+v", ex.Media)
+	}
+	var buf bytes.Buffer
+	_ = gedcom.Write(&buf, ex.Records, gedcom.WriteOptions{})
+	if strings.Contains(buf.String(), secret.SHA256) || strings.Count(buf.String(), "@ OBJE") != 2 {
+		t.Errorf("media records leaked:\n%s", buf.String())
+	}
+}
+
+func TestExportExcludeLivingSkipsPortraitAndEventMedia(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	old := deadPerson(t, s, a, "Old")
+	rel, err := s.AddRelative(ctx, a, old.ID, RelativeInput{Relation: RelationChild, Person: &PersonInput{GivenNames: "Young", Surname: "Weber"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	young := rel.Person.ID
+	birth, err := s.CreateEvent(ctx, a, EventInput{PersonID: &young, Type: "BIRT", Date: "1990"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A portrait that was removed from the gallery but is still the portrait.
+	portrait, _, err := s.CreateMedia(ctx, a, newMedia(1), &MediaLinkInput{EntityType: "person", EntityID: young})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetPortrait(ctx, a, young, PortraitInput{MediaID: &portrait.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UnlinkMedia(ctx, a, portrait.ID, "person", young); err != nil {
+		t.Fatal(err)
+	}
+	// Media of an event of the living person.
+	scan, _, err := s.CreateMedia(ctx, a, newMedia(2), &MediaLinkInput{EntityType: "event", EntityID: birth.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Media of the deceased person's portrait stays.
+	kept, _, err := s.CreateMedia(ctx, a, newMedia(3), &MediaLinkInput{EntityType: "person", EntityID: old.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetPortrait(ctx, a, old.ID, PortraitInput{MediaID: &kept.ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	ex, err := s.ExportGEDCOM(ctx, a, ExportOptions{Privacy: PrivacyExcludeLiving, WithMedia: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ex.Media) != 1 || ex.Media[0].SHA256 != kept.SHA256 {
+		t.Errorf("media files: %+v", ex.Media)
+	}
+	all, err := s.ExportGEDCOM(ctx, a, ExportOptions{Privacy: PrivacyAll, WithMedia: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all.Media) != 3 {
+		t.Errorf("full export media: %+v (portrait %s, scan %s)", all.Media, portrait.SHA256, scan.SHA256)
+	}
+}
+
+func TestExportNameOnlySkipsPortraitMedia(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	old := deadPerson(t, s, a, "Old")
+	rel, err := s.AddRelative(ctx, a, old.ID, RelativeInput{Relation: RelationChild, Person: &PersonInput{GivenNames: "Young", Surname: "Weber"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	young := rel.Person.ID
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &young, Type: "BIRT", Date: "1990"}); err != nil {
+		t.Fatal(err)
+	}
+	// One portrait still in the gallery, one removed from it.
+	for i, unlink := range []bool{false, true} {
+		m, _, err := s.CreateMedia(ctx, a, newMedia(byte(i+1)), &MediaLinkInput{EntityType: "person", EntityID: young})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.SetPortrait(ctx, a, young, PortraitInput{MediaID: &m.ID}); err != nil {
+			t.Fatal(err)
+		}
+		if unlink {
+			if err := s.UnlinkMedia(ctx, a, m.ID, "person", young); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	kept, _, err := s.CreateMedia(ctx, a, newMedia(3), &MediaLinkInput{EntityType: "person", EntityID: old.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ex, err := s.ExportGEDCOM(ctx, a, ExportOptions{Privacy: PrivacyLivingNameOnly, WithMedia: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ex.Media) != 1 || ex.Media[0].SHA256 != kept.SHA256 {
+		t.Errorf("media files: %+v", ex.Media)
 	}
 }
 

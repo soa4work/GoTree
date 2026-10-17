@@ -67,6 +67,13 @@ export function LogDialog({ entry, initialLinks = [], initialTaskId = null, onCl
     taskOptions.push({ id: entry.taskId, title: entry.taskTitle } as (typeof taskOptions)[number])
   }
 
+  // Before the tasks load the select would be empty and then jump to taskId,
+  // which a form would take for an edit; hold the value with a placeholder
+  // (a task that is not active stays listed by its number).
+  if (taskId && !taskOptions.some((x) => x.id === taskId)) {
+    taskOptions.push({ id: taskId, title: tasks.isPending ? t('common.searching') : `#${taskId}` } as (typeof taskOptions)[number])
+  }
+
   return (
     <>
       <Dialog open onClose={onClose} title={entry ? t('research.editEntry') : t('research.newEntry')}>

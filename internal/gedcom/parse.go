@@ -128,8 +128,9 @@ func (d *Document) warn(line int, format string, args ...any) {
 }
 
 // charDecl captures the whole CHAR value (it may hold spaces, as in "IBM
-// WINDOWS") and the optional "2 VERS" line right below it.
-var charDecl = regexp.MustCompile(`(?m)^\s*1\s+CHAR\s+([^\r\n]*?)\s*(?:\r?\n|\z)(?:\s*2\s+VERS\s+(\S+))?`)
+// WINDOWS") and the optional "2 VERS" line right below it. Lines may end
+// in CR alone, as in files from classic Mac OS.
+var charDecl = regexp.MustCompile(`(?:^|[\r\n])[ \t]*1[ \t]+CHAR[ \t]+([^\r\n]*?)[ \t]*(?:\r\n?|\n|\z)(?:[ \t]*2[ \t]+VERS[ \t]+(\S+))?`)
 
 // Parse reads a GEDCOM file. Only input that is not GEDCOM at all is an
 // error; problems inside the file become warnings.

@@ -88,6 +88,16 @@ func TestWriteLongLines(t *testing.T) {
 	}
 }
 
+func TestWriteLongLinesShortTag(t *testing.T) {
+	// "1 _X" is shorter than the "2 CONC" of its continuation lines.
+	out := write(t, []*Node{{Xref: "I1", Tag: "INDI", Children: []*Node{{Tag: "_X", Value: strings.Repeat("ab", 400)}}}}, false)
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if len(line) > maxLine551 {
+			t.Errorf("line of %d bytes: %q", len(line), line[:20])
+		}
+	}
+}
+
 func TestSplitForCONC(t *testing.T) {
 	for _, s := range []string{strings.Repeat("ü", 300), strings.Repeat("a ", 200), strings.Repeat("x", 1000)} {
 		parts := splitForCONC(s, 100)
@@ -104,6 +114,9 @@ func TestSplitForCONC(t *testing.T) {
 
 func TestEscapeKeepsCalendars(t *testing.T) {
 	if got := escape("@#DJULIAN@ 4 OCT 1582 by me@home", false); got != "@#DJULIAN@ 4 OCT 1582 by me@@home" {
+		t.Errorf("got %q", got)
+	}
+	if got := escape("@#DFRENCH R@ 1 VEND 1 and @#Idea@", false); got != "@#DFRENCH R@ 1 VEND 1 and @@#Idea@@" {
 		t.Errorf("got %q", got)
 	}
 }

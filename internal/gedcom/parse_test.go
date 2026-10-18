@@ -129,6 +129,7 @@ func TestEncodings(t *testing.T) {
 		{"ibmpc vers 437", "CP437", enc(charmap.CodePage437, "0 HEAD\n1 GEDC\n2 VERS 5.5.1\n1 CHAR IBMPC\n2 VERS 437\n"+muller), false, "Jürgen /Müller/"},
 		{"cp437", "CP437", enc(charmap.CodePage437, head("CP437")+muller), false, "Jürgen /Müller/"},
 		{"macintosh", "MACINTOSH", enc(charmap.Macintosh, head("MACINTOSH")+body), false, ""},
+		{"macintosh cr", "MACINTOSH", enc(charmap.Macintosh, strings.ReplaceAll(head("MACINTOSH")+body, "\n", "\r")), false, ""},
 		{"latin1", "ISO-8859-1", enc(charmap.ISO8859_1, head("ISO-8859-1")+body), false, ""},
 		{"ibm windows", "ANSI", enc(charmap.Windows1252, head("IBM WINDOWS")+body), false, ""},
 	}

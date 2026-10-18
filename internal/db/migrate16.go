@@ -64,6 +64,15 @@ func withoutForeignKeys(ctx context.Context, db *sql.DB, fn func(*sql.Tx) error)
 	if _, err := c.ExecContext(ctx, "PRAGMA foreign_keys = OFF"); err != nil {
 		return err
 	}
+	// The pragma is a silent no-op inside a transaction. If it did not take,
+	// DROP TABLE would cascade and wipe the child rows, so stop instead.
+	var on int
+	if err := c.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&on); err != nil {
+		return err
+	}
+	if on != 0 {
+		return fmt.Errorf("could not turn foreign keys off")
+	}
 	// Registered after Close, so it runs before it.
 	defer c.ExecContext(context.WithoutCancel(ctx), "PRAGMA foreign_keys = ON")
 	tx, err := c.BeginTx(ctx, nil)

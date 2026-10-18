@@ -9,6 +9,12 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Accounts, trees and members over the API (#59): administrators create and delete accounts,
+  change their role and reset passwords (which signs the account out everywhere); owners add
+  existing accounts to a tree as owner, editor or viewer, change roles and remove members, and a
+  tree always keeps one owner; any account can create a tree and switch between its trees, and
+  logging in opens the tree chosen last
+
 - Account page: change your password (your other devices are then signed out), see the devices you are signed in on and sign any of them out, or sign out everywhere (#57)
 
 - `GOTREE_TRUSTED_PROXIES` names the reverse proxies whose X-Forwarded-For is trusted, so behind a proxy failed logins are counted per real client (#57)
@@ -178,6 +184,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
   scripts from its own files (#2)
 
 ### Changed
+
+- Viewers can export GEDCOM only without living people (#59)
 
 - The export check is a POST request, only editors and owners can run it, and only one runs at a
   time; a second one is asked to wait (#58)

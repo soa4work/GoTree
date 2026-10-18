@@ -11,7 +11,7 @@ test('an administrator creates an account and deletes it again', async ({ page }
 
   // The own row can be edited, but not reset or deleted.
   const own = page.getByRole('listitem').filter({ hasText: '@admin' })
-  await expect(own.getByRole('button', { name: /^Edit: admin/ })).toBeVisible()
+  await expect(own.getByRole('button', { name: /^Edit\s*: admin$/ })).toBeVisible()
   await expect(own.getByRole('button', { name: /^Reset password/ })).toHaveCount(0)
   await expect(own.getByRole('button', { name: /^Delete/ })).toHaveCount(0)
 

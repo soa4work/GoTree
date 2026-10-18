@@ -46,8 +46,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
       </>
     )
   }
-  // An administrator without a tree can still manage accounts, for example to
-  // add themselves to a tree.
+  // An administrator without a tree can still manage accounts. Only the
+  // /admin/ pages pass; the rest of the app needs a tree.
   const onAdminPage = auth.data.user.role === 'admin' && location.pathname.startsWith('/admin/')
   if (!auth.data.tree && !onAdminPage) {
     return (

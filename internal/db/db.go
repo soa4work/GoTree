@@ -52,7 +52,42 @@ func Open(ctx context.Context, path string) (*sql.DB, error) {
 		conn.Close()
 		return nil, err
 	}
+	if err := refreshNameKeys(ctx, conn); err != nil {
+		conn.Close()
+		return nil, err
+	}
 	return conn, nil
+}
+
+const fingerprintKey = "names_key_fingerprint"
+
+// refreshNameKeys recomputes persons.surname_key/given_key when the stored
+// fingerprint of NamesKey is missing or differs from the current one, so a
+// change of the key function (or of golang.org/x/text) cannot leave stale
+// keys behind. The update and the new fingerprint are one transaction.
+func refreshNameKeys(ctx context.Context, conn *sql.DB) error {
+	want := NamesKeyFingerprint()
+	var have string
+	err := conn.QueryRowContext(ctx, `SELECT value FROM app_meta WHERE key = ?`, fingerprintKey).Scan(&have)
+	if err == nil && have == want {
+		return nil
+	}
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("name key fingerprint: %w", err)
+	}
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE persons SET surname_key = names_key(surname), given_key = names_key(given_names)`); err != nil {
+		return fmt.Errorf("recompute name keys: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO app_meta (key, value) VALUES (?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, fingerprintKey, want); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // Migrate applies all pending migrations.

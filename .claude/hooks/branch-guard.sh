@@ -124,7 +124,7 @@ $tail_out"
 # with \x02, so a quoted ">" is never mistaken for one. A subshell opens with
 # the word \x03( and closes with \x03). Heredoc bodies are data and dropped,
 # unless the heredoc is fed to a shell; $(...) and backticks are emitted as
-# commands of their own.
+# commands of their own and leave \x04 in the word they stood in.
 read -r -d '' TOKENIZER <<'PERL'
 use strict; use warnings;
 my @out;
@@ -184,8 +184,8 @@ sub lex {
       }
       next;
     }
-    if ($s =~ s/^\$\(//) { my ($in, $rest) = balanced($s); $s = $rest; lex($in, $depth + 1); $tok .= 'S'; $has = 1; next; }
-    if ($s =~ s/^`([^`]*)`?//s) { lex($1, $depth + 1); $tok .= 'S'; $has = 1; next; }
+    if ($s =~ s/^\$\(//) { my ($in, $rest) = balanced($s); $s = $rest; lex($in, $depth + 1); $tok .= "\x04"; $has = 1; next; }
+    if ($s =~ s/^`([^`]*)`?//s) { lex($1, $depth + 1); $tok .= "\x04"; $has = 1; next; }
     if ($c eq '#' && !$has) { $s =~ s/^[^\n]*//; next; }
     if ($s =~ s/^(&>>|&>|>>|>\||>&|>|<<<|<<-|<<|<&|<>|<)//) {
       my $op = $1;
@@ -207,13 +207,18 @@ PERL
 tokenize() { perl -e "$TOKENIZER" <<< "$1"; }
 
 resolve() { # dir path -> absolute path
-  if [[ "$2" == /* ]]; then realpath -m "$2"; else realpath -m "$1/$2"; fi
+  local p="$2"
+  [[ "$p" == \~ || "$p" == \~/* ]] && p="${HOME:-/}${p:1}"
+  if [[ "$p" == /* ]]; then realpath -m "$p"; else realpath -m "$1/$p"; fi
 }
 
 # A redirection or tee into a checkout on main is an edit of that checkout.
 check_write() {
   local path="$1" r b
   [[ "$path" == /dev/* ]] && return
+  # A path built from a variable or $(...) is unknown, not a file named
+  # "$S/out.txt" in the current checkout (see the header).
+  [[ "$path" == *'$'* || "$path" == *$'\x04'* ]] && return
   r="$(checkout_for "$(existing_dir "$(dirname "$path")")")" || return
   b="$(branch_of "$r")"
   valid "$b" || deny "Refusing to write $path on branch '$b'. $HINT"

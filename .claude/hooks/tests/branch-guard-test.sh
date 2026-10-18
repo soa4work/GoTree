@@ -135,6 +135,12 @@ check allow Bash  "echo x > /dev/null 2>&1"
 check allow Bash  "echo x > $W/outside.txt"
 check allow Bash  "echo \"a > README.md\""
 check allow Bash  "$G log > /tmp/log.txt"
+# A target built from a variable, ~ or $(...) is not a file in the checkout.
+check allow Bash  "S=$W; echo x > \$S/out.txt"
+check allow Bash  "echo x | tee \"\$TMPDIR/out.txt\""
+check allow Bash  "echo x > ~/out.txt"
+check allow Bash  "echo x > \$(mktemp)"
+check allow Bash  "cd \$S && echo x > out.txt"
 
 git switch -qc fix/1-test
 echo "== on fix/1-test"

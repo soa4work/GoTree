@@ -102,6 +102,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A GEDCOM 5.5.1 export of a large tree no longer goes through every event for every person (#56)
+
 - A GEDCOM export without living people (or with their names only) no longer writes the dates and
   notes of a living heirloom holder (#56)
 

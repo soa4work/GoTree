@@ -1224,6 +1224,7 @@
     "gedcom_zip_no_ged": "The zip file contains no .ged file.",
     "gedcom_zip_several_ged": "The zip file contains several .ged files; upload the one you want.",
     "tree_not_empty": "The tree is not empty.",
+    "export_check_busy": "An export check is already running. Try again in a moment.",
     "field": {
       "required": "is required",
       "too_long": "is too long",

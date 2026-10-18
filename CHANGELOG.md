@@ -102,6 +102,16 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Share links that show living people by name only no longer find them by nickname or other names,
+  such as a maiden name; only their given names and surname are searched, and such links list
+  matches in name order, since relevance also weighed the hidden names (#58)
+
+- GEDCOM export and import no longer lose data on a round trip (#51): heirloom custody dates
+  are written as GEDCOM dates (`12 MAR 1850` instead of `12.3.1850`), disputed and disproven
+  events and names keep their status and reason, GEDCOM 7 participant roles (head, sibling,
+  relative, informant and custom roles) and religious names come back as written, and an
+  interpreted date with a dual year (`INT 1750/51`) keeps its second year in GEDCOM 7
+
 - Searching places, sources, repositories and heirlooms ignores the case of Russian and Kazakh
   letters and treats ё as е, so «москва» finds «Москва» (#52)
 
@@ -161,6 +171,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
   download fetches at most four photos at a time, and the tree no longer gets stuck on "Could not
   load" when the last viewed person was deleted or the tree replaced: it forgets that person per
   tree and starts from the first one, or shows the getting-started card (#60)
+
+- The export check is a POST request, only editors and owners can run it, and only one runs at a
+  time; a second one is asked to wait (#58)
 
 - Dates read as plain English ("26 February 1820", "about 1850", "between 1850 and 1860") on the
   timeline, heirlooms and in the date field preview, and can be typed that way in events,

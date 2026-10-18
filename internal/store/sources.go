@@ -138,13 +138,14 @@ func (in RepositoryInput) validate() error {
 	return v.err()
 }
 
-// ListRepositories returns the tree's repositories by name, filtered by q.
+// ListRepositories returns the tree's repositories by name, filtered by a
+// case-insensitive substring of the name.
 func (s *Store) ListRepositories(ctx context.Context, a Actor, q string) ([]Repository, error) {
 	args := []any{a.TreeID}
 	filter := ""
 	if q = strings.TrimSpace(q); q != "" {
-		filter = ` AND name LIKE ? ESCAPE '\'`
-		args = append(args, "%"+escapeLike(q)+"%")
+		filter = ` AND search_fold(name) LIKE ? ESCAPE '\'`
+		args = append(args, containsPattern(q))
 	}
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id, name, address, url, notes, created_at, updated_at FROM repositories
@@ -281,8 +282,8 @@ func scanSource(sc scanner) (Source, error) {
 	return src, nil
 }
 
-// ListSources returns sources by title, filtered by a substring of the
-// title or author.
+// ListSources returns sources by title, filtered by a case-insensitive
+// substring of the title or author.
 func (s *Store) ListSources(ctx context.Context, a Actor, q string, limit int) ([]Source, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
@@ -290,8 +291,8 @@ func (s *Store) ListSources(ctx context.Context, a Actor, q string, limit int) (
 	args := []any{a.TreeID}
 	filter := ""
 	if q = strings.TrimSpace(q); q != "" {
-		filter = ` AND (s.title LIKE ? ESCAPE '\' OR s.author LIKE ? ESCAPE '\')`
-		like := "%" + escapeLike(q) + "%"
+		filter = ` AND (search_fold(s.title) LIKE ? ESCAPE '\' OR search_fold(s.author) LIKE ? ESCAPE '\')`
+		like := containsPattern(q)
 		args = append(args, like, like)
 	}
 	args = append(args, limit)

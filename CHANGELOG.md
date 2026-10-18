@@ -102,6 +102,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Searching places, sources, repositories and heirlooms ignores the case of Russian and Kazakh
+  letters and treats ё as е, so «москва» finds «Москва» (#52)
+
 - Dates in Kazakh no longer repeat «ж.» and no longer fall back to English in browsers without Kazakh
   locale data, and Russian months after prepositions are declined («до февраля 1820 г.») (#50)
 

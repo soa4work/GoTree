@@ -321,8 +321,8 @@ func (s *Store) getHeirloom(ctx context.Context, q queryer, a Actor, id int64) (
 func (s *Store) ListHeirlooms(ctx context.Context, a Actor, query string, personID int64) ([]HeirloomRef, error) {
 	where, args := []string{"h.tree_id = ?"}, []any{a.TreeID}
 	if q := strings.TrimSpace(query); q != "" {
-		where = append(where, `(h.name LIKE ? ESCAPE '\' OR h.description LIKE ? ESCAPE '\')`)
-		like := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(q) + "%"
+		where = append(where, `(search_fold(h.name) LIKE ? ESCAPE '\' OR search_fold(h.description) LIKE ? ESCAPE '\')`)
+		like := containsPattern(q)
 		args = append(args, like, like)
 	}
 	if personID != 0 {

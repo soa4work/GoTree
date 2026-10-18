@@ -7,6 +7,8 @@ import (
 	"math"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/praetorianer777/gotree/internal/db"
 )
 
 // Place is a node in the place hierarchy, e.g. Berlin → Brandenburg → Germany.
@@ -105,8 +107,9 @@ func placeIsAncestorOf(ctx context.Context, q queryer, ancestor, candidate int64
 	return found > 0, err
 }
 
-// ListPlaces returns the tree's places, filtered by a case-insensitive
-// substring of the full name when q is not empty.
+// ListPlaces returns the tree's places, filtered by a substring of the full
+// name, ignoring case in any script and ё/й (see db.SearchFold), when q is
+// not empty.
 func (s *Store) ListPlaces(ctx context.Context, a Actor, q string, limit int) ([]Place, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
@@ -114,8 +117,8 @@ func (s *Store) ListPlaces(ctx context.Context, a Actor, q string, limit int) ([
 	args := []any{a.TreeID, a.TreeID}
 	filter := ""
 	if q = strings.TrimSpace(q); q != "" {
-		filter = ` AND f.full_name LIKE ? ESCAPE '\'`
-		args = append(args, "%"+escapeLike(q)+"%")
+		filter = ` AND search_fold(f.full_name) LIKE ? ESCAPE '\'`
+		args = append(args, containsPattern(q))
 	}
 	args = append(args, limit)
 	rows, err := s.DB.QueryContext(ctx, placeFullNameCTE+`
@@ -141,6 +144,12 @@ func (s *Store) ListPlaces(ctx context.Context, a Actor, q string, limit int) ([
 
 func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
+}
+
+// containsPattern is the LIKE pattern for "contains q" against
+// search_fold(column): q is folded like the column, then escaped.
+func containsPattern(q string) string {
+	return "%" + escapeLike(db.SearchFold(q)) + "%"
 }
 
 type scanner interface{ Scan(dest ...any) error }

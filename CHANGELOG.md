@@ -11,6 +11,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 - Calendar feeds in Russian or Kazakh (#24)
 
+- Dates typed in Russian or Kazakh are understood (#24)
+
 - Russian translation of the interface (#24): all screens, messages and plurals are in Russian;
   phrases that would need declined names ("X's birth") are worded with a colon or brackets instead
 

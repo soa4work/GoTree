@@ -17,6 +17,23 @@ var keywordAliases = map[string]string{
 	"and": "AND", "und": "AND",
 	"from": "FROM", "von": "FROM", "seit": "FROM",
 	"to": "TO", "bis": "TO",
+
+	// Russian.
+	"около": "ABT", "ок": "ABT", "примерно": "ABT", "приблизительно": "ABT", "прибл": "ABT", "приб": "ABT",
+	"расч": "CAL", "расчетно": "CAL",
+	"оценка": "EST", "оценочно": "EST",
+	"до": "BEF", "после": "AFT", "между": "BET", "и": "AND", "с": "FROM", "по": "TO",
+
+	// Kazakh. The postpositions (дейін, кейін, аралығында) come after the
+	// date and are handled by rewriteKazakh.
+	"шамамен": "ABT", "шам": "ABT",
+}
+
+// noiseWords are year markers that carry no information once the date is
+// read: "1850 г.", "1850 года", "в 1850 году", "1850 ж.", "1850 жылы".
+var noiseWords = map[string]bool{
+	"г": true, "гг": true, "год": true, "года": true, "году": true, "годов": true, "годами": true, "годах": true,
+	"ж": true, "жж": true, "жыл": true, "жылы": true, "жылдың": true,
 }
 
 var monthAliases = map[string]string{
@@ -34,8 +51,46 @@ var monthAliases = map[string]string{
 	"december": "DEC", "dezember": "DEC", "dec": "DEC", "dez": "DEC",
 }
 
+func init() {
+	// Russian: nominative, genitive and abbreviations (ё is folded to е).
+	for mon, words := range map[string][]string{
+		"JAN": {"январь", "января", "январе", "янв"},
+		"FEB": {"февраль", "февраля", "феврале", "февр", "фев"},
+		"MAR": {"март", "марта", "марте", "мар"},
+		"APR": {"апрель", "апреля", "апреле", "апр"},
+		"MAY": {"май", "мая", "мае"},
+		"JUN": {"июнь", "июня", "июне", "июн"},
+		"JUL": {"июль", "июля", "июле", "июл"},
+		"AUG": {"август", "августа", "августе", "авг"},
+		"SEP": {"сентябрь", "сентября", "сентябре", "сент", "сен"},
+		"OCT": {"октябрь", "октября", "октябре", "окт"},
+		"NOV": {"ноябрь", "ноября", "ноябре", "нояб", "ноя"},
+		"DEC": {"декабрь", "декабря", "декабре", "дек"},
+	} {
+		for _, w := range words {
+			monthAliases[w] = mon
+		}
+	}
+	// Kazakh: the bare month name plus the locative and genitive forms
+	// that show up in "12 наурызда" and "наурыздың" in longer phrases.
+	for mon, stem := range map[string]string{
+		"JAN": "қаңтар", "FEB": "ақпан", "MAR": "наурыз", "APR": "сәуір",
+		"MAY": "мамыр", "JUN": "маусым", "JUL": "шілде", "AUG": "тамыз",
+		"SEP": "қыркүйек", "OCT": "қазан", "NOV": "қараша", "DEC": "желтоқсан",
+	} {
+		monthAliases[stem] = mon
+		for _, suf := range kazakhCaseSuffixes {
+			monthAliases[stem+suf] = mon
+		}
+	}
+}
+
+// kazakhCaseSuffixes are the locative (-да/-де/-та/-те) and genitive
+// (-дың/-дің/-тың/-тің/-ның/-нің) endings tried after a month name.
+var kazakhCaseSuffixes = []string{"да", "де", "та", "те", "дың", "дің", "тың", "тің", "ның", "нің"}
+
 var (
-	yearRange = regexp.MustCompile(`^(\d{3,4})\s*[-–]\s*(\d{3,4})$`)
+	yearRange = regexp.MustCompile(`^(\d{3,4})\s*[-–]\s*(\d{3,4})(?:\s*(?:гг?|жж?)\.?)?$`)
 	ordinal   = regexp.MustCompile(`^(\d{1,2})(st|nd|rd|th)$`)
 )
 
@@ -56,6 +111,7 @@ func Normalize(s string) (Date, error) {
 
 func rewriteLoose(s string) (string, bool) {
 	s = strings.TrimSpace(strings.ToLower(s))
+	s = strings.NewReplacer("ё", "е").Replace(s)
 	if strings.HasPrefix(s, "(") {
 		return "", false
 	}
@@ -66,19 +122,37 @@ func rewriteLoose(s string) (string, bool) {
 	s = strings.TrimSuffix(s, "?")
 	s = strings.NewReplacer(",", " ", " - ", " TO ", "–", " TO ").Replace(s)
 
-	var out []string
+	var toks []string
 	for _, tok := range strings.Fields(s) {
 		// "12." and "ca." lose their dot, but "12.3.1850" keeps it for Parse.
 		if strings.Count(tok, ".") == 1 && strings.HasSuffix(tok, ".") {
 			tok = strings.TrimSuffix(tok, ".")
 		}
+		toks = append(toks, tok)
+	}
+	// "в 1850 году": the leading preposition is dropped.
+	if len(toks) > 1 && toks[0] == "в" {
+		toks = toks[1:]
+	}
+	toks = rewriteKazakh(toks)
+
+	var out []string
+	hasFrom := false
+	for _, tok := range toks {
 		switch {
+		case noiseWords[tok]:
+			continue
+		case tok == "до" && hasFrom:
+			tok = "TO" // "с 1850 до 1860"
 		case keywordAliases[tok] != "":
 			tok = keywordAliases[tok]
 		case monthAliases[tok] != "":
 			tok = monthAliases[tok]
 		case ordinal.MatchString(tok):
 			tok = ordinal.FindStringSubmatch(tok)[1]
+		}
+		if tok == "FROM" {
+			hasFrom = true
 		}
 		out = append(out, tok)
 	}
@@ -90,6 +164,66 @@ func rewriteLoose(s string) (string, bool) {
 		out = append([]string{"ABT"}, out...)
 	}
 	return strings.Join(out, " "), true
+}
+
+// rewriteKazakh turns the Kazakh postpositions into leading GEDCOM
+// keywords: "1900 жылға дейін" -> BEF, "1900 жылдан кейін" -> AFT,
+// "1850 және 1860 аралығында" -> BET … AND, "1850 жылдан 1860 жылға
+// дейін" -> FROM … TO. "1850 жылы 12 наурызда" becomes "12 наурызда 1850".
+// Tokens without such a postposition are returned unchanged.
+func rewriteKazakh(toks []string) []string {
+	n := len(toks)
+	if n >= 3 && toks[1] == "жылы" && isYear(toks[0]) {
+		return append(append([]string{}, toks[2:]...), toks[0])
+	}
+	if n < 2 {
+		return toks
+	}
+	head := toks[:n-1]
+	switch toks[n-1] {
+	case "аралығында":
+		for i, t := range head {
+			if t == "және" {
+				return concat([]string{"BET"}, trimYearCase(head[:i]), []string{"AND"}, trimYearCase(head[i+1:]))
+			}
+		}
+	case "дейін":
+		for i, t := range head {
+			if t == "жылдан" {
+				return concat([]string{"FROM"}, head[:i], []string{"TO"}, trimYearCase(head[i+1:]))
+			}
+		}
+		return concat([]string{"BEF"}, trimYearCase(head))
+	case "кейін":
+		return concat([]string{"AFT"}, trimYearCase(head))
+	case "бұрын":
+		return concat([]string{"BEF"}, trimYearCase(head))
+	case "бастап", "жылдан":
+		return concat([]string{"FROM"}, trimYearCase(head))
+	}
+	// A bare "1900 жылға" is left as is so that it is rejected.
+	return toks
+}
+
+// trimYearCase drops a trailing ablative or dative year marker
+// ("1850 жылдан", "1900 жылға") that belongs to the postposition.
+func trimYearCase(toks []string) []string {
+	if n := len(toks); n > 0 && (toks[n-1] == "жылдан" || toks[n-1] == "жылға") {
+		return toks[:n-1]
+	}
+	return toks
+}
+
+func concat(parts ...[]string) []string {
+	var out []string
+	for _, p := range parts {
+		out = append(out, p...)
+	}
+	return out
+}
+
+func isYear(s string) bool {
+	return len(s) >= 3 && len(s) <= 4 && isDigits(s)
 }
 
 // monthFirstToDayFirst turns the English "MAR 12 1850" into "12 MAR 1850"

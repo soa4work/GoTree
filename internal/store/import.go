@@ -199,6 +199,13 @@ func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document,
 	if mode != ImportIntoEmpty && mode != ImportReplace {
 		return report, &ValidationError{Fields: map[string]string{"mode": "must be empty or replace"}}
 	}
+	// The API checks this too; the store enforces it for every caller.
+	if !a.CanEdit() {
+		return report, ErrViewOnly
+	}
+	if mode == ImportReplace && a.Role != RoleOwner {
+		return report, ErrOwnerOnly
+	}
 
 	err := s.tx(ctx, func(tx *sql.Tx) error {
 		if mode == ImportReplace {

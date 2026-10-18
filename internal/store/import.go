@@ -145,6 +145,7 @@ type deferredParticipant struct {
 	eventID int64
 	xref    string
 	role    string
+	custom  string
 	line    int
 }
 
@@ -356,7 +357,7 @@ func (im *importer) run(ctx context.Context) error {
 			continue
 		}
 		if _, err := im.tx.ExecContext(ctx, `
-			INSERT OR IGNORE INTO event_participants (event_id, person_id, role) VALUES (?, ?, ?)`, p.eventID, pid, p.role); err != nil {
+			INSERT OR IGNORE INTO event_participants (event_id, person_id, role, custom_role) VALUES (?, ?, ?, ?)`, p.eventID, pid, p.role, p.custom); err != nil {
 			return err
 		}
 	}
@@ -699,6 +700,13 @@ func (im *importer) name(n *gedcom.Node, kept *[]keptNode, ctx string, primary b
 			spfx = c.Value
 		case "TYPE":
 			p.nameType = c.Value
+			// 7.0 writes religious and other names as TYPE OTHER + PHRASE.
+			if strings.EqualFold(strings.TrimSpace(c.Value), "OTHER") {
+				if ph := strings.TrimSpace(c.Text("PHRASE")); ph != "" {
+					p.nameType = ph
+					im.mapped(ctx + ".NAME.TYPE.PHRASE")
+				}
+			}
 		case "_STAT":
 			st := strings.ToLower(strings.TrimSpace(c.Value))
 			switch {
@@ -981,11 +989,24 @@ func (im *importer) event(ctx context.Context, owner string, e *gedcom.Node, per
 		}
 	}
 	for _, a := range assos {
-		role := assoRoles[strings.ToUpper(a.Text("ROLE"))]
-		if role == "" {
+		role := assoRoles[strings.ToUpper(strings.TrimSpace(a.Text("ROLE")))]
+		custom := ""
+		if role == "" || role == "other" {
+			// 7.0 has no head, sibling, relative or informant: GoTree writes
+			// them as ROLE OTHER with the role in a PHRASE.
 			role = "other"
+			if rn := a.First("ROLE"); rn != nil {
+				if ph := collapse(rn.Text("PHRASE")); ph != "" {
+					if r := strings.ToLower(ph); oneOf(r, participantRoles...) {
+						role = r
+					} else {
+						custom = ph
+					}
+					im.mapped(path + ".ASSO.ROLE.PHRASE")
+				}
+			}
 		}
-		im.deferred = append(im.deferred, deferredParticipant{eventID: eid, xref: a.Pointer, role: role, line: a.Line})
+		im.deferred = append(im.deferred, deferredParticipant{eventID: eid, xref: a.Pointer, role: role, custom: custom, line: a.Line})
 		im.mapped(path + ".ASSO")
 	}
 	return eid, nil

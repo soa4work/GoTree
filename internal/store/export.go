@@ -123,8 +123,9 @@ type placeInfo struct {
 }
 
 type participantRow struct {
-	personID int64
-	role     string
+	personID   int64
+	role       string
+	customRole string
 }
 
 // ExportGEDCOM builds the records of a GEDCOM file for the actor's tree.
@@ -297,14 +298,14 @@ func (ex *exporter) load(ctx context.Context) error {
 	rows.Close()
 
 	rows, err = db.QueryContext(ctx, `
-		SELECT p.event_id, p.person_id, p.role FROM event_participants p JOIN events e ON e.id = p.event_id WHERE e.tree_id = ?`, a.TreeID)
+		SELECT p.event_id, p.person_id, p.role, p.custom_role FROM event_participants p JOIN events e ON e.id = p.event_id WHERE e.tree_id = ?`, a.TreeID)
 	if err != nil {
 		return err
 	}
 	for rows.Next() {
 		var eid int64
 		var pr participantRow
-		if err := rows.Scan(&eid, &pr.personID, &pr.role); err != nil {
+		if err := rows.Scan(&eid, &pr.personID, &pr.role, &pr.customRole); err != nil {
 			rows.Close()
 			return err
 		}
@@ -634,7 +635,7 @@ func (ex *exporter) eventNode(e exportEvent) *gedcom.Node {
 		for _, p := range ex.parts[e.id] {
 			if ex.included[p.personID] {
 				asso := pointer("ASSO", personXref(p.personID))
-				asso.Children = append(asso.Children, roleNode(p.role))
+				asso.Children = append(asso.Children, roleNode(p.role, p.customRole))
 				n.Children = append(n.Children, asso)
 			}
 		}
@@ -666,9 +667,18 @@ var roles7 = map[string]string{
 	"spouse": "SPOU", "neighbor": "NGHBR", "officiant": "OFFICIATOR", "witness": "WITN",
 }
 
-func roleNode(role string) *gedcom.Node {
+// roleNode writes a participant's 7.0 ROLE. Roles 7.0 lacks (head, sibling,
+// relative, informant) go out as OTHER with the role in a PHRASE, and so
+// does a custom role.
+func roleNode(role, custom string) *gedcom.Node {
 	if r, ok := roles7[role]; ok {
 		return node("ROLE", r)
+	}
+	if role == "other" {
+		if custom == "" {
+			return node("ROLE", "OTHER")
+		}
+		return node("ROLE", "OTHER", node("PHRASE", custom))
 	}
 	return node("ROLE", "OTHER", node("PHRASE", role))
 }

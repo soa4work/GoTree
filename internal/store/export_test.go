@@ -648,3 +648,100 @@ func TestExportStatusRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+func TestExportParticipantRolesRoundTrip(t *testing.T) {
+	roles := []struct{ given, role, custom string }{
+		{"Bert", "head", ""}, {"Clara", "sibling", ""}, {"Dora", "relative", ""}, {"Emil", "informant", ""},
+		{"Fritz", "other", "lodger"}, {"Gerd", "godparent", ""}, {"Hans", "witness", ""},
+	}
+	s := newStore(t)
+	a := setup(t, s)
+	anna := mustPerson(t, s, a, "Anna", "Weber")
+	var parts []ParticipantInput
+	for _, r := range roles {
+		p := mustPerson(t, s, a, r.given, "Weber")
+		parts = append(parts, ParticipantInput{PersonID: p.ID, Role: r.role, CustomRole: r.custom})
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &anna.ID, Type: "CENS", Date: "1900", Participants: parts}); err != nil {
+		t.Fatal(err)
+	}
+
+	participants := func(s *Store, a Actor) map[string]Participant {
+		got := map[string]Participant{}
+		for _, e := range findPerson(t, s, a, "anna").Events {
+			if e.Type == "CENS" {
+				for _, p := range e.Participants {
+					got[p.Person.GivenNames] = p
+				}
+			}
+		}
+		return got
+	}
+
+	t551 := exportText(t, s, a, ExportOptions{})
+	for _, want := range []string{"2 RELA head (CENS)", "2 RELA sibling (CENS)", "2 RELA relative (CENS)", "2 RELA informant (CENS)", "2 RELA godparent (CENS)"} {
+		if !strings.Contains(t551, want) {
+			t.Errorf("5.5.1 export lacks %q:\n%s", want, t551)
+		}
+	}
+	s1, a1 := reimport(t, t551)
+	got551 := participants(s1, a1)
+	for _, r := range roles {
+		if got551[r.given].Role != r.role {
+			t.Errorf("5.5.1: %s came back as %q, want %q", r.given, got551[r.given].Role, r.role)
+		}
+	}
+	// Known limit: the 5.5.1 RELA form has no room for a custom role.
+	if got551["Fritz"].CustomRole != "" {
+		t.Errorf("5.5.1 kept a custom role: %+v", got551["Fritz"])
+	}
+
+	t7 := exportText(t, s, a, ExportOptions{Version7: true})
+	for _, want := range []string{
+		"3 ROLE OTHER\n4 PHRASE head", "3 ROLE OTHER\n4 PHRASE sibling", "3 ROLE OTHER\n4 PHRASE relative",
+		"3 ROLE OTHER\n4 PHRASE informant", "3 ROLE OTHER\n4 PHRASE lodger", "3 ROLE GODP", "3 ROLE WITN",
+	} {
+		if !strings.Contains(t7, want) {
+			t.Errorf("7.0 export lacks %q:\n%s", want, t7)
+		}
+	}
+	s2, a2 := reimport(t, t7)
+	got7 := participants(s2, a2)
+	for _, r := range roles {
+		if got7[r.given].Role != r.role || got7[r.given].CustomRole != r.custom {
+			t.Errorf("7.0: %s came back as %q / %q, want %q / %q", r.given, got7[r.given].Role, got7[r.given].CustomRole, r.role, r.custom)
+		}
+	}
+	if again := exportText(t, s2, a2, ExportOptions{Version7: true}); strings.Count(again, "ROLE OTHER\n4 PHRASE") != strings.Count(t7, "ROLE OTHER\n4 PHRASE") ||
+		!strings.Contains(again, "3 ROLE OTHER\n4 PHRASE lodger") || !strings.Contains(again, "3 ROLE OTHER\n4 PHRASE head") {
+		t.Errorf("7.0 round trip is not stable:\n%s", again)
+	}
+}
+
+func TestExportNameTypeRoundTrip(t *testing.T) {
+	for _, v7 := range []bool{false, true} {
+		t.Run(fmt.Sprintf("v7=%v", v7), func(t *testing.T) {
+			s := newStore(t)
+			a := setup(t, s)
+			if _, err := s.CreatePerson(ctx, a, PersonInput{GivenNames: "Anna", Surname: "Weber",
+				AlternateNames: []AlternateNameInput{
+					{Type: "religious", GivenNames: "Anna Maria"},
+					{Type: "other", GivenNames: "Anni"},
+					{Type: "immigrant", GivenNames: "Ann", Surname: "Weaver"},
+				}}); err != nil {
+				t.Fatal(err)
+			}
+			s2, a2 := reimport(t, exportText(t, s, a, ExportOptions{Version7: v7}))
+			got := map[string]string{}
+			for _, n := range findPerson(t, s2, a2, "anna").AlternateNames {
+				got[n.GivenNames] = n.Type
+			}
+			want := map[string]string{"Anna Maria": "religious", "Anni": "other", "Ann": "immigrant"}
+			for name, typ := range want {
+				if got[name] != typ {
+					t.Errorf("%s came back as %q, want %q (all: %v)", name, got[name], typ, got)
+				}
+			}
+		})
+	}
+}

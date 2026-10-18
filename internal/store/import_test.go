@@ -413,3 +413,44 @@ func TestImportStatusFromFile(t *testing.T) {
 		t.Errorf("the unknown status was not kept under DEAT:\n%s", text)
 	}
 }
+
+func TestImportRolePhrase(t *testing.T) {
+	src := strings.Join([]string{
+		"0 HEAD", "1 GEDC", "2 VERS 7.0",
+		"0 @I1@ INDI", "1 NAME Anna /Weber/",
+		"1 BIRT",
+		"2 ASSO @I2@", "3 ROLE OTHER", "4 PHRASE Informant",
+		"2 ASSO @I3@", "3 ROLE OTHER", "4 PHRASE Lodger",
+		"2 ASSO @I4@", "3 ROLE OTHER",
+		"2 ASSO @I5@", "3 ROLE WITN", "4 PHRASE chief witness",
+		"0 @I2@ INDI", "1 NAME Bert /Weber/",
+		"0 @I3@ INDI", "1 NAME Clara /Weber/",
+		"0 @I4@ INDI", "1 NAME Dora /Weber/",
+		"0 @I5@ INDI", "1 NAME Emil /Weber/",
+		"0 TRLR", "",
+	}, "\n")
+	doc, err := gedcom.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := newStore(t)
+	a := setup(t, s)
+	if _, err := s.ImportGEDCOM(ctx, a, doc, ImportIntoEmpty); err != nil {
+		t.Fatal(err)
+	}
+	type rc struct{ role, custom string }
+	got := map[string]rc{}
+	for _, e := range findPerson(t, s, a, "anna").Events {
+		for _, p := range e.Participants {
+			got[p.Person.GivenNames] = rc{p.Role, p.CustomRole}
+		}
+	}
+	want := map[string]rc{
+		"Bert": {"informant", ""}, "Clara": {"other", "Lodger"}, "Dora": {"other", ""}, "Emil": {"witness", ""},
+	}
+	for name, w := range want {
+		if got[name] != w {
+			t.Errorf("%s: %+v, want %+v", name, got[name], w)
+		}
+	}
+}

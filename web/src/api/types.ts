@@ -396,6 +396,10 @@ export interface ImportReport {
   brokenReferences: string[]
   childrenFromFamc: number
   childrenFromFamcExamples: string[]
+  /** Share links to a branch kept because the file has the same person. */
+  shareLinksKept: number
+  /** Labels of the working share links deleted with the old tree. */
+  shareLinksLost: string[]
   durationMs: number
 }
 

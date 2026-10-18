@@ -11,6 +11,8 @@ import (
 	"math"
 	"sort"
 	"time"
+
+	"github.com/praetorianer777/gotree/internal/gendate"
 )
 
 // Severity tells how sure a rule is that something is wrong.
@@ -160,12 +162,12 @@ func Day(year, month, day int) int {
 	return year*yearDays + (month-1)*31 + (day - 1)
 }
 
-// FromSortKeys turns the stored YYYYMMDD sort keys of a date into a Range;
-// a 00 month or day widens the range to the whole year or month, and the
-// qualifier opens or widens it.
+// FromSortKeys turns the stored YYYYMMDD sort keys of a date (negative
+// years for B.C.) into a Range; a 00 month or day widens the range to the
+// whole year or month, and the qualifier opens or widens it.
 func FromSortKeys(start, end int, qualifier string) Range {
 	lo := func(k int) int {
-		y, m, d := split(k)
+		y, m, d := gendate.SplitKey(k)
 		if m == 0 {
 			m = 1
 		}
@@ -175,7 +177,7 @@ func FromSortKeys(start, end int, qualifier string) Range {
 		return Day(y, m, d)
 	}
 	hi := func(k int) int {
-		y, m, d := split(k)
+		y, m, d := gendate.SplitKey(k)
 		if m == 0 {
 			m = 12
 		}
@@ -184,7 +186,32 @@ func FromSortKeys(start, end int, qualifier string) Range {
 		}
 		return Day(y, m, d)
 	}
-	r := Range{lo(start), hi(end)}
+	return widen(Range{lo(start), hi(end)}, qualifier)
+}
+
+// FromDate is FromSortKeys for a parsed date. It is exact for partial
+// Julian dates, whose month or year does not line up with the Gregorian one.
+// ok is false for a date without a calendar date (a phrase).
+func FromDate(d gendate.Date) (r Range, ok bool) {
+	first, last := d.Start, d.End
+	if first == nil {
+		first = last
+	}
+	if last == nil {
+		last = first
+	}
+	if first == nil {
+		return Range{}, false
+	}
+	lo, _ := first.Bounds()
+	_, hi := last.Bounds()
+	ly, lm, ld := gendate.SplitKey(lo)
+	hy, hm, hd := gendate.SplitKey(hi)
+	return widen(Range{Day(ly, lm, ld), Day(hy, hm, hd)}, string(d.Qualifier)), true
+}
+
+// widen opens or widens a range by the qualifier of its date.
+func widen(r Range, qualifier string) Range {
 	switch qualifier {
 	case "BEF", "TO":
 		r.Lo = math.MinInt
@@ -195,18 +222,6 @@ func FromSortKeys(start, end int, qualifier string) Range {
 		r.Hi += 2 * yearDays
 	}
 	return r
-}
-
-func split(k int) (y, m, d int) {
-	neg := k < 0
-	if neg {
-		k = -k
-	}
-	y, m, d = k/10000, k/100%100, k%100
-	if neg {
-		y = -y
-	}
-	return y, m, d
 }
 
 var open = Range{math.MinInt, math.MaxInt}

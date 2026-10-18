@@ -149,7 +149,7 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 			return nil
 		}
 	}
-	stored, err := s.Files.SaveChecked(buffered, s.MaxUpload, check)
+	staged, err := s.Files.Stage(buffered, s.MaxUpload, check)
 	if errors.Is(err, media.ErrImageTooLarge) {
 		writeErrorP(w, http.StatusUnprocessableEntity, CodeImageTooLarge, fmt.Sprintf("the image is larger than %d megapixels", media.MaxImagePixels/1_000_000), map[string]any{"megapixels": media.MaxImagePixels / 1_000_000})
 		return
@@ -171,9 +171,20 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, CodeStoreFileFailed, "could not store the file")
 		return
 	}
+	defer staged.Discard()
+
+	// The slow transfer is done; from here a deletion of the same content must
+	// not decide "unused" and remove the file between the commit and the record.
+	unlock := s.fileLocks.Lock(staged.SHA256)
+	defer unlock()
+	if err := staged.Commit(); err != nil {
+		s.Log.Error("store upload", "err", err)
+		writeError(w, http.StatusInternalServerError, CodeStoreFileFailed, "could not store the file")
+		return
+	}
 
 	in := store.NewMedia{
-		SHA256: stored.SHA256, Mime: mimeType, Kind: string(kind), Size: stored.Size,
+		SHA256: staged.SHA256, Mime: mimeType, Kind: string(kind), Size: staged.Size,
 		OriginalName: filepath.Base(part.FileName()), Orientation: 1,
 	}
 	if kind == media.KindImage {
@@ -229,15 +240,31 @@ func (s *Server) updateMedia(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// afterMediaDeleteDecision is called by deleteMedia between deciding that a
+// file is unused and removing it. Nil in production; for tests.
+var afterMediaDeleteDecision func()
+
 func (s *Server) deleteMedia(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
 		return
 	}
+	// Deciding that the file is unused and removing it happen under the hash
+	// lock, so an identical upload cannot slip in between.
+	m, err := s.Store.GetMedia(r.Context(), actorFrom(r), id)
+	if err != nil {
+		writeStoreError(w, s.Log, err)
+		return
+	}
+	unlock := s.fileLocks.Lock(m.SHA256)
+	defer unlock()
 	sha, orphaned, err := s.Store.DeleteMedia(r.Context(), actorFrom(r), id)
 	if err != nil {
 		writeStoreError(w, s.Log, err)
 		return
+	}
+	if afterMediaDeleteDecision != nil {
+		afterMediaDeleteDecision()
 	}
 	if orphaned {
 		if err := s.Files.Remove(sha); err != nil {
@@ -247,8 +274,9 @@ func (s *Server) deleteMedia(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// mediaFile serves the original. Content-addressed files never change, so
-// they may be cached for good; range requests let players seek.
+// mediaFile serves the file, without the GPS position unless the instance
+// keeps it. Content-addressed files never change, so they may be cached for
+// good; range requests let players seek.
 func (s *Server) mediaFile(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -259,9 +287,21 @@ func (s *Server) mediaFile(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, s.Log, err)
 		return
 	}
-	path, err := s.Files.Path(m.SHA256)
+	var path string
+	if s.KeepPhotoLocation {
+		path, err = s.Files.Path(m.SHA256)
+	} else {
+		path, err = s.Files.WithoutLocation(m.SHA256, m.Mime)
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		s.Log.Error("open media file", "id", id, "err", err)
+		writeError(w, http.StatusNotFound, CodeFileMissing, "the file is missing on the server")
+		return
+	}
 	if err != nil {
-		writeStoreError(w, s.Log, err)
+		// Never fall back to the original: it may carry the position.
+		s.Log.Error("prepare media file", "id", id, "err", err)
+		writeError(w, http.StatusInternalServerError, CodeMediaPrepareFailed, "could not prepare the file for download")
 		return
 	}
 	f, err := os.Open(path)

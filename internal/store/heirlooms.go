@@ -138,6 +138,8 @@ func (s *Store) validateHeirloom(ctx context.Context, q queryer, a Actor, in Hei
 	return v.err()
 }
 
+// madeSort is the sort key of a made date; keep in sync with
+// db.refreshHeirloomDates.
 func madeSort(date string) sql.NullInt64 {
 	if d, err := gendate.Parse(date); err == nil {
 		if k, ok := d.SortKey(); ok {

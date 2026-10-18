@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/praetorianer777/gotree/internal/check"
 	"github.com/praetorianer777/gotree/internal/gendate"
@@ -120,6 +121,15 @@ func (s *Store) Checks(ctx context.Context, a Actor, personID int64) (CheckRepor
 		e.Invalid = raw != "" && norm == ""
 		if start.Valid && end.Valid {
 			r := check.FromSortKeys(int(start.Int64), int(end.Int64), qual)
+			// A Julian month or year does not line up with the
+			// Gregorian one, so its range comes from the date.
+			if strings.Contains(norm, "@#DJULIAN@") {
+				if pd, err := gendate.Parse(norm); err == nil {
+					if jr, ok := check.FromDate(pd); ok {
+						r = jr
+					}
+				}
+			}
 			e.Date = &r
 		}
 		d.Events = append(d.Events, e)

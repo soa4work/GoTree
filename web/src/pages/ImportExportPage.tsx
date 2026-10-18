@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ApiError, getAuthState } from '../api/client'
-import { importGedcom, listPersons } from '../api/endpoints'
+import { importGedcom, listPersons, listShareLinks } from '../api/endpoints'
 import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PageHeading } from '../components/PageHeading'
@@ -54,7 +54,16 @@ function ImportSection() {
   const hasData = (people.data?.total ?? 0) > 0
   const auth = useQuery({ queryKey: ['auth'], queryFn: ({ signal }) => getAuthState(signal), staleTime: Infinity })
   // Replacing wipes the tree: only its owner may do it.
-  const replaceBlocked = hasData && auth.data?.tree?.role !== 'owner'
+  const isOwner = auth.data?.tree?.role === 'owner'
+  const replaceBlocked = hasData && !isOwner
+  // Share links to a branch may be deleted by replacing; the list is
+  // owner-only on the server, like replacing itself.
+  const shares = useQuery({ queryKey: ['share-links'], queryFn: ({ signal }) => listShareLinks(signal), enabled: hasData && isOwner })
+  const now = new Date().toISOString()
+  const branchLinks = (shares.data ?? []).filter(
+    (l) => l.scope === 'descendants' && !l.revokedAt && (!l.expiresAt || l.expiresAt > now),
+  ).length
+  const replaceConfirm = t('transfer.replaceConfirm', { count: people.data?.total ?? 0 })
 
   const run = useMutation({
     mutationFn: (mode: 'empty' | 'replace') => importGedcom(file!, mode),
@@ -93,6 +102,9 @@ function ImportSection() {
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{t('transfer.fileHint')}</p>
       </div>
       {hasData && <p className="font-medium text-amber-800 dark:text-amber-300">{t('transfer.replaceWarning')}</p>}
+      {hasData && branchLinks > 0 && (
+        <p className="text-slate-700 dark:text-slate-300">{t('transfer.replaceShareLinks', { count: branchLinks })}</p>
+      )}
       {replaceBlocked && <p className="text-slate-700 dark:text-slate-300">{t('transfer.ownerOnly')}</p>}
       <Button
         disabled={!file || replaceBlocked}
@@ -113,7 +125,7 @@ function ImportSection() {
       <ConfirmDialog
         open={confirmReplace}
         title={t('transfer.replaceTitle')}
-        message={t('transfer.replaceConfirm', { count: people.data?.total ?? 0 })}
+        message={branchLinks > 0 ? `${replaceConfirm} ${t('transfer.replaceShareLinks', { count: branchLinks })}` : replaceConfirm}
         confirmLabel={t('transfer.replaceButton')}
         busy={run.isPending}
         error={error}

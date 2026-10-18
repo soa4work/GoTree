@@ -26,11 +26,19 @@ type Server struct {
 	// Frontend is the built SPA (web/dist); see web.Dist.
 	Frontend fs.FS
 	Log      *slog.Logger
+	// KeepPhotoLocation serves photos with their GPS position; by default it is
+	// removed from files leaving the server (the parsed position stays in the database).
+	KeepPhotoLocation bool
+
+	throttle *loginThrottle
+	// fileLocks keeps "this file is unused, remove it" and an upload of the same
+	// content from interleaving.
+	fileLocks media.HashLocks
+
 	// TrustedProxies are the reverse proxies whose X-Forwarded-For names the
 	// client (GOTREE_TRUSTED_PROXIES). Empty: the TCP peer is the client.
 	TrustedProxies []netip.Prefix
 
-	throttle *loginThrottle
 	// verifySlot lets one export check run at a time; each one builds a whole database.
 	verifySlot chan struct{}
 }

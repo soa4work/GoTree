@@ -56,6 +56,7 @@ type exportPerson struct {
 	id                                       int64
 	given, surname, prefix, suffix, nickname string
 	sex, notes, xref, extra                  string
+	nameNotes                                string
 	living                                   bool
 }
 
@@ -64,6 +65,7 @@ type exportName struct {
 	id                                            int64
 	typ, given, surname, prefix, suffix, nickname string
 	status, statusReason                          string
+	notes                                         string
 }
 
 type exportEvent struct {
@@ -164,14 +166,14 @@ func (ex *exporter) load(ctx context.Context) error {
 		return err
 	}
 	rows, err := db.QueryContext(ctx, `
-		SELECT id, given_names, surname, name_prefix, name_suffix, nickname, sex, notes, gedcom_xref, extra_json
+		SELECT id, given_names, surname, name_prefix, name_suffix, nickname, sex, notes, gedcom_xref, extra_json, name_notes
 		FROM persons WHERE tree_id = ? ORDER BY id`, a.TreeID)
 	if err != nil {
 		return err
 	}
 	for rows.Next() {
 		var p exportPerson
-		if err := rows.Scan(&p.id, &p.given, &p.surname, &p.prefix, &p.suffix, &p.nickname, &p.sex, &p.notes, &p.xref, &p.extra); err != nil {
+		if err := rows.Scan(&p.id, &p.given, &p.surname, &p.prefix, &p.suffix, &p.nickname, &p.sex, &p.notes, &p.xref, &p.extra, &p.nameNotes); err != nil {
 			rows.Close()
 			return err
 		}
@@ -194,14 +196,14 @@ func (ex *exporter) load(ctx context.Context) error {
 	}
 
 	rows, err = db.QueryContext(ctx, `
-		SELECT n.person_id, n.id, n.type, n.given_names, n.surname, n.name_prefix, n.name_suffix, n.nickname, n.status, n.status_reason
+		SELECT n.person_id, n.id, n.type, n.given_names, n.surname, n.name_prefix, n.name_suffix, n.nickname, n.status, n.status_reason, n.notes
 		FROM person_names n JOIN persons p ON p.id = n.person_id WHERE p.tree_id = ? ORDER BY n.person_id, n.sort_order, n.id`, a.TreeID)
 	if err != nil {
 		return err
 	}
 	for rows.Next() {
 		var n exportName
-		if err := rows.Scan(&n.personID, &n.id, &n.typ, &n.given, &n.surname, &n.prefix, &n.suffix, &n.nickname, &n.status, &n.statusReason); err != nil {
+		if err := rows.Scan(&n.personID, &n.id, &n.typ, &n.given, &n.surname, &n.prefix, &n.suffix, &n.nickname, &n.status, &n.statusReason, &n.notes); err != nil {
 			rows.Close()
 			return err
 		}
@@ -282,25 +284,55 @@ func (ex *exporter) load(ctx context.Context) error {
 
 	rows, err = db.QueryContext(ctx, `
 		-- GEDCOM cites a fact as a whole; a citation of its date and of its
-		-- place is one SOUR.
-		SELECT DISTINCT l.entity_type, l.entity_id, c.id, c.source_id, c.page, c.text, c.notes, c.quality, c.extra_json
+		-- place is one SOUR (see the de-duplication below). A citation of the
+		-- main name is field "name" of the person.
+		SELECT l.entity_type, l.entity_id, l.field, c.id, c.source_id, c.page, c.text, c.notes, c.quality, c.extra_json
 		FROM citation_links l JOIN citations c ON c.id = l.citation_id
 		WHERE c.tree_id = ? ORDER BY c.id`, a.TreeID)
 	if err != nil {
 		return err
 	}
 	for rows.Next() {
-		var typ string
+		var typ, field string
 		var eid int64
 		var c exportCitation
-		if err := rows.Scan(&typ, &eid, &c.id, &c.sourceID, &c.page, &c.text, &c.notes, &c.quality, &c.extra); err != nil {
+		if err := rows.Scan(&typ, &eid, &field, &c.id, &c.sourceID, &c.page, &c.text, &c.notes, &c.quality, &c.extra); err != nil {
 			rows.Close()
 			return err
 		}
 		key := fmt.Sprintf("%s:%d", typ, eid)
-		ex.cites[key] = append(ex.cites[key], c)
+		if typ == "person" && field == "name" {
+			key = fmt.Sprintf("person-name:%d", eid)
+		}
+		dup := false
+		for _, o := range ex.cites[key] {
+			dup = dup || o.id == c.id
+		}
+		if !dup {
+			ex.cites[key] = append(ex.cites[key], c)
+		}
 	}
 	rows.Close()
+	// A citation of the person as a whole that also cites the name is
+	// written once, at person level.
+	for key, list := range ex.cites {
+		id, ok := strings.CutPrefix(key, "person-name:")
+		if !ok {
+			continue
+		}
+		whole := ex.cites["person:"+id]
+		kept := list[:0:0]
+		for _, c := range list {
+			dup := false
+			for _, o := range whole {
+				dup = dup || o.id == c.id
+			}
+			if !dup {
+				kept = append(kept, c)
+			}
+		}
+		ex.cites[key] = kept
+	}
 
 	rows, err = db.QueryContext(ctx, `
 		SELECT p.event_id, p.person_id, p.role, p.custom_role FROM event_participants p JOIN events e ON e.id = p.event_id WHERE e.tree_id = ?`, a.TreeID)
@@ -557,12 +589,16 @@ func (ex *exporter) nameNode(typ, given, surname, prefix, suffix, nickname strin
 
 func (ex *exporter) personRecord(p exportPerson, events []exportEvent, partnerFams []int64, childFams []exportChildRef) *gedcom.Node {
 	r := &gedcom.Node{Xref: personXref(p.id), Tag: "INDI"}
-	r.Children = append(r.Children, ex.nameNode("", p.given, p.surname, p.prefix, p.suffix, p.nickname))
+	nn0 := ex.nameNode("", p.given, p.surname, p.prefix, p.suffix, p.nickname)
+	r.Children = append(r.Children, nn0)
 	short := ex.nameOnly[p.id]
 	if !short {
+		add(nn0, "NOTE", p.nameNotes)
+		ex.citations(nn0, "person-name", p.id)
 		for _, n := range ex.names[p.id] {
 			nn := ex.nameNode(n.typ, n.given, n.surname, n.prefix, n.suffix, n.nickname)
 			ex.status(nn, n.status, n.statusReason)
+			add(nn, "NOTE", n.notes)
 			ex.citations(nn, "name", n.id)
 			r.Children = append(r.Children, nn)
 		}

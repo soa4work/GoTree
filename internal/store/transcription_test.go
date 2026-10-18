@@ -259,7 +259,11 @@ func TestFieldCitationsExportOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := exportText(t, s, a, ExportOptions{})
-	if n := strings.Count(out, "3 PAGE line 1"); n != 1 {
+	// The citation also supports the person's name, which is written on
+	// the NAME line; the birth must still cite it once.
+	birth := out[strings.Index(out, "\n1 BIRT"):]
+	birth = birth[:strings.Index(birth[1:], "\n1 ")+1]
+	if n := strings.Count(birth, "3 PAGE line 1"); n != 1 {
 		t.Errorf("the birth cites line 1 %d times:\n%s", n, out)
 	}
 }

@@ -128,6 +128,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- GEDCOM import keeps the notes and sources of every name: NAME.NOTE becomes a note on the name,
+  shown and editable on the person, sources of other and married names are attached to those names,
+  and a source of the main name stays on the name through export and import instead of moving to
+  the person (#54)
+
 - Switching between media no longer carries the form over (saving could overwrite the other
   medium), saving a transcription keeps unsaved rows, failed task, repository, photo link, face,
   match search and logout actions say so, an expired session during a save brings up the login screen, and a new version is

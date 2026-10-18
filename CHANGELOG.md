@@ -12,6 +12,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 - Health check: `gotree -healthcheck` asks the running server whether it is healthy, and the
   Docker image uses it as its HEALTHCHECK (#62)
 
+- People list: sort by surname, birth (oldest or youngest first) or recent changes, and filter by
+  sex and living or deceased, kept in the address; the sources list and the media gallery load more
+  with a "Show more" button instead of stopping at 100 sources and 200 media (#60)
+
 - Account page: change your password (your other devices are then signed out), see the devices you are signed in on and sign any of them out, or sign out everywhere (#57)
 
 - `GOTREE_TRUSTED_PROXIES` names the reverse proxies whose X-Forwarded-For is trusted, so behind a proxy failed logins are counted per real client (#57)
@@ -185,6 +189,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 - Docker images: `latest` and `X.Y` move only to the newest release, so re-running an older
   release or publishing a prerelease no longer moves them back, and the image is built from base
   images pinned by digest; prereleases are marked as such on GitHub (#62)
+
+- The tree chart redraws only the cards whose selection or focus changed, the wall chart's SVG
+  download fetches at most four photos at a time, and the tree no longer gets stuck on "Could not
+  load" when the last viewed person was deleted or the tree replaced: it forgets that person per
+  tree and starts from the first one, or shows the getting-started card (#60)
 
 - The export check is a POST request, only editors and owners can run it, and only one runs at a
   time; a second one is asked to wait (#58)

@@ -2,9 +2,11 @@ package media
 
 import (
 	"bytes"
+	"compress/zlib"
 	"encoding/binary"
 	"hash/crc32"
 	"image"
+	"image/jpeg"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -451,4 +453,103 @@ func TestWithoutLocationTruncatedSegment(t *testing.T) {
 	if got, _ := os.ReadFile(clean); len(got) != len(data) || bytes.Contains(got, gps) {
 		t.Errorf("truncated segment kept its position (%d bytes)", len(got))
 	}
+}
+
+func stripFile(t *testing.T, data []byte, mime string) []byte {
+	t.Helper()
+	f := Files{Root: t.TempDir()}
+	sha := saved(t, f, data)
+	p, err := f.WithoutLocation(sha, mime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(p)
+	if len(got) != len(data) {
+		t.Fatalf("size %d, want %d", len(got), len(data))
+	}
+	return got
+}
+
+func TestWithoutLocationEmbeddedJPEG(t *testing.T) {
+	main := encodeJPEG(t, 32, 16)
+	embedded := gpsJPEG(t)
+	data := append(append([]byte{}, main...), embedded...)
+	if m := ReadMeta(bytes.NewReader(embedded)); m.Lat == nil {
+		t.Fatal("embedded image has no position")
+	}
+	got := stripFile(t, data, "image/jpeg")
+	if m := ReadMeta(bytes.NewReader(got[len(main):])); m.Lat != nil || m.Lng != nil {
+		t.Errorf("position survived in the embedded image: %+v", m)
+	}
+	if m := ReadMeta(bytes.NewReader(got[len(main):])); m.Orientation != 6 {
+		t.Errorf("embedded orientation lost: %+v", m)
+	}
+	if !bytes.Equal(got[:len(main)], main) {
+		t.Error("main image changed")
+	}
+}
+
+func TestWithoutLocationEmbeddedJPEGUnparseable(t *testing.T) {
+	main := encodeJPEG(t, 32, 16)
+	// An image start followed by a segment that runs past the end of the file.
+	tail := append([]byte{0xFF, 0xD8, 0xFF, 0xE1, 0xFF, 0xF0}, []byte("SECRET 51.3N")...)
+	data := append(append([]byte{}, main...), tail...)
+	got := stripFile(t, data, "image/jpeg")
+	if bytes.Contains(got, []byte("SECRET")) || !bytes.Equal(got[:len(main)], main) {
+		t.Errorf("tail not blanked or main image changed")
+	}
+	if _, err := jpegDecode(got); err != nil {
+		t.Errorf("main image no longer decodes: %v", err)
+	}
+}
+
+func TestWithoutLocationExtendedXMP(t *testing.T) {
+	payload := append(append([]byte{}, xmpExtPrefix...), []byte("0123456789ABCDEF0123456789ABCDEF\x00\x00\x00\x10\x00\x00\x00\x00<a exif:GPSLatitude=\"51,20N\"/>")...)
+	data := withSegments(encodeJPEG(t, 16, 16), app1(payload))
+	got := stripFile(t, data, "image/jpeg")
+	if bytes.Contains(got, []byte("51,20N")) || bytes.Contains(got, []byte("GPSLatitude")) {
+		t.Error("extended XMP survived")
+	}
+	if _, err := jpegDecode(got); err != nil {
+		t.Errorf("does not decode: %v", err)
+	}
+}
+
+func TestWithoutLocationPNGTextProfiles(t *testing.T) {
+	var base bytes.Buffer
+	if err := png.Encode(&base, image.NewRGBA(image.Rect(0, 0, 4, 4))); err != nil {
+		t.Fatal(err)
+	}
+	var zbuf bytes.Buffer
+	zw := zlib.NewWriter(&zbuf)
+	zw.Write([]byte("SECRETZ"))
+	zw.Close()
+	chunks := [][]byte{
+		pngChunk("tEXt", []byte("Raw profile type exif\x00SECRET1")),
+		pngChunk("zTXt", append([]byte("Raw profile type xmp\x00\x00"), zbuf.Bytes()...)),
+		pngChunk("tEXt", []byte("XML:com.adobe.xmp\x00SECRET3")),
+		pngChunk("iTXt", []byte("Raw profile type APP1\x00\x00\x00\x00\x00SECRET4")),
+		pngChunk("tEXt", []byte("Comment\x00keep me")),
+	}
+	raw := base.Bytes()
+	data := append([]byte{}, raw[:33]...)
+	for _, c := range chunks {
+		data = append(data, c...)
+	}
+	data = append(data, raw[33:]...)
+
+	got := stripFile(t, data, "image/png")
+	if bytes.Contains(got, []byte("SECRET")) || bytes.Contains(got, []byte("Raw profile")) {
+		t.Error("profile text survived")
+	}
+	if !bytes.Contains(got, []byte("keep me")) {
+		t.Error("an ordinary comment was removed")
+	}
+	if _, err := png.Decode(bytes.NewReader(got)); err != nil {
+		t.Errorf("does not decode: %v", err)
+	}
+}
+
+func jpegDecode(b []byte) (image.Image, error) {
+	return jpeg.Decode(bytes.NewReader(b))
 }

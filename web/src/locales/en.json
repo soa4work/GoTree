@@ -541,7 +541,7 @@
     "formatGed": "GEDCOM file (.ged)",
     "formatGedHint": "The family data, without photos.",
     "formatZip": "With photos and documents (.gdz / .zip)",
-    "formatZipHint": "A zip with the GEDCOM file and all media files. Photos are included without their GPS position.",
+    "formatZipHint": "A zip with the GEDCOM file and all media files. GPS positions are removed from photos unless the server is set to keep them.",
     "download": "Download",
     "check": "Check the export",
     "checking": "Exporting and reading the file back…",

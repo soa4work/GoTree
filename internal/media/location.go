@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 // cleanVersion names the stripping rules in the file names under Root/clean.
@@ -268,14 +269,30 @@ func blankExifBlock(b []byte) bool {
 // stripJPEG blanks the GPS position in the EXIF and XMP segments of an open
 // JPEG, in place. Segments are rewritten with the same length.
 func stripJPEG(f *os.File) (bool, error) {
-	changed := false
+	changed, stop, _, err := walkJPEG(f, 2)
+	if err != nil {
+		return changed, err
+	}
+	c, err := stripEmbeddedJPEGs(f, stop)
+	return changed || c, err
+}
+
+// maxEmbedded bounds how many embedded images are walked; a file with more
+// is not trusted.
+const maxEmbedded = 1000
+
+// walkJPEG blanks the position in the EXIF and XMP segments of the image
+// whose header segments start at start (just after its SOI). It stops at the
+// start of image data (SOS) or EOI, and reports where in stop; clean is false
+// when the walk ended any other way (garbage, a cut-off segment).
+func walkJPEG(f *os.File, start int64) (changed bool, stop int64, clean bool, err error) {
 	var hdr [4]byte
-	for pos := int64(2); ; {
+	for pos := start; ; {
 		if _, err := f.ReadAt(hdr[:], pos); err != nil {
-			return changed, nil // end of file before image data: nothing more
+			return changed, pos, false, nil // end of file before image data
 		}
 		if hdr[0] != 0xFF {
-			return changed, nil
+			return changed, pos, false, nil
 		}
 		marker := hdr[1]
 		if marker == 0xD8 || (marker >= 0xD0 && marker <= 0xD7) || marker == 0x01 || marker == 0xFF {
@@ -283,18 +300,19 @@ func stripJPEG(f *os.File) (bool, error) {
 			continue
 		}
 		if marker == 0xDA || marker == 0xD9 {
-			return changed, nil
+			return changed, pos, true, nil
 		}
 		size := int64(binary.BigEndian.Uint16(hdr[2:]))
 		if size < 2 {
-			return changed, nil
+			return changed, pos, false, nil
 		}
 		if marker == 0xE1 {
 			payload := make([]byte, size-2)
 			if n, err := f.ReadAt(payload, pos+4); err != nil {
 				// A truncated segment ends the file; ReadMeta ignores it, but
 				// other tools may read what is there, so it is cleared.
-				return blankTail(f, n, pos+4, changed)
+				changed, err = blankTail(f, n, pos+4, changed)
+				return changed, pos, false, err
 			}
 			var c bool
 			switch {
@@ -303,17 +321,107 @@ func stripJPEG(f *os.File) (bool, error) {
 			case bytes.HasPrefix(payload, xmpPrefix):
 				c = blankXMPLocation(payload[len(xmpPrefix):])
 			case bytes.HasPrefix(payload, xmpExtPrefix):
-				c = blankXMPLocation(payload[len(xmpExtPrefix):])
+				// Extended XMP continues a larger XMP packet in pieces that
+				// cannot be parsed one by one: blank it all.
+				c = blankAll(payload[len(xmpExtPrefix):], ' ')
 			}
 			if c {
 				if _, err := f.WriteAt(payload, pos+4); err != nil {
-					return changed, err
+					return changed, pos, false, err
 				}
 				changed = true
 			}
 		}
 		pos += 2 + size
 	}
+}
+
+// blankAll fills b with c and reports whether that changed it.
+func blankAll(b []byte, c byte) bool {
+	changed := false
+	for i := range b {
+		if b[i] != c {
+			b[i], changed = c, true
+		}
+	}
+	return changed
+}
+
+// stripEmbeddedJPEGs handles images stored after the main one (the second
+// image of MPO files, gain maps, previews), which carry their own EXIF.
+// JPEG entropy data never contains FF D8, so every FF D8 FF after from is a
+// start of image. Each one's header segments are walked like the main
+// image's; if one cannot be parsed, or there are too many, everything after
+// the first EOI is zeroed.
+func stripEmbeddedJPEGs(f *os.File, from int64) (bool, error) {
+	size, err := fileSize(f)
+	if err != nil {
+		return false, err
+	}
+	changed := false
+	cursor := from
+	for count := 0; ; count++ {
+		at, ok, err := indexAt(f, cursor, size, []byte{0xFF, 0xD8, 0xFF})
+		if err != nil || !ok {
+			return changed, err
+		}
+		c, _, clean, err := walkJPEG(f, at+2)
+		changed = changed || c
+		if err != nil {
+			return changed, err
+		}
+		if !clean || count >= maxEmbedded {
+			eoi, found, err := indexAt(f, from, size, []byte{0xFF, 0xD9})
+			if err != nil {
+				return changed, err
+			}
+			if !found {
+				eoi = from
+			}
+			if err := zeroRange(f, eoi+2, size); err != nil {
+				return changed, err
+			}
+			return true, nil
+		}
+		cursor = at + 2
+	}
+}
+
+func fileSize(f *os.File) (int64, error) {
+	st, err := f.Stat()
+	if err != nil {
+		return 0, err
+	}
+	return st.Size(), nil
+}
+
+// indexAt finds the first occurrence of pat in [from, size) of f.
+func indexAt(f *os.File, from, size int64, pat []byte) (int64, bool, error) {
+	const block = 1 << 20
+	buf := make([]byte, block+len(pat)-1)
+	for pos := from; pos < size; pos += block {
+		n, err := f.ReadAt(buf, pos)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return 0, false, err
+		}
+		if i := bytes.Index(buf[:n], pat); i >= 0 {
+			return pos + int64(i), true, nil
+		}
+	}
+	return 0, false, nil
+}
+
+// zeroRange overwrites [from, to) of f with zeros.
+func zeroRange(f *os.File, from, to int64) error {
+	zeros := make([]byte, 64<<10)
+	for from < to {
+		n := min(int64(len(zeros)), to-from)
+		if _, err := f.WriteAt(zeros[:n], from); err != nil {
+			return err
+		}
+		from += n
+	}
+	return nil
 }
 
 // blankTail zeroes the n bytes at off, the rest of a file that ends inside
@@ -346,10 +454,19 @@ func stripPNG(f *os.File) (bool, error) {
 		}
 		dataAt := pos + 8
 		switch typ {
-		case "eXIf", "iTXt":
-			var head [32]byte
+		case "tEXt", "zTXt", "iTXt", "eXIf":
+			var head [96]byte
 			n, _ := f.ReadAt(head[:min(size, int64(len(head)))], dataAt)
-			if typ == "iTXt" && !bytes.HasPrefix(head[:n], []byte("XML:com.adobe.xmp\x00")) {
+			if typ != "eXIf" && pngMetaKeyword(head[:n]) && !(typ == "iTXt" && bytes.HasPrefix(head[:n], []byte("XML:com.adobe.xmp\x00"))) {
+				// Text chunks that carry EXIF or XMP as text: nothing to parse,
+				// the chunk becomes a private one that decoders skip.
+				if err := neutralizePNGChunk(f, pos, size); err != nil {
+					return changed, err
+				}
+				changed = true
+				break
+			}
+			if typ == "tEXt" || typ == "zTXt" || (typ == "iTXt" && !bytes.HasPrefix(head[:n], []byte("XML:com.adobe.xmp\x00"))) {
 				break
 			}
 			if size > maxChunk {
@@ -382,6 +499,55 @@ func stripPNG(f *os.File) (bool, error) {
 		}
 		pos = dataAt + size + 4
 	}
+}
+
+// pngMetaKeywords name text chunks that hold a whole EXIF or XMP block as text.
+var pngMetaKeywords = []string{"Raw profile type exif", "Raw profile type APP1", "Raw profile type xmp", "XML:com.adobe.xmp"}
+
+// pngMetaKeyword reports whether a text chunk's data starts with one of them.
+func pngMetaKeyword(data []byte) bool {
+	kw, _, ok := bytes.Cut(data, []byte{0})
+	if !ok {
+		return false
+	}
+	for _, k := range pngMetaKeywords {
+		if strings.EqualFold(string(kw), k) {
+			return true
+		}
+	}
+	return false
+}
+
+// neutralizePNGChunk zeroes the data of the chunk at pos, renames it to gtPv
+// (ancillary, private, safe to copy: decoders ignore it) and fixes the CRC.
+// The length does not change.
+func neutralizePNGChunk(f *os.File, pos, size int64) error {
+	dataAt := pos + 8
+	if fsize, err := fileSize(f); err != nil {
+		return err
+	} else if dataAt+size+4 > fsize {
+		// The file ends inside the chunk: clear what is there, never grow the file.
+		return zeroRange(f, dataAt, fsize)
+	}
+	if err := zeroRange(f, dataAt, dataAt+size); err != nil {
+		return err
+	}
+	typ := []byte("gtPv")
+	crc := crc32.NewIEEE()
+	crc.Write(typ)
+	zeros := make([]byte, 64<<10)
+	for left := size; left > 0; {
+		n := min(left, int64(len(zeros)))
+		crc.Write(zeros[:n])
+		left -= n
+	}
+	var sum [4]byte
+	binary.BigEndian.PutUint32(sum[:], crc.Sum32())
+	if _, err := f.WriteAt(typ, pos+4); err != nil {
+		return err
+	}
+	_, err := f.WriteAt(sum[:], dataAt+size)
+	return err
 }
 
 // blankITXtXMP blanks location in an iTXt chunk holding XMP. The layout is

@@ -110,6 +110,13 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Photos are served and exported in GEDZIP archives without their GPS position (EXIF and XMP, in
+  JPEG, PNG and WebP); the position read on upload stays visible to members of the tree, and
+  GOTREE_PHOTO_LOCATION=keep serves the originals, except in exports without living people (#58)
+
+- Deleting a medium while the same file is uploaded again no longer leaves the new upload without
+  its file (#58)
+
 - Dates: dual years count by their second year, so "29 FEB 1751/52" is accepted, "FEB 1750/51"
   sorts in 1751 and "BET 1 DEC 1750 AND 10 FEB 1750/51" is a valid range; Julian dates without
   a day are converted to the Gregorian calendar too, so the plausibility checks no longer

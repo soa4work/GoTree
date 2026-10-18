@@ -405,3 +405,50 @@ func fileExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
 }
+
+// TestBlankTIFFGPSIndirectPointer: a GPS pointer stored as two LONGs makes
+// ReadMeta follow one more offset; such a block is cleared, not misread.
+func TestBlankTIFFGPSIndirectPointer(t *testing.T) {
+	for _, order := range []binary.ByteOrder{binary.LittleEndian, binary.BigEndian} {
+		exif := buildEXIF(order, 6, "", 'N', [3]float64{51, 20, 24}, 'E', [3]float64{12, 22, 12})
+		b := append([]byte{}, exif[4+6:]...)
+		for i := 8; i+12 <= len(b); i++ {
+			if order.Uint16(b[i:]) == 0x8825 && order.Uint16(b[i+2:]) == 4 {
+				at := len(b)
+				b = append(b, make([]byte, 8)...)
+				order.PutUint32(b[at:], order.Uint32(b[i+8:]))
+				order.PutUint32(b[i+4:], 2)
+				order.PutUint32(b[i+8:], uint32(at))
+				break
+			}
+		}
+		var before, after Meta
+		parseTIFF(b, &before)
+		if before.Lat == nil {
+			t.Fatalf("%v: test block has no position", order)
+		}
+		blankTIFFGPS(b)
+		if parseTIFF(b, &after); after.Lat != nil {
+			t.Errorf("%v: position survived", order)
+		}
+	}
+}
+
+// TestWithoutLocationTruncatedSegment: a file that ends inside its EXIF
+// segment keeps none of the bytes that are there.
+func TestWithoutLocationTruncatedSegment(t *testing.T) {
+	exif := buildEXIF(binary.LittleEndian, 1, "", 'N', [3]float64{51, 20, 24}, 'E', [3]float64{12, 22, 12})
+	gps := binary.LittleEndian.AppendUint32(nil, 51000)
+	data := append([]byte{0xFF, 0xD8}, exif[:len(exif)-4]...)
+	if !bytes.Contains(data, gps) {
+		t.Fatal("test GPS data not found")
+	}
+	f := Files{Root: t.TempDir()}
+	clean, err := f.WithoutLocation(saved(t, f, data), "image/jpeg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(clean); len(got) != len(data) || bytes.Contains(got, gps) {
+		t.Errorf("truncated segment kept its position (%d bytes)", len(got))
+	}
+}

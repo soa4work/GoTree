@@ -249,3 +249,18 @@ func mustRead(t *testing.T, path string) []byte {
 	}
 	return b
 }
+
+func TestMediaFileMissingOriginal(t *testing.T) {
+	ts := newServer(t, builtFrontend)
+	c := loggedIn(t, ts)
+	photo := gpsJPEG(t)
+	m := uploadPhoto(t, c, "gps.jpg", photo)
+	sum := sha256.Sum256(photo)
+	stored, _ := testServers[ts].Files.Path(hex.EncodeToString(sum[:]))
+	if err := os.Remove(stored); err != nil {
+		t.Fatal(err)
+	}
+	if resp, body := c.get(fmt.Sprintf("/api/media/%d/file", m.ID)); resp.StatusCode != http.StatusNotFound || !bytes.Contains(body, []byte(CodeFileMissing)) {
+		t.Errorf("missing original: %d %s", resp.StatusCode, firstN(body, 80))
+	}
+}

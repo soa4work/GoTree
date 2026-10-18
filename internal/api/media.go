@@ -277,6 +277,11 @@ func (s *Server) mediaFile(w http.ResponseWriter, r *http.Request) {
 	} else {
 		path, err = s.Files.WithoutLocation(m.SHA256, m.Mime)
 	}
+	if errors.Is(err, os.ErrNotExist) {
+		s.Log.Error("open media file", "id", id, "err", err)
+		writeError(w, http.StatusNotFound, CodeFileMissing, "the file is missing on the server")
+		return
+	}
 	if err != nil {
 		// Never fall back to the original: it may carry the position.
 		s.Log.Error("prepare media file", "id", id, "err", err)

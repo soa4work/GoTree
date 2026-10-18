@@ -143,16 +143,27 @@ func blankTIFFGPS(b []byte) bool {
 				return 0
 			}
 			tag, _ := t.u16(e)
-			switch tag {
-			case 0x8825:
-				p, _ := t.u32(e + 8)
+			if tag != 0x8825 && tag != 0x8769 {
+				continue
+			}
+			// A pointer is one LONG (or IFD) held in the entry. Any other
+			// form makes readers look elsewhere, so it cannot be followed
+			// safely.
+			if typ, _ := t.u16(e + 2); typ != 4 && typ != 13 {
+				bad = true
+				continue
+			}
+			if count, _ := t.u32(e + 4); count != 1 {
+				bad = true
+				continue
+			}
+			p, _ := t.u32(e + 8)
+			if tag == 0x8825 {
 				c, ok := t.blankGPSIFD(p)
 				changed = changed || c
 				bad = bad || !ok
-			case 0x8769:
-				if p, _ := t.u32(e + 8); depth == 0 {
-					scan(p, depth+1)
-				}
+			} else if depth == 0 {
+				scan(p, depth+1)
 			}
 		}
 		next, _ := t.u32(off + 2 + n*12)
@@ -185,7 +196,7 @@ func (t tiff) blankGPSIFD(off int) (changed, ok bool) {
 		e := off + 2 + i*12
 		typ, _ := t.u16(e + 2)
 		count, _ := t.u32(e + 4)
-		unit, known := typeSize[typ]
+		unit, known := allTypeSizes[typ]
 		if !known {
 			unit = 1
 		}
@@ -201,6 +212,10 @@ func (t tiff) blankGPSIFD(off int) (changed, ok bool) {
 	t.order.PutUint16(t.b[off:], 0)
 	return true, true
 }
+
+// allTypeSizes extends typeSize with the TIFF types ReadMeta does not use,
+// so their out-of-line values are found and cleared too.
+var allTypeSizes = map[int]int{1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8, 13: 4, 16: 8, 17: 8, 18: 8}
 
 var (
 	xmpGPSAttr = regexp.MustCompile(`[\w.-]+:(?i:gps)\w*\s*=\s*("[^"]*"|'[^']*')`)
@@ -276,8 +291,10 @@ func stripJPEG(f *os.File) (bool, error) {
 		}
 		if marker == 0xE1 {
 			payload := make([]byte, size-2)
-			if _, err := f.ReadAt(payload, pos+4); err != nil {
-				return changed, nil // truncated segment; ReadMeta ignores it too
+			if n, err := f.ReadAt(payload, pos+4); err != nil {
+				// A truncated segment ends the file; ReadMeta ignores it, but
+				// other tools may read what is there, so it is cleared.
+				return blankTail(f, n, pos+4, changed)
 			}
 			var c bool
 			switch {
@@ -297,6 +314,18 @@ func stripJPEG(f *os.File) (bool, error) {
 		}
 		pos += 2 + size
 	}
+}
+
+// blankTail zeroes the n bytes at off, the rest of a file that ends inside
+// a metadata block.
+func blankTail(f *os.File, n int, off int64, changed bool) (bool, error) {
+	if n == 0 {
+		return changed, nil
+	}
+	if _, err := f.WriteAt(make([]byte, n), off); err != nil {
+		return changed, err
+	}
+	return true, nil
 }
 
 var pngSignature = []byte("\x89PNG\r\n\x1a\n")
@@ -327,8 +356,8 @@ func stripPNG(f *os.File) (bool, error) {
 				return changed, errMetaTooLarge
 			}
 			data := make([]byte, size)
-			if _, err := f.ReadAt(data, dataAt); err != nil {
-				return changed, nil
+			if n, err := f.ReadAt(data, dataAt); err != nil {
+				return blankTail(f, n, dataAt, changed)
 			}
 			var c bool
 			if typ == "eXIf" {

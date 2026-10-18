@@ -179,6 +179,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The tree chart redraws only the cards whose selection or focus changed, the wall chart's SVG
+  download fetches at most four photos at a time, and the tree no longer gets stuck on "Could not
+  load" when the last viewed person was deleted or the tree replaced: it forgets that person per
+  tree and starts from the first one, or shows the getting-started card (#60)
+
 - The export check is a POST request, only editors and owners can run it, and only one runs at a
   time; a second one is asked to wait (#58)
 

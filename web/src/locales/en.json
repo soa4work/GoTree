@@ -352,6 +352,8 @@
     "chartHelp": "Use the arrow keys to move between people: up to parents, down to children, left and right within a generation. Press Enter to select a person.",
     "minimap": "Overview of the whole chart",
     "rootPerson": "center of the tree",
+    "rootMissing": "This person is no longer in the tree.",
+    "showFirst": "Show the tree",
     "repeat": "{{name}}, shown elsewhere",
     "alsoAbove": "shown elsewhere in this tree",
     "ancestors": "Ancestors",

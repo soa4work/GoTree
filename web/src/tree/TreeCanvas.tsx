@@ -11,13 +11,14 @@ import {
   type Node,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDark } from '../lib/theme'
 import type { LayoutNode, TreeLayout } from './layout'
 import type { TreeIndex } from './model'
 import { edgeTypes, nodeTypes, type TreeLook } from './nodeTypes'
 import type { PersonNodeData, RepeatNodeData } from './nodes'
+import { createTreeUiStore, TreeUiContext } from './treeUi'
 
 interface Props {
   layout: TreeLayout
@@ -87,13 +88,10 @@ function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy',
   const dark = useDark()
   const helpId = useId()
   const rootId = index.rootId
-  const [focusId, setFocusId] = useState<number>(rootId)
-  const [prevRoot, setPrevRoot] = useState(rootId)
+  const [ui] = useState(() => createTreeUiStore({ selectedId, focusId: rootId }))
+  useLayoutEffect(() => ui.set({ selectedId }), [ui, selectedId])
   // A new root moves the single tab stop back to it.
-  if (prevRoot !== rootId) {
-    setPrevRoot(rootId)
-    setFocusId(rootId)
-  }
+  useLayoutEffect(() => ui.set({ focusId: rootId }), [ui, rootId])
 
   const byPerson = useMemo(
     () => new Map(layout.nodes.filter((n) => n.kind === 'person').map((n) => [n.personId!, n])),
@@ -104,8 +102,11 @@ function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy',
     const n = byPerson.get(id)
     if (!n) return
     const c = center(n)
-    void flow.setCenter(c.x, c.y, { zoom: Math.max(flow.getZoom(), 0.8), duration: 250 })
-    setFocusId(id)
+    void flow.setCenter(c.x, c.y, {
+      zoom: Math.max(flow.getZoom(), 0.8),
+      duration: 250,
+    })
+    ui.set({ focusId: id })
     if (focus) requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-tree-person="${id}"]`)?.focus())
   }
 
@@ -117,22 +118,42 @@ function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy',
     if (to) reveal(to.personId!, true)
   }
 
+  // The cards read selection and focus from the store and call the latest
+  // callbacks through the context, so none of that is in the node data.
+  const latest = useRef({ onSelect, onCenter, reveal, onKey })
+  useLayoutEffect(() => {
+    latest.current = { onSelect, onCenter, reveal, onKey }
+  })
+  const ctx = useMemo(
+    () => ({
+      store: ui,
+      actions: {
+        select: (id: number) => {
+          ui.set({ focusId: id })
+          latest.current.onSelect(id)
+        },
+        center: (id: number) => latest.current.onCenter(id),
+        key: (id: number, e: KeyboardEvent<HTMLButtonElement>) => latest.current.onKey(id, e),
+        jump: (id: number) => latest.current.reveal(id, true),
+      },
+    }),
+    [ui],
+  )
+
   const nodes: Node[] = useMemo(
     () =>
       layout.nodes.map((n): Node => {
-        const base = { id: n.id, position: { x: n.x, y: n.y }, width: n.w, height: n.h, type: n.kind }
+        const base = {
+          id: n.id,
+          position: { x: n.x, y: n.y },
+          width: n.w,
+          height: n.h,
+          type: n.kind,
+        }
         if (n.kind === 'person') {
           const data: PersonNodeData = {
             person: index.persons.get(n.personId!)!,
             root: n.personId === rootId,
-            selected: n.personId === selectedId,
-            tabbable: n.personId === focusId,
-            onSelect: (id) => {
-              setFocusId(id)
-              onSelect(id)
-            },
-            onCenter,
-            onKey,
             look,
           }
           return { ...base, data }
@@ -140,19 +161,21 @@ function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy',
         if (n.kind === 'repeat') {
           const data: RepeatNodeData = {
             person: index.persons.get(n.personId!)!,
-            onJump: (id) => reveal(id, true),
             look,
           }
           return { ...base, data }
         }
         return { ...base, data: { look } }
       }),
-    // onKey and reveal only read layout-derived values that are deps here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [layout, index, selectedId, focusId, rootId, onSelect, onCenter, look],
+    [layout, index, rootId, look],
   )
   const edges: Edge[] = useMemo(() => {
-    if (look === 'leafy') return layout.edges.map((e) => ({ ...e, type: 'vine', focusable: false }))
+    if (look === 'leafy')
+      return layout.edges.map((e) => ({
+        ...e,
+        type: 'vine',
+        focusable: false,
+      }))
     return layout.edges.map((e) => ({
       ...e,
       type: 'smoothstep',
@@ -213,48 +236,50 @@ function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy',
       <p id={helpId} className="sr-only">
         {t('tree.chartHelp')}
       </p>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        nodesFocusable={false}
-        edgesFocusable={false}
-        elementsSelectable={false}
-        minZoom={0.1}
-        maxZoom={2}
-        zoomOnDoubleClick={false}
-        onlyRenderVisibleElements={layout.nodes.length > 300}
-        colorMode={dark ? 'dark' : 'light'}
-        disableKeyboardA11y
-      >
-        <Background
-          bgColor={leafy ? (dark ? '#0b140f' : '#f7f3e6') : dark ? '#0f1510' : '#faf7ef'}
-          gap={20}
-          size={1.5}
-          color={leafy ? (dark ? '#1f3a26' : '#d9d0b4') : dark ? '#2a3128' : '#cdc3ad'}
-        />
-        <Controls showInteractive={false} position="bottom-left" />
-        <MiniMap
-          className="!hidden lg:!block"
-          style={{
-            width: 150,
-            height: 96,
-            backgroundColor: dark ? '#1b221c' : '#faf7ef',
-            border: `1px solid ${dark ? '#463e31' : '#cdc3ad'}`,
-            borderRadius: 8,
-          }}
-          position="bottom-right"
-          pannable
-          zoomable
-          ariaLabel={t('tree.minimap')}
-          nodeBorderRadius={8}
-          nodeColor={(n) => (n.type === 'person' ? (dark ? '#7b715f' : '#a59a82') : 'transparent')}
-          maskColor={dark ? 'rgb(15 21 16 / 0.6)' : 'rgb(242 237 224 / 0.6)'}
-        />
-      </ReactFlow>
+      <TreeUiContext.Provider value={ctx}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          nodesFocusable={false}
+          edgesFocusable={false}
+          elementsSelectable={false}
+          minZoom={0.1}
+          maxZoom={2}
+          zoomOnDoubleClick={false}
+          onlyRenderVisibleElements={layout.nodes.length > 300}
+          colorMode={dark ? 'dark' : 'light'}
+          disableKeyboardA11y
+        >
+          <Background
+            bgColor={leafy ? (dark ? '#0b140f' : '#f7f3e6') : dark ? '#0f1510' : '#faf7ef'}
+            gap={20}
+            size={1.5}
+            color={leafy ? (dark ? '#1f3a26' : '#d9d0b4') : dark ? '#2a3128' : '#cdc3ad'}
+          />
+          <Controls showInteractive={false} position="bottom-left" />
+          <MiniMap
+            className="!hidden lg:!block"
+            style={{
+              width: 150,
+              height: 96,
+              backgroundColor: dark ? '#1b221c' : '#faf7ef',
+              border: `1px solid ${dark ? '#463e31' : '#cdc3ad'}`,
+              borderRadius: 8,
+            }}
+            position="bottom-right"
+            pannable
+            zoomable
+            ariaLabel={t('tree.minimap')}
+            nodeBorderRadius={8}
+            nodeColor={(n) => (n.type === 'person' ? (dark ? '#7b715f' : '#a59a82') : 'transparent')}
+            maskColor={dark ? 'rgb(15 21 16 / 0.6)' : 'rgb(242 237 224 / 0.6)'}
+          />
+        </ReactFlow>
+      </TreeUiContext.Provider>
     </div>
   )
 }

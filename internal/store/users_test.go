@@ -255,3 +255,32 @@ func TestPruneSessions(t *testing.T) {
 		t.Errorf("sessions left: %v, want only #3", left)
 	}
 }
+
+func TestSessionExtensionReportsCookieLifetime(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	t0 := s.Now()
+	token, err := s.CreateSession(ctx, a.UserID, "ua")
+	if err != nil {
+		t.Fatal(err)
+	}
+	day := 24 * time.Hour
+	clockAt(s, t0, 30*time.Second)
+	if sess, _ := s.SessionByToken(ctx, token); sess.CookieMaxAge != 0 {
+		t.Errorf("no extension within a minute, got CookieMaxAge %v", sess.CookieMaxAge)
+	}
+	for _, d := range []time.Duration{10 * day, 35 * day, 60 * day} {
+		clockAt(s, t0, d)
+		sess, err := s.SessionByToken(ctx, token)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := SessionTTL
+		if limit := SessionMaxAge - d; limit < want {
+			want = limit
+		}
+		if sess.CookieMaxAge != want {
+			t.Errorf("after %v: CookieMaxAge %v, want %v", d, sess.CookieMaxAge, want)
+		}
+	}
+}

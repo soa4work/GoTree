@@ -30,9 +30,13 @@ const UserRoleAdmin = "admin"
 // Session is an authenticated browser session.
 type Session struct {
 	// ID names the session without revealing its token.
-	ID     int64
-	User   User
-	TreeID int64
+	ID int64
+	// CookieMaxAge is set when this use extended the session: the cookie
+	// should be sent again with this lifetime, which never reaches past
+	// SessionMaxAge after login.
+	CookieMaxAge time.Duration
+	User         User
+	TreeID       int64
 	// TreeRole is the user's role in TreeID.
 	TreeRole string
 }
@@ -247,6 +251,7 @@ func (s *Store) SessionByToken(ctx context.Context, token string) (Session, erro
 		}
 		_, _ = s.DB.ExecContext(ctx, `UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE token_hash = ?`,
 			now.Format(time.RFC3339Nano), next.Format(time.RFC3339Nano), h)
+		sess.CookieMaxAge = next.Sub(now)
 	}
 	return sess, nil
 }

@@ -3,7 +3,7 @@
 -- Sessions get a numeric id so the account page can list and end them
 -- without exposing anything derived from the token.
 CREATE TABLE sessions_new (
-    id           INTEGER PRIMARY KEY,
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
     token_hash   BLOB NOT NULL UNIQUE,
     user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     tree_id      INTEGER REFERENCES trees (id) ON DELETE SET NULL,

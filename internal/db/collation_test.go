@@ -130,7 +130,7 @@ func TestNamesCollationSpeed(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("sorted 50000 names in %s", time.Since(start))
-	if d := time.Since(start); d > 20*time.Second {
+	if d := time.Since(start); d > 20*time.Second && !raceEnabled {
 		t.Errorf("sorting 50000 names took %s", d)
 	}
 }

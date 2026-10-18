@@ -15,6 +15,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
   tree always keeps one owner; any account can create a tree and switch between its trees, and
   logging in opens the tree chosen last
 
+- Health check: `gotree -healthcheck` asks the running server whether it is healthy, and the
+  Docker image uses it as its HEALTHCHECK (#62)
+
 - People list: sort by surname, birth (oldest or youngest first) or recent changes, and filter by
   sex and living or deceased, kept in the address; the sources list and the media gallery load more
   with a "Show more" button instead of stopping at 100 sources and 200 media (#60)
@@ -236,6 +239,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Viewers can export GEDCOM only without living people (#59)
+
+- Docker images: `latest` and `X.Y` move only to the newest release, so re-running an older
+  release or publishing a prerelease no longer moves them back, and the image is built from base
+  images pinned by digest; prereleases are marked as such on GitHub (#62)
 
 - The tree chart redraws only the cards whose selection or focus changed, the wall chart's SVG
   download fetches at most four photos at a time, and the tree no longer gets stuck on "Could not

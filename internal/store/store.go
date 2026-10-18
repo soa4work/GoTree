@@ -51,6 +51,8 @@ const (
 var (
 	// ErrNotFound is returned for missing rows and for rows of another tree.
 	ErrNotFound = errors.New("not found")
+	// ErrViewOnly is returned when a viewer tries to change the tree.
+	ErrViewOnly = errors.New("you can only view this tree")
 	// ErrConflict is returned when an operation would break a reference,
 	// such as deleting a place that events still use.
 	ErrConflict = errors.New("conflict")

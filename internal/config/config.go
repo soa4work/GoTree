@@ -4,9 +4,11 @@ package config
 import (
 	"errors"
 	"flag"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // Config holds everything the server needs to start.
@@ -24,6 +26,11 @@ type Config struct {
 	// HealthCheck asks a running server on ListenAddr whether it is healthy
 	// and exits, instead of starting one (the Docker HEALTHCHECK).
 	HealthCheck bool
+
+	// TrustedProxies are the reverse proxies whose X-Forwarded-For header
+	// names the client (GOTREE_TRUSTED_PROXIES, comma-separated addresses or
+	// CIDR ranges). Empty: the TCP peer is the client.
+	TrustedProxies []netip.Prefix
 }
 
 // MediaDir is where uploaded files are kept inside DataDir.
@@ -53,6 +60,11 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 		}
 		cfg.MaxUploadMB = n
 	}
+	proxies, err := parseProxies(getenv("GOTREE_TRUSTED_PROXIES"))
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.TrustedProxies = proxies
 
 	fs := flag.NewFlagSet("gotree", flag.ContinueOnError)
 	fs.StringVar(&cfg.DataDir, "data-dir", cfg.DataDir, "directory for the database and media (env GOTREE_DATA_DIR)")
@@ -81,4 +93,26 @@ func envOr(getenv func(string) string, key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// parseProxies reads a comma-separated list of IP addresses and CIDR ranges.
+func parseProxies(v string) ([]netip.Prefix, error) {
+	var out []netip.Prefix
+	for _, entry := range strings.Split(v, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		p, err := netip.ParsePrefix(entry)
+		if err != nil {
+			a, aerr := netip.ParseAddr(entry)
+			if aerr != nil {
+				return nil, errors.New("GOTREE_TRUSTED_PROXIES must be a comma-separated list of IP addresses or CIDR ranges")
+			}
+			a = a.Unmap()
+			p = netip.PrefixFrom(a, a.BitLen())
+		}
+		out = append(out, p.Masked())
+	}
+	return out, nil
 }

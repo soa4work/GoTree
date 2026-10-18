@@ -9,6 +9,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Calendar feeds in Russian or Kazakh (#24)
+
 - Dates typed in Russian or Kazakh are understood (#24)
 
 - Russian translation of the interface (#24): all screens, messages and plurals are in Russian;

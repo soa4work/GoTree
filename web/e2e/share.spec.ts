@@ -83,7 +83,7 @@ test('subscribe to the birthday calendar', async ({ page, playwright }) => {
   await dialog.getByLabel(/^Name/).fill(`Phone ${surname}`)
   await dialog.getByRole('button', { name: /Create address/ }).click()
   const url = await page.getByLabel('Calendar address', { exact: true }).inputValue()
-  expect(url).toMatch(/\/ical\/[A-Za-z0-9_-]{40,}\.ics$/)
+  expect(url).toMatch(/\/ical\/[A-Za-z0-9_-]{40,}\.ics\?lang=en$/)
   await expectAccessible(page)
 
   // A calendar app has no cookies.

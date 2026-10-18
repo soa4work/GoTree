@@ -11,8 +11,7 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 - Russian relationship names (#24): the relationship page names kin in correct Russian with gender,
   half-blood (единокровный/единоутробный), step and in-law terms (свёкор, тёща, деверь, золовка,
-  шурин, невестка…) by the spouse's side, and cousins of any degree (двоюродный, троюродный…);
-  the relationship report also carries birth sort keys for terms that tell older from younger
+  шурин, невестка…) by the spouse's side, and cousins of any degree (двоюродный, троюродный…)
 
 - Russian translation of the interface (#24): all screens, messages and plurals are in Russian;
   phrases that would need declined names ("X's birth") are worded with a colon or brackets instead

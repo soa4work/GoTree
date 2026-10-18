@@ -26,8 +26,8 @@ import type { Kinship, PersonRef, RelationshipReport, Sex } from '../api/types'
  *    внучатый), with "N-юродный" for N = m - 1 in front.
  *  - Beyond десятиюродный or more than 5 generations apart, the neutral
  *    "родственник N-й степени" where N = up + down (the civil law degree).
- * Direct ancestors and descendants use пра- repeated up to three times, then
- * "пра×N-".
+ * Direct ancestors and descendants use пра- repeated up to four times, then
+ * "предок/потомок в N-м поколении".
  */
 
 type Gender = 'M' | 'F' | 'U'
@@ -75,11 +75,14 @@ const maxRemoved = 5
 /** The "N-юродный" adjective list for cousin degree n; none for n < 1. */
 const cousin = (n: number): string[] => (n < 1 ? [] : [cousinAdjectives[n] ?? ''])
 
-/** пра- × n: written out up to three times, then counted. */
-const pra = (n: number) => (n <= 0 ? '' : n <= 3 ? 'пра'.repeat(n) : `пра×${n}-`)
+/** пра- × n, written out; lineal terms beyond maxPra use "предок/потомок в N-м поколении". */
+const pra = (n: number) => 'пра'.repeat(Math.max(n, 0))
+const maxPra = 4
 
 /** Declines a masculine nominative adjective in -ый. */
 function decline(adj: string, g: 'M' | 'F', c: Case): string {
+  const paren = /^(.+) \((.+)\)$/.exec(adj)
+  if (paren) return `${decline(paren[1] ?? '', g, c)} (${decline(paren[2] ?? '', g, c)})`
   const stem = adj.slice(0, -2)
   if (c === 'nom') return g === 'M' ? adj : `${stem}ая`
   return `${stem}${g === 'M' ? 'ого' : 'ой'}`
@@ -141,16 +144,18 @@ function modify(term: Term, k: KinshipPart, halfSex: Sex | undefined): Term {
   const lineal = (k.up === 1 && k.down === 0) || (k.up === 0 && k.down === 1)
   const sibling = k.up === 1 && k.down === 1
   if (k.adoptive) {
-    // The graph cannot tell an adopted child from a step-child, so siblings
-    // joined by a non-birth link are "сводные" and direct kin "приёмные".
+    // The graph cannot tell an adopted child from a step-child: direct kin
+    // are "приёмные", siblings joined by a non-birth link are named both ways.
     if (lineal) return { ...term, adj: ['приёмный'] }
-    if (sibling) return { ...term, adj: ['сводный'] }
+    if (sibling) return { ...term, adj: ['сводный (приёмный)'] }
     return { ...term, tail: ' (не по рождению)' }
   }
   if (k.half) {
     // Same father: единокровный; same mother: единоутробный.
     if (sibling) return { ...term, adj: [halfSex === 'M' ? 'единокровный' : halfSex === 'F' ? 'единоутробный' : 'неполнородный'] }
-    return { ...term, tail: ' (по одному из родителей)' }
+    if (halfSex === 'M') return { ...term, tail: ' (по отцу)' }
+    if (halfSex === 'F') return { ...term, tail: ' (по матери)' }
+    return { ...term, adj: ['неполнородный', ...term.adj] }
   }
   return term
 }
@@ -165,6 +170,10 @@ function distant(k: KinshipPart, g: Gender, c: Case): string {
 function kinship(t: TFunction, k: KinshipPart, sex: Sex | undefined, persons: Persons | undefined, c: Case): string {
   const g = gender(sex)
   const halfSex = k.half && k.ancestors?.[0] ? persons?.[k.ancestors[0]]?.sex : undefined
+  if ((k.down === 0 && k.up - 2 > maxPra) || (k.up === 0 && k.down - 2 > maxPra)) {
+    const [nom, gen, n] = k.down === 0 ? ['предок', 'предка', k.up] : ['потомок', 'потомка', k.down]
+    return `${c === 'nom' ? nom : gen} в ${n}-м поколении`
+  }
   const term = bloodTerm(k, halfSex)
   return term ? render(t, term, g, c) : distant(k, g, c)
 }

@@ -46,8 +46,8 @@ describe('ru: lineal kin', () => {
     [4, 0, 'M', 'прапрадед'],
     [4, 0, 'F', 'прапрабабушка'],
     [5, 0, 'M', 'прапрапрадед'],
-    [6, 0, 'M', 'пра×4-дед'],
-    [7, 0, 'F', 'пра×5-бабушка'],
+    [6, 0, 'M', 'прапрапрапрадед'],
+    [7, 0, 'F', 'предок в 7-м поколении'],
     [0, 1, 'M', 'сын'],
     [0, 1, 'F', 'дочь'],
     [0, 1, 'U', 'ребёнок'],
@@ -57,7 +57,8 @@ describe('ru: lineal kin', () => {
     [0, 3, 'F', 'правнучка'],
     [0, 4, 'M', 'праправнук'],
     [0, 4, 'F', 'праправнучка'],
-    [0, 6, 'M', 'пра×4-внук'],
+    [0, 6, 'M', 'прапрапраправнук'],
+    [0, 8, 'F', 'потомок в 8-м поколении'],
   ])('%i up, %i down, sex %s: %s', (up, down, sex, want) => {
     expect(kinshipName(t, k(up, down), sex)).toBe(want)
   })
@@ -143,15 +144,17 @@ describe('ru: half, step and adoptive', () => {
   })
 
   it('names half uncles without a special word', () => {
-    expect(kinshipName(t, k(2, 1, { half: true, ancestors: [10] }), 'M', persons)).toBe('дядя (по одному из родителей)')
+    expect(kinshipName(t, k(2, 1, { half: true, ancestors: [10] }), 'M', persons)).toBe('дядя (по отцу)')
+    expect(kinshipName(t, k(2, 1, { half: true, ancestors: [11] }), 'F', persons)).toBe('тётя (по матери)')
+    expect(kinshipName(t, k(2, 1, { half: true, ancestors: [-4] }), 'M', persons)).toBe('неполнородный дядя')
   })
 
   it('marks adoptive and step links', () => {
     expect(kinshipName(t, k(1, 0, { adoptive: true }), 'M')).toBe('приёмный отец')
     expect(kinshipName(t, k(1, 0, { adoptive: true }), 'F')).toBe('приёмная мать')
     expect(kinshipName(t, k(0, 1, { adoptive: true }), 'F')).toBe('приёмная дочь')
-    expect(kinshipName(t, k(1, 1, { adoptive: true }), 'M')).toBe('сводный брат')
-    expect(kinshipName(t, k(1, 1, { adoptive: true }), 'F')).toBe('сводная сестра')
+    expect(kinshipName(t, k(1, 1, { adoptive: true }), 'M')).toBe('сводный (приёмный) брат')
+    expect(kinshipName(t, k(1, 1, { adoptive: true }), 'F')).toBe('сводная (приёмная) сестра')
     expect(kinshipName(t, k(2, 1, { adoptive: true }), 'F')).toBe('тётя (не по рождению)')
   })
 })
@@ -223,6 +226,8 @@ describe('ru: relationship names', () => {
     ['wife’s first cousin', report('relative_of_spouse', 2, 2, 'M', 'F'), 'двоюродный брат жены'],
     ['husband’s grandmother', report('relative_of_spouse', 2, 0, 'F', 'M'), 'бабушка мужа'],
     ['wife’s aunt', report('relative_of_spouse', 2, 1, 'F', 'F'), 'тётя жены'],
+    ['wife’s remote ancestor', report('relative_of_spouse', 9, 0, 'M', 'F'), 'предок в 9-м поколении жены'],
+    ['remote descendant’s wife', report('spouse_of_relative', 0, 9, 'F', 'M'), 'жена потомка в 9-м поколении'],
     ['wife’s very distant relative', report('relative_of_spouse', 12, 12, 'F', 'F'), 'родственница 24-й степени жены'],
   ])('%s', (_, rep, want) => {
     expect(relationshipName(t, rep)).toBe(want)

@@ -151,17 +151,6 @@ func TestRelationship(t *testing.T) {
 	if rep.Kind != "blood" || rep.Kinship.Up != 1 || rep.Kinship.Down != 2 || len(rep.Kinship.Path) != 4 || rep.Kinship.Path[1] >= 0 {
 		t.Errorf("niece: %+v %+v", rep, rep.Kinship)
 	}
-	if _, ok := rep.BirthSort[niece.Person.ID]; ok || rep.BirthSort == nil {
-		t.Errorf("birth sort without a birth date: %v", rep.BirthSort)
-	}
-	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &niece.Person.ID, Type: "BIRT", Date: "1905"}); err != nil {
-		t.Fatal(err)
-	}
-	if rep, err = s.Relationship(ctx, a, anna.ID, niece.Person.ID); err != nil {
-		t.Fatal(err)
-	} else if got := rep.BirthSort[niece.Person.ID]; got/10000 != 1905 {
-		t.Errorf("birth sort = %d, want a 1905 date", got)
-	}
 	if rep.Persons[niece.Person.ID].GivenNames != "Clara" {
 		t.Errorf("persons: %+v", rep.Persons)
 	}

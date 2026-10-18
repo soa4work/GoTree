@@ -117,7 +117,19 @@ const (
 	// KindRelativeOfSpouse: B is a relative of A's spouse (mother-in-law,
 	// step-child).
 	KindRelativeOfSpouse = "relative_of_spouse"
-	KindNone             = "none"
+	// KindSpouseBloodSpouse: B is the spouse of a relative of A's spouse
+	// (husbands of sisters, wives of brothers). Via is A's spouse, Via2 the
+	// relative; Kinship runs from Via to Via2 and Path is A, Kinship.Path, B.
+	KindSpouseBloodSpouse = "spouse_blood_spouse"
+	// KindStepSibling: B is a child of the spouse of A's parent. Via is that
+	// parent, Via2 the step-parent; Kinship is A to Via and Path is A, Via,
+	// Via2, B.
+	KindStepSibling = "step_sibling"
+	// KindCoParentInLaw: B is a parent of the spouse of A's child. Via is the
+	// child, Via2 the child's spouse; Kinship is A to Via and Path is A, Via,
+	// Via2, B.
+	KindCoParentInLaw = "co_parent_in_law"
+	KindNone          = "none"
 )
 
 // Relationship says what B is to A.
@@ -128,6 +140,9 @@ type Relationship struct {
 	Kinship *Kinship `json:"kinship,omitempty"`
 	// Via is the spouse that links the in-law kinds.
 	Via int64 `json:"via,omitempty"`
+	// Via2 is the second person on the way for the kinds that go through two
+	// marriages or a step-parent.
+	Via2 int64 `json:"via2,omitempty"`
 	// Others are further blood relationships, e.g. through pedigree
 	// collapse when cousins married.
 	Others []Kinship `json:"others"`
@@ -174,7 +189,75 @@ func (g *Graph) Relate(a, b int64) Relationship {
 			consider(KindRelativeOfSpouse, s, k)
 		}
 	}
+	if best.Kind == KindNone {
+		return g.viaTwoLinks(a, b)
+	}
 	return best
+}
+
+// viaTwoLinks finds the relations that need two marriage or step links. It
+// only runs when nothing closer exists and is bounded by the number of
+// spouses, parents and children of the two people (plus one kinship search
+// per pair of spouses).
+func (g *Graph) viaTwoLinks(a, b int64) Relationship {
+	none := Relationship{Kind: KindNone, Others: []Kinship{}}
+	// A's spouse's relative's spouse.
+	var best Relationship
+	bestLen := -1
+	for _, s1 := range g.spouses[a] {
+		for _, s2 := range g.spouses[b] {
+			if s1 == s2 || s1 == b || s2 == a {
+				continue
+			}
+			ks := g.kinships(s1, s2)
+			if len(ks) == 0 {
+				continue
+			}
+			k := ks[0]
+			if n := k.Up + k.Down; bestLen < 0 || n < bestLen {
+				k.Path = append(append([]int64{a}, k.Path...), b)
+				best, bestLen = Relationship{Kind: KindSpouseBloodSpouse, Kinship: &k, Via: s1, Via2: s2, Others: []Kinship{}}, n
+			}
+		}
+	}
+	if bestLen >= 0 {
+		return best
+	}
+	// A's parent's spouse's child.
+	for _, pl := range g.parents[a] {
+		for _, s := range g.spouses[pl.parent] {
+			if s == a || s == b {
+				continue
+			}
+			for _, bl := range g.parents[b] {
+				if bl.parent == s {
+					return Relationship{
+						Kind:    KindStepSibling,
+						Kinship: &Kinship{Up: 1, Adoptive: !pl.blood, Ancestors: []int64{pl.parent}, Path: []int64{a, pl.parent, s, b}},
+						Via:     pl.parent, Via2: s, Others: []Kinship{},
+					}
+				}
+			}
+		}
+	}
+	// A's child's spouse's parent.
+	for _, c := range g.children[a] {
+		for _, s := range g.spouses[c] {
+			if s == a || s == b {
+				continue
+			}
+			for _, pl := range g.parents[s] {
+				if pl.parent == b {
+					return Relationship{
+						Kind:    KindCoParentInLaw,
+						Kinship: &Kinship{Down: 1, Ancestors: []int64{}, Path: []int64{a, c, s, b}},
+						Via:     c, Via2: s, Others: []Kinship{},
+					}
+				}
+			}
+		}
+	}
+	return none
 }
 
 func limit(ks []Kinship) []Kinship {

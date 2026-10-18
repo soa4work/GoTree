@@ -17,5 +17,15 @@ export function relationshipPath(rep: RelationshipReport): PathStep[] {
     const steps = blood(k.path.slice(0, -1), 0)
     return [...steps, { id: rep.b, link: 'spouse' }]
   }
+  if (rep.kind === 'spouse_blood_spouse') {
+    // A, the spouse, the blood path to the spouse's relative, B
+    const mid = blood(k.path.slice(1, -1), 0).map((s, i) => (i === 0 ? { ...s, link: 'spouse' as const } : s))
+    return [{ id: rep.a, link: null }, ...mid, { id: rep.b, link: 'spouse' }]
+  }
+  if (rep.kind === 'step_sibling' || rep.kind === 'co_parent_in_law') {
+    // Four people, each linked to the one before: parent, spouse, child — or child, spouse, parent
+    const links: PathStep['link'][] = rep.kind === 'step_sibling' ? ['parent', 'spouse', 'child'] : ['child', 'spouse', 'parent']
+    return k.path.map((id, i) => ({ id, link: i === 0 ? null : (links[i - 1] ?? null) }))
+  }
   return blood(k.path, 0)
 }

@@ -368,6 +368,25 @@ export function relationshipName(t: TFunction, rep: RelationshipReport): string 
       const head = kinship(blood, b?.sex, rep.persons)
       return `${genitive(spouseHead[viaG])} ${renderPossessed(t, head)}`
     }
+    case 'spouse_blood_spouse': {
+      if (!k) return null
+      const via2 = rep.via2 ? rep.persons[rep.via2] : undefined
+      if (is(k, 1, 1) && !k.half) {
+        // Husbands of sisters: бажа; wives of brothers: абысын.
+        if (g === 'M' && viaG === 'F' && via2?.sex === 'F') return 'бажа'
+        if (g === 'F' && viaG === 'M' && via2?.sex === 'M') return 'абысын'
+      }
+      // The path runs A, the spouse, ..., the spouse's relative, B: "әйелінің ағасының әйелі".
+      const relative = kinship({ ...k, path: k.path.slice(1, -1) }, via2?.sex, rep.persons)
+      const owner = `${genitive(spouseHead[viaG])} ${renderPossessed(t, relative)}`
+      const words = owner.split(' ')
+      words[words.length - 1] = genitive(words[words.length - 1] ?? '')
+      return `${words.join(' ')} ${spouseHead[g]}`
+    }
+    case 'step_sibling':
+      return 'өгей бауыр'
+    case 'co_parent_in_law':
+      return pick(t, g, 'құда', 'құдағи')
     default:
       return null
   }

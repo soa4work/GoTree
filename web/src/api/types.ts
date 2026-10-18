@@ -475,7 +475,16 @@ export interface Kinship {
   path: number[]
 }
 
-export type RelationshipKind = 'self' | 'blood' | 'spouse' | 'spouse_of_relative' | 'relative_of_spouse' | 'none'
+export type RelationshipKind =
+  | 'self'
+  | 'blood'
+  | 'spouse'
+  | 'spouse_of_relative'
+  | 'relative_of_spouse'
+  | 'spouse_blood_spouse'
+  | 'step_sibling'
+  | 'co_parent_in_law'
+  | 'none'
 
 export interface RelationshipReport {
   a: number
@@ -483,6 +492,8 @@ export interface RelationshipReport {
   kind: RelationshipKind
   kinship?: Kinship
   via?: number
+  /** The second person on the way for the kinds through two marriages or a step-parent. */
+  via2?: number
   others: Kinship[]
   persons: Record<number, PersonRef>
 }

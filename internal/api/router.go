@@ -31,6 +31,8 @@ type Server struct {
 	TrustedProxies []netip.Prefix
 
 	throttle *loginThrottle
+	// verifySlot lets one export check run at a time; each one builds a whole database.
+	verifySlot chan struct{}
 }
 
 // Handler builds the complete HTTP handler.
@@ -40,6 +42,9 @@ func (s *Server) Handler() http.Handler {
 		s.throttle.onFull = func() {
 			s.Log.Warn("login throttle is full of locked keys; refusing logins from unknown addresses")
 		}
+	}
+	if s.verifySlot == nil {
+		s.verifySlot = make(chan struct{}, 1)
 	}
 
 	r := chi.NewRouter()
@@ -80,7 +85,7 @@ func (s *Server) Handler() http.Handler {
 			s.qualityRoutes(r)
 			r.Post("/import/gedcom", s.importGEDCOM)
 			r.Get("/export/gedcom", s.exportGEDCOM)
-			r.Get("/export/verify", s.verifyExport)
+			r.Post("/export/verify", s.verifyExport)
 			r.Get("/backup", s.backup)
 			s.shareLinkRoutes(r)
 			s.calendarFeedRoutes(r)

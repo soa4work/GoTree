@@ -271,6 +271,24 @@ func TestBackupStaysAdminOnlyWithSeveralTrees(t *testing.T) {
 	admin.call("GET", "/api/backup", nil, http.StatusOK, nil)
 }
 
+func TestAdminWithoutTreeCanDownloadBackup(t *testing.T) {
+	ts := newServer(t, builtFrontend)
+	admin := loggedIn(t, ts)
+	bob := newAccount(t, ts, admin, "bob", "user")
+	st := stateOf(t, admin)
+	members := fmt.Sprintf("/api/trees/%d/members", st.Tree.ID)
+	admin.call("POST", members, map[string]string{"username": "bob", "role": "owner"}, http.StatusCreated, nil)
+	admin.call("DELETE", fmt.Sprintf("%s/%d", members, st.User.ID), nil, http.StatusNoContent, nil)
+	callError(t, admin, "GET", "/api/persons", nil, http.StatusForbidden)
+
+	admin.call("GET", "/api/backup", nil, http.StatusOK, nil)
+	if e := callError(t, bob, "GET", "/api/backup", nil, http.StatusForbidden); e.Code != CodeAdminOnlyBackup {
+		t.Errorf("regular user: %q", e.Code)
+	}
+	anon := newClient(t, ts)
+	anon.call("GET", "/api/backup", nil, http.StatusUnauthorized, nil)
+}
+
 func TestViewerExportWithoutLiving(t *testing.T) {
 	ts := newServer(t, builtFrontend)
 	admin := loggedIn(t, ts)

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -9,10 +8,11 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 
-	"github.com/praetorianer777/gotree/internal/db"
+	"github.com/praetorianer777/gotree/internal/db/dbtest"
 	"github.com/praetorianer777/gotree/internal/media"
 	"github.com/praetorianer777/gotree/internal/store"
 )
@@ -25,11 +25,7 @@ func newServer(t *testing.T, frontend fstest.MapFS) *httptest.Server {
 // newServerWith is newServer with a hook to adjust the Server before it starts.
 func newServerWith(t *testing.T, frontend fstest.MapFS, adjust func(*Server)) *httptest.Server {
 	t.Helper()
-	conn, err := db.Open(context.Background(), filepath.Join(t.TempDir(), "test.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { conn.Close() })
+	conn := dbtest.Open(t)
 	s := &Server{
 		Store:     store.New(conn),
 		Files:     media.Files{Root: filepath.Join(t.TempDir(), "media")},
@@ -42,10 +38,14 @@ func newServerWith(t *testing.T, frontend fstest.MapFS, adjust func(*Server)) *h
 		adjust(s)
 	}
 	ts := httptest.NewServer(s.Handler())
+	testServersMu.Lock()
 	testServers[ts] = s
+	testServersMu.Unlock()
 	t.Cleanup(func() {
 		ts.Close()
+		testServersMu.Lock()
 		delete(testServers, ts)
+		testServersMu.Unlock()
 	})
 	return ts
 }
@@ -53,6 +53,16 @@ func newServerWith(t *testing.T, frontend fstest.MapFS, adjust func(*Server)) *h
 // testServers gives tests access to the Server behind a test server, e.g.
 // to change data directly in the database.
 var testServers = map[*httptest.Server]*Server{}
+
+// testServersMu guards testServers: tests run in parallel.
+var testServersMu sync.Mutex
+
+// serverOf returns the Server behind a test server.
+func serverOf(ts *httptest.Server) *Server {
+	testServersMu.Lock()
+	defer testServersMu.Unlock()
+	return testServers[ts]
+}
 
 func get(t *testing.T, url string) (*http.Response, string) {
 	t.Helper()
@@ -76,6 +86,7 @@ var builtFrontend = fstest.MapFS{
 }
 
 func TestHealth(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	resp, body := get(t, ts.URL+"/api/health")
 	if resp.StatusCode != http.StatusOK {
@@ -95,6 +106,7 @@ func TestHealth(t *testing.T) {
 }
 
 func TestUnknownAPIRouteIsJSON404(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	resp, body := get(t, ts.URL+"/api/nope")
 	if resp.StatusCode != http.StatusNotFound {
@@ -109,6 +121,7 @@ func TestUnknownAPIRouteIsJSON404(t *testing.T) {
 }
 
 func TestSPA(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	tests := []struct {
 		path        string
@@ -143,6 +156,7 @@ func TestSPA(t *testing.T) {
 }
 
 func TestSPAContentSecurityPolicy(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	for _, path := range []string{"/", "/people/42", "/share/abc"} {
 		resp, _ := get(t, ts.URL+path)
@@ -159,6 +173,7 @@ func TestSPAContentSecurityPolicy(t *testing.T) {
 }
 
 func TestManifestContentType(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	resp, _ := get(t, ts.URL+"/manifest.webmanifest")
 	if ct := resp.Header.Get("Content-Type"); ct != "application/manifest+json" {
@@ -167,6 +182,7 @@ func TestManifestContentType(t *testing.T) {
 }
 
 func TestSPANotBuilt(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, fstest.MapFS{".gitkeep": {}})
 	resp, body := get(t, ts.URL+"/")
 	if resp.StatusCode != http.StatusServiceUnavailable {

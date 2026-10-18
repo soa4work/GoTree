@@ -70,6 +70,7 @@ func listIDs(list PersonList) map[int64]bool {
 }
 
 func TestShareDeceasedOnly(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	f := shareTree(t, s, a)
@@ -124,6 +125,7 @@ func TestShareDeceasedOnly(t *testing.T) {
 }
 
 func TestShareDescendantsWithLivingNames(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	f := shareTree(t, s, a)
@@ -195,6 +197,7 @@ func TestShareDescendantsWithLivingNames(t *testing.T) {
 }
 
 func TestShareLinkLifecycle(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	p := mustPerson(t, s, a, "Anna", "")
@@ -248,6 +251,7 @@ func TestShareLinkLifecycle(t *testing.T) {
 }
 
 func TestRotateShareLink(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	link, err := s.CreateShareLink(ctx, a, ShareLinkInput{Label: "Family", Scope: ShareScopeTree, Privacy: SharePrivacyLivingNames, ExpiresOn: "2026-10-05"})
@@ -297,6 +301,7 @@ func TestRotateShareLink(t *testing.T) {
 }
 
 func TestShareSearchNameOnlyUsesPrimaryName(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	person := func(in PersonInput, died bool) Person {
@@ -382,6 +387,7 @@ func TestShareSearchNameOnlyUsesPrimaryName(t *testing.T) {
 }
 
 func TestSearchWords(t *testing.T) {
+	t.Parallel()
 	if got := ftsQuery("O'Brien Пётр"); got != `"OBrien"* "Петр"*` {
 		t.Errorf("ftsQuery: %q", got)
 	}
@@ -394,6 +400,7 @@ func TestSearchWords(t *testing.T) {
 }
 
 func TestOnThisDay(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	f := shareTree(t, s, a)
@@ -410,6 +417,7 @@ func TestOnThisDay(t *testing.T) {
 }
 
 func TestShareReducedPersonHidesNameNotes(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	f := shareTree(t, s, a)

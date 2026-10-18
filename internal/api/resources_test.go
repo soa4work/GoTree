@@ -10,6 +10,7 @@ import (
 )
 
 func TestFamilyWorkflow(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 
@@ -84,6 +85,7 @@ func TestFamilyWorkflow(t *testing.T) {
 }
 
 func TestRequestErrors(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 
@@ -107,6 +109,7 @@ func TestRequestErrors(t *testing.T) {
 }
 
 func TestAddRelativeAndDatePreview(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 
@@ -160,6 +163,7 @@ func TestAddRelativeAndDatePreview(t *testing.T) {
 }
 
 func TestTreeEndpoint(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	var paul store.Person
@@ -177,6 +181,7 @@ func TestTreeEndpoint(t *testing.T) {
 }
 
 func TestSourcesAPI(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 
@@ -209,6 +214,7 @@ func TestSourcesAPI(t *testing.T) {
 }
 
 func TestSearchCyrillicAPI(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 

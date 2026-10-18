@@ -18,6 +18,7 @@ func newRelative(t *testing.T, s *Store, a Actor, anchor int64, relation, given 
 }
 
 func TestAddRelativesInAnyOrder(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	paul := mustPerson(t, s, a, "Paul", "Weber")
@@ -87,6 +88,7 @@ func TestAddRelativesInAnyOrder(t *testing.T) {
 }
 
 func TestAddRelativeIsAtomic(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	paul := mustPerson(t, s, a, "Paul", "")

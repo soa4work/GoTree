@@ -79,6 +79,7 @@ func reimport(t *testing.T, text string) (*Store, Actor) {
 }
 
 func TestExportRoundTrip(t *testing.T) {
+	t.Parallel()
 	for _, fixture := range []string{"ancestry-551.ged", "gedcom7.ged"} {
 		for _, v7 := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s v7=%v", fixture, v7), func(t *testing.T) {
@@ -112,6 +113,7 @@ func TestExportRoundTrip(t *testing.T) {
 }
 
 func TestExportContent(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	if _, err := s.ImportGEDCOM(ctx, a, parseFixture(t, "ancestry-551.ged"), ImportIntoEmpty); err != nil {
@@ -165,6 +167,7 @@ func TestExportContent(t *testing.T) {
 }
 
 func TestExportGedcom7DatePhraseRoundTrip(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	p, err := s.CreatePerson(ctx, a, PersonInput{GivenNames: "Anna", Surname: "Weber", Sex: "F"})
@@ -226,6 +229,7 @@ func TestExportGedcom7DatePhraseRoundTrip(t *testing.T) {
 // TestExportIntDualYear551 pins that an interpreted date with a dual year
 // keeps both in 5.5.1, and that 7.0 keeps the dual year in a PHRASE.
 func TestExportIntDualYear551(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	p := mustPerson(t, s, a, "Anna", "Weber")
@@ -270,6 +274,7 @@ func TestExportIntDualYear551(t *testing.T) {
 }
 
 func TestExportKeptDatePhrase(t *testing.T) {
+	t.Parallel()
 	src := "0 HEAD\n1 GEDC\n2 VERS 7.0\n0 @I1@ INDI\n1 NAME Anna /Weber/\n1 BIRT\n2 DATE ABT 1900\n3 PHRASE during the war\n0 TRLR\n"
 	s, a := reimport(t, src)
 	v7 := exportText(t, s, a, ExportOptions{Version7: true})
@@ -283,6 +288,7 @@ func TestExportKeptDatePhrase(t *testing.T) {
 }
 
 func TestExportPrivacy(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	old := mustPerson(t, s, a, "Old", "Weber")
@@ -321,6 +327,7 @@ func TestExportPrivacy(t *testing.T) {
 }
 
 func TestExportMedia(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	p := mustPerson(t, s, a, "Anna", "")
@@ -360,6 +367,7 @@ func deadPerson(t *testing.T, s *Store, a Actor, given string) Person {
 }
 
 func TestExportExcludeLivingHidesFamilyEvents(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	old := deadPerson(t, s, a, "Old")
@@ -386,6 +394,7 @@ func TestExportExcludeLivingHidesFamilyEvents(t *testing.T) {
 }
 
 func TestExportExcludeLivingSkipsMedia(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	old := deadPerson(t, s, a, "Old")
@@ -432,6 +441,7 @@ func TestExportExcludeLivingSkipsMedia(t *testing.T) {
 }
 
 func TestExportExcludeLivingSkipsPortraitAndEventMedia(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	old := deadPerson(t, s, a, "Old")
@@ -486,6 +496,7 @@ func TestExportExcludeLivingSkipsPortraitAndEventMedia(t *testing.T) {
 }
 
 func TestExportNameOnlySkipsPortraitMedia(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	old := deadPerson(t, s, a, "Old")
@@ -527,6 +538,7 @@ func TestExportNameOnlySkipsPortraitMedia(t *testing.T) {
 }
 
 func TestVerifyExport(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	if _, err := s.ImportGEDCOM(ctx, a, parseFixture(t, "ancestry-551.ged"), ImportIntoEmpty); err != nil {
@@ -553,6 +565,7 @@ func TestVerifyExport(t *testing.T) {
 }
 
 func TestExportStatusRoundTrip(t *testing.T) {
+	t.Parallel()
 	for _, v7 := range []bool{false, true} {
 		t.Run(fmt.Sprintf("v7=%v", v7), func(t *testing.T) {
 			s := newStore(t)
@@ -660,6 +673,7 @@ func TestExportStatusRoundTrip(t *testing.T) {
 }
 
 func TestExportParticipantRolesRoundTrip(t *testing.T) {
+	t.Parallel()
 	roles := []struct{ given, role, custom string }{
 		{"Bert", "head", ""}, {"Clara", "sibling", ""}, {"Dora", "relative", ""}, {"Emil", "informant", ""},
 		{"Fritz", "other", "lodger"}, {"Gerd", "godparent", ""}, {"Hans", "witness", ""},
@@ -728,6 +742,7 @@ func TestExportParticipantRolesRoundTrip(t *testing.T) {
 }
 
 func TestExportNameTypeRoundTrip(t *testing.T) {
+	t.Parallel()
 	for _, v7 := range []bool{false, true} {
 		t.Run(fmt.Sprintf("v7=%v", v7), func(t *testing.T) {
 			s := newStore(t)
@@ -756,6 +771,7 @@ func TestExportNameTypeRoundTrip(t *testing.T) {
 }
 
 func TestDatePhraseKeepsParentheses(t *testing.T) {
+	t.Parallel()
 	tests := []struct{ in, want string }{
 		{"Frühjahr 1850", "(Frühjahr 1850)"},
 		{"Frühjahr (1850)", "(Frühjahr (1850))"},
@@ -778,6 +794,7 @@ func TestDatePhraseKeepsParentheses(t *testing.T) {
 }
 
 func TestExportNamesRoundTrip(t *testing.T) {
+	t.Parallel()
 	for _, v7 := range []bool{false, true} {
 		t.Run(fmt.Sprintf("v7=%v", v7), func(t *testing.T) {
 			s := newStore(t)
@@ -879,6 +896,7 @@ func participantSet(t *testing.T, s *Store, a Actor) []string {
 }
 
 func TestExportParticipantsRoundTrip(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	anna := mustPerson(t, s, a, "Anna", "Weber")
@@ -939,6 +957,7 @@ func TestExportParticipantsRoundTrip(t *testing.T) {
 }
 
 func TestExportFamilyWitnessesOnFirstPartner(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	anna := mustPerson(t, s, a, "Anna", "Weber")
@@ -959,6 +978,7 @@ func TestExportFamilyWitnessesOnFirstPartner(t *testing.T) {
 }
 
 func TestExportFamilyWitnessesPrivacy(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	born := func(given string) Person {

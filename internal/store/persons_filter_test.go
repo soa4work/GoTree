@@ -53,6 +53,7 @@ func (f filterFixture) ids(t *testing.T, q string, flt PersonFilter, limit, offs
 }
 
 func TestPersonFilterSortByBirth(t *testing.T) {
+	t.Parallel()
 	f := newFilterFixture(t)
 	got := f.ids(t, "", PersonFilter{Sort: "birth"}, 50, 0)
 	if len(got) != 5 || !reflect.DeepEqual(got[:3], []int64{f.chr1850, f.dead1900, f.anna1990}) {
@@ -65,6 +66,7 @@ func TestPersonFilterSortByBirth(t *testing.T) {
 }
 
 func TestPersonFilterSexAndTotal(t *testing.T) {
+	t.Parallel()
 	f := newFilterFixture(t)
 	got := f.ids(t, "", PersonFilter{Sex: "F"}, 50, 0)
 	if !reflect.DeepEqual(got, []int64{f.anna1990}) {
@@ -83,6 +85,7 @@ func TestPersonFilterSexAndTotal(t *testing.T) {
 }
 
 func TestPersonFilterPagingIsStable(t *testing.T) {
+	t.Parallel()
 	f := newFilterFixture(t)
 	all := f.ids(t, "", PersonFilter{Sort: "updated"}, 50, 0)
 	var paged []int64
@@ -96,6 +99,7 @@ func TestPersonFilterPagingIsStable(t *testing.T) {
 
 // The SQL living rule must agree with the Go rule in personRefs.
 func TestPersonFilterLivingMatchesRefs(t *testing.T) {
+	t.Parallel()
 	f := newFilterFixture(t)
 	// Edge cases of the rule: a stated flag beats a death record, and a
 	// disproven death does not count.
@@ -136,6 +140,7 @@ func TestPersonFilterLivingMatchesRefs(t *testing.T) {
 }
 
 func TestPersonFilterZeroEqualsListPersons(t *testing.T) {
+	t.Parallel()
 	f := newFilterFixture(t)
 	for _, q := range []string{"", "weber"} {
 		a, err := f.s.ListPersons(ctx, f.a, q, 50, 0)

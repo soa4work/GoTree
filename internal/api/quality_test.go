@@ -9,6 +9,7 @@ import (
 )
 
 func TestQualityEndpoints(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 
@@ -34,7 +35,7 @@ func TestQualityEndpoints(t *testing.T) {
 	if len(prop.Items) != 0 {
 		t.Fatalf("a just-saved date was proposed: %+v", prop)
 	}
-	if _, err := testServers[ts].Store.DB.Exec(`UPDATE events SET date_raw = 'ca. 1855', date = '', date_sort = NULL WHERE id = ?`, birth.ID); err != nil {
+	if _, err := serverOf(ts).Store.DB.Exec(`UPDATE events SET date_raw = 'ca. 1855', date = '', date_sort = NULL WHERE id = ?`, birth.ID); err != nil {
 		t.Fatal(err)
 	}
 	c.call("GET", "/api/dates/proposals", nil, http.StatusOK, &prop)
@@ -60,7 +61,7 @@ func TestQualityEndpoints(t *testing.T) {
 	c.call("GET", "/api/relationship?a=1", nil, http.StatusBadRequest, nil)
 	c.call("GET", fmt.Sprintf("/api/relationship?a=%d&b=999", parent.ID), nil, http.StatusNotFound, nil)
 
-	srv := testServers[ts]
+	srv := serverOf(ts)
 	if _, err := srv.Store.DB.Exec(`UPDATE tree_members SET role = 'viewer'`); err != nil {
 		t.Fatal(err)
 	}

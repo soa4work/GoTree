@@ -39,6 +39,7 @@ func callError(t *testing.T, c *client, method, path string, body any, wantStatu
 }
 
 func TestErrorResponsesCarryCodes(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 
@@ -90,7 +91,7 @@ func TestErrorResponsesCarryCodes(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		if _, err := testServers[ts].Store.DB.Exec(`UPDATE tree_members SET role = 'viewer'`); err != nil {
+		if _, err := serverOf(ts).Store.DB.Exec(`UPDATE tree_members SET role = 'viewer'`); err != nil {
 			t.Fatal(err)
 		}
 		e := callError(t, c, "POST", "/api/persons", map[string]string{"givenNames": "After"}, http.StatusForbidden)
@@ -103,6 +104,7 @@ func TestErrorResponsesCarryCodes(t *testing.T) {
 // The codes the server defines and the apiError keys in en.json must be the
 // same set: a new code cannot ship without text, and a stale text is removed.
 func TestCodesMatchTranslations(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("../../web/src/locales/en.json")
 	if err != nil {
 		t.Fatal(err)
@@ -171,6 +173,7 @@ func sortedKeys(m map[string]bool) []string {
 }
 
 func TestClassifyField(t *testing.T) {
+	t.Parallel()
 	for msg, want := range map[string]FieldError{
 		"is required":                               {Code: FieldRequired},
 		"is too long":                               {Code: FieldTooLong},

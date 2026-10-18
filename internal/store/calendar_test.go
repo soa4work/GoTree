@@ -7,6 +7,7 @@ import (
 )
 
 func TestCalendarFeedKeepsEmptyName(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	p, err := s.CreatePerson(ctx, a, PersonInput{Sex: "F"})
@@ -30,6 +31,7 @@ func TestCalendarFeedKeepsEmptyName(t *testing.T) {
 }
 
 func TestCalendarFeed(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	f := shareTree(t, s, a)

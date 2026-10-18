@@ -3,6 +3,7 @@ package store
 import "testing"
 
 func TestEventPlainLanguageDates(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	p := mustPerson(t, s, a, "Plain", "Dates")
@@ -28,6 +29,7 @@ func TestEventPlainLanguageDates(t *testing.T) {
 // Imports stay strict: loose heirloom dates are kept as written and only
 // text Parse reads is made canonical, as before storedDate existed.
 func TestHeirloomImportDatesStayStrict(t *testing.T) {
+	t.Parallel()
 	text := "0 HEAD\n1 GEDC\n2 VERS 5.5.1\n1 CHAR UTF-8\n" +
 		"0 @H1@ _HEIRLOOM\n1 NAME Loose\n1 DATE March 12, 1850\n" +
 		"0 @H2@ _HEIRLOOM\n1 NAME Abbreviated\n1 DATE abt 1880\n" +
@@ -46,6 +48,7 @@ func TestHeirloomImportDatesStayStrict(t *testing.T) {
 }
 
 func TestStoredDateEverywhere(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	anna := mustPerson(t, s, a, "Anna", "Weber")

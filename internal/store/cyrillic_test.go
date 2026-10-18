@@ -7,6 +7,7 @@ import (
 )
 
 func TestPersonsSortCyrillicAndKazakh(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	for _, surname := range []string{
@@ -39,6 +40,7 @@ func TestPersonsSortCyrillicAndKazakh(t *testing.T) {
 }
 
 func TestPersonSearchCyrillic(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	elkin := mustPerson(t, s, a, "Пётр", "Ёлкин")
@@ -63,6 +65,7 @@ func TestPersonSearchCyrillic(t *testing.T) {
 }
 
 func TestPlacesAndSourcesSortCyrillic(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	for _, n := range []string{"Шымкент", "алматы", "Астана", "Әулиеата", "Zürich", "Ақтау"} {
@@ -100,6 +103,7 @@ func TestPlacesAndSourcesSortCyrillic(t *testing.T) {
 }
 
 func TestPersonsSortByCyrillicGivenNames(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	for _, given := range []string{"Яков", "иван", "Әлия", "Иван", "Алия", "Нұрлан"} {
@@ -129,6 +133,7 @@ func placeNames(list []Place) []string {
 }
 
 func TestListPlacesSearchIgnoresCyrillicCase(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	mk := func(name string, parent *int64) int64 {
@@ -186,6 +191,7 @@ func TestListPlacesSearchIgnoresCyrillicCase(t *testing.T) {
 }
 
 func TestListSourcesAndRepositoriesSearchIgnoresCyrillicCase(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	for _, n := range []string{"Центральный государственный архив", "Қазақстан ұлттық архиві"} {
@@ -247,6 +253,7 @@ func TestListSourcesAndRepositoriesSearchIgnoresCyrillicCase(t *testing.T) {
 }
 
 func TestListHeirloomsSearchIgnoresCyrillicCase(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	for _, in := range []HeirloomInput{

@@ -20,6 +20,7 @@ func mustSource(t *testing.T, s *Store, a Actor, title string) Source {
 }
 
 func TestCensusTranscription(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	src := mustSource(t, s, a, "Census 1900, Leipzig")
@@ -120,6 +121,7 @@ func TestCensusTranscription(t *testing.T) {
 }
 
 func TestMarriageAndBaptismTranscription(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	src := mustSource(t, s, a, "Kirchenbuch")
@@ -177,6 +179,7 @@ func TestMarriageAndBaptismTranscription(t *testing.T) {
 }
 
 func TestTranscriptionValidation(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	_, err := s.CreateTranscription(ctx, a, TranscriptionInput{TemplateKey: "nope"})
@@ -196,6 +199,7 @@ func TestTranscriptionValidation(t *testing.T) {
 }
 
 func TestCustomTemplates(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	tpl := RecordTemplate{
@@ -246,6 +250,7 @@ func TestCustomTemplates(t *testing.T) {
 }
 
 func TestFieldCitationsExportOnce(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	src := mustSource(t, s, a, "Census")
@@ -269,6 +274,7 @@ func TestFieldCitationsExportOnce(t *testing.T) {
 }
 
 func TestTranscriptionReusesPlaceIgnoringCyrillicCase(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	moscow, err := s.CreatePlace(ctx, a, PlaceInput{Name: "Москва"})

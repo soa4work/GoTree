@@ -15,6 +15,7 @@ import (
 )
 
 func TestBackup(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	c.call("POST", "/api/persons", map[string]any{"givenNames": "Anna"}, http.StatusCreated, nil)
@@ -79,7 +80,7 @@ func TestBackup(t *testing.T) {
 		t.Errorf("restored persons: %d %v", n, err)
 	}
 
-	srv := testServers[ts]
+	srv := serverOf(ts)
 	if _, err := srv.Store.DB.Exec(`UPDATE users SET role = 'user'`); err != nil {
 		t.Fatal(err)
 	}

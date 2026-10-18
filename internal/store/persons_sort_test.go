@@ -12,6 +12,7 @@ import (
 )
 
 func TestListPersonsUsesSortIndex(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	rows, err := s.DB.QueryContext(ctx, `EXPLAIN QUERY PLAN `+listPersonsSQL, 1, 50, 0)
 	if err != nil {
@@ -34,6 +35,7 @@ func TestListPersonsUsesSortIndex(t *testing.T) {
 }
 
 func TestUpdatePersonMovesInList(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	mustPerson(t, s, a, "A", "Борисов")
@@ -51,6 +53,7 @@ func TestUpdatePersonMovesInList(t *testing.T) {
 }
 
 func TestSearchPagingIsStable(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	surnames := []string{"Muller", "Müller", "MULLER", "muller"}
@@ -78,6 +81,7 @@ func TestSearchPagingIsStable(t *testing.T) {
 }
 
 func TestImportFillsSortKeys(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	doc, err := gedcom.Parse([]byte("0 HEAD\n1 GEDC\n2 VERS 5.5.1\n1 CHAR UTF-8\n" +

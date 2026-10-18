@@ -27,6 +27,7 @@ func rawPost(t *testing.T, c *client, path, body string) (int, string) {
 }
 
 func TestInvalidJSONHidesGoTypes(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 
@@ -61,6 +62,7 @@ func TestInvalidJSONHidesGoTypes(t *testing.T) {
 }
 
 func TestJSONBodyTooLargeIs413(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := newClient(t, ts)
 	body := `{"username":"` + strings.Repeat("a", 2<<20) + `"}`
@@ -74,6 +76,7 @@ func TestJSONBodyTooLargeIs413(t *testing.T) {
 }
 
 func TestSlowJSONBodyTimesOut(t *testing.T) {
+	// Not parallel: it changes bodyReadTimeout.
 	old := bodyReadTimeout
 	bodyReadTimeout = 300 * time.Millisecond
 	t.Cleanup(func() { bodyReadTimeout = old })
@@ -103,6 +106,7 @@ func TestSlowJSONBodyTimesOut(t *testing.T) {
 // The deadline must not stay armed while a long handler runs, or it would
 // cancel the request context.
 func TestBodyDeadlineIsClearedAfterRead(t *testing.T) {
+	// Not parallel: it changes bodyReadTimeout.
 	old := bodyReadTimeout
 	bodyReadTimeout = 100 * time.Millisecond
 	t.Cleanup(func() { bodyReadTimeout = old })

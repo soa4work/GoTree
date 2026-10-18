@@ -15,6 +15,7 @@ import (
 // its code behind that prefix, with the column as a param, so a reworded
 // message still breaks a test.
 func TestRowMessagesAreClassified(t *testing.T) {
+	t.Parallel()
 	for m, want := range pinned {
 		msg := strings.ReplaceAll(m, "{}", "7")
 		got := classifyField("givenNames: " + msg)
@@ -32,6 +33,7 @@ func TestRowMessagesAreClassified(t *testing.T) {
 }
 
 func TestRowErrorFromApplyIsCoded(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	var src struct {
@@ -69,6 +71,7 @@ func zipOf(t *testing.T, names ...string) []byte {
 }
 
 func TestGedcomErrorsHaveSubCodes(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	for _, tc := range []struct {

@@ -26,6 +26,9 @@ type Store struct {
 
 // New returns a Store using the real clock.
 func New(db *sql.DB) *Store {
+	// Build the dummy hash now so the first unknown-user login costs the
+	// same as any other.
+	dummyHash()
 	return &Store{DB: db, Now: time.Now}
 }
 

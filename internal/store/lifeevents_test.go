@@ -6,6 +6,7 @@ import (
 )
 
 func TestCreatePersonWithBirthAndDeath(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	place, err := s.CreatePlace(ctx, a, PlaceInput{Name: "Leipzig"})
@@ -69,6 +70,7 @@ func TestCreatePersonWithBirthAndDeath(t *testing.T) {
 }
 
 func TestAddRelativeWithBirth(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	paul := mustPerson(t, s, a, "Paul", "Weber")

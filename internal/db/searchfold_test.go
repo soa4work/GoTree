@@ -7,6 +7,7 @@ import (
 )
 
 func TestSearchFold(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct{ in, want string }{
 		{"Москва", "москва"},
 		{"МОСКВА", "москва"},
@@ -31,6 +32,7 @@ func TestSearchFold(t *testing.T) {
 }
 
 func TestSearchFoldSQL(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "t.db"))
 	if err != nil {

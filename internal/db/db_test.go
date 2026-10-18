@@ -9,6 +9,7 @@ import (
 )
 
 func TestOpenMigratesAndReopens(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "test.db")
 
@@ -44,6 +45,7 @@ func TestOpenMigratesAndReopens(t *testing.T) {
 }
 
 func TestPragmasApplyToEveryConnection(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -77,6 +79,7 @@ func TestPragmasApplyToEveryConnection(t *testing.T) {
 }
 
 func TestOpenPathWithSpecialCharacters(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	base := t.TempDir()
 	a, err := Open(ctx, filepath.Join(base, "family #1", "tree?.db"))
@@ -101,6 +104,7 @@ func TestOpenPathWithSpecialCharacters(t *testing.T) {
 // Migration 9 rebuilds media_links and citation_links; links made before
 // must survive it.
 func TestHeirloomMigrationKeepsLinks(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -150,6 +154,7 @@ func TestHeirloomMigrationKeepsLinks(t *testing.T) {
 }
 
 func TestUserLastTreeMigration(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -184,6 +189,7 @@ func TestUserLastTreeMigration(t *testing.T) {
 }
 
 func TestNameNotesMigration(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {

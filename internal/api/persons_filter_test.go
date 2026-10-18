@@ -9,6 +9,7 @@ import (
 )
 
 func TestPersonsFilterAPI(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 
@@ -33,6 +34,7 @@ func TestPersonsFilterAPI(t *testing.T) {
 }
 
 func TestSourcesPagingAPI(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	for i := 1; i <= 5; i++ {

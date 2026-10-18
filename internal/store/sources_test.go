@@ -6,6 +6,7 @@ import (
 )
 
 func TestSourcesAndCitations(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 
@@ -126,6 +127,7 @@ func TestSourcesAndCitations(t *testing.T) {
 }
 
 func TestNameCitationsSurviveEdits(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	src, err := s.CreateSource(ctx, a, SourceInput{Title: "Heiratsregister"})
@@ -166,6 +168,7 @@ func TestNameCitationsSurviveEdits(t *testing.T) {
 }
 
 func TestRelativeWithCitation(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	src, err := s.CreateSource(ctx, a, SourceInput{Title: "Taufregister"})
@@ -186,6 +189,7 @@ func TestRelativeWithCitation(t *testing.T) {
 }
 
 func TestRemoveCitationsOnSave(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	src, err := s.CreateSource(ctx, a, SourceInput{Title: "Register"})

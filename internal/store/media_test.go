@@ -16,6 +16,7 @@ func newMedia(sha byte) NewMedia {
 }
 
 func TestMedia(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	anna := mustPerson(t, s, a, "Anna", "Müller")

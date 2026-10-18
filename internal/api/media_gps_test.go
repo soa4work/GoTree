@@ -100,6 +100,7 @@ func uploadPhoto(t *testing.T, c *client, name string, data []byte) store.Media 
 }
 
 func TestMediaFileWithoutGPS(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	photo := gpsJPEG(t)
@@ -132,15 +133,16 @@ func TestMediaFileWithoutGPS(t *testing.T) {
 	}
 	// The stored original is untouched.
 	sum := sha256.Sum256(photo)
-	stored, _ := testServers[ts].Files.Path(hex.EncodeToString(sum[:]))
+	stored, _ := serverOf(ts).Files.Path(hex.EncodeToString(sum[:]))
 	if got := mustRead(t, stored); !bytes.Equal(got, photo) {
 		t.Error("the original changed")
 	}
 }
 
 func TestMediaFileKeepLocation(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
-	testServers[ts].KeepPhotoLocation = true
+	serverOf(ts).KeepPhotoLocation = true
 	c := loggedIn(t, ts)
 	photo := gpsJPEG(t)
 	m := uploadPhoto(t, c, "gps.jpg", photo)
@@ -150,6 +152,7 @@ func TestMediaFileKeepLocation(t *testing.T) {
 }
 
 func TestGedzipWithoutGPS(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	photo := gpsJPEG(t)
@@ -177,7 +180,7 @@ func TestGedzipWithoutGPS(t *testing.T) {
 	if got := exported(""); hasPosition(t, got) || len(got) != len(photo) {
 		t.Errorf("privacy=all: position %v", hasPosition(t, got))
 	}
-	testServers[ts].KeepPhotoLocation = true
+	serverOf(ts).KeepPhotoLocation = true
 	if got := exported(""); !bytes.Equal(got, photo) {
 		t.Error("keep with privacy=all: original expected")
 	}
@@ -189,6 +192,7 @@ func TestGedzipWithoutGPS(t *testing.T) {
 }
 
 func TestPlainGedcomHasNoCoordinates(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	uploadPhoto(t, c, "gps.jpg", gpsJPEG(t))
@@ -201,6 +205,7 @@ func TestPlainGedcomHasNoCoordinates(t *testing.T) {
 }
 
 func TestDeleteRacesIdenticalUpload(t *testing.T) {
+	// Not parallel: it sets afterMediaDeleteDecision.
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	photo := jpegBytes(t, 33, 22)
@@ -251,12 +256,13 @@ func mustRead(t *testing.T, path string) []byte {
 }
 
 func TestMediaFileMissingOriginal(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	photo := gpsJPEG(t)
 	m := uploadPhoto(t, c, "gps.jpg", photo)
 	sum := sha256.Sum256(photo)
-	stored, _ := testServers[ts].Files.Path(hex.EncodeToString(sum[:]))
+	stored, _ := serverOf(ts).Files.Path(hex.EncodeToString(sum[:]))
 	if err := os.Remove(stored); err != nil {
 		t.Fatal(err)
 	}

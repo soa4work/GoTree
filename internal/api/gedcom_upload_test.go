@@ -10,6 +10,7 @@ import (
 // A multipart body that ends before its closing boundary is a broken
 // upload, not one that is too large.
 func TestGedcomBrokenUploadIsNotTooLarge(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	body := "--X\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.ged\"\r\nContent-Type: text/plain\r\n\r\n0 HEAD\r\n"

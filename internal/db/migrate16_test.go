@@ -146,6 +146,7 @@ func has(list []string, s string) bool {
 }
 
 func TestMigration16KeepsRealisticData(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -316,6 +317,7 @@ func TestMigration16KeepsRealisticData(t *testing.T) {
 
 // Down must give the old schema back with all data, and Up must work again.
 func TestMigration16DownAndUpAgain(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -418,6 +420,7 @@ func TestMigration16DownAndUpAgain(t *testing.T) {
 
 // A fresh database passes through migration 16 with no rows at all.
 func TestMigration16OnEmptyDatabase(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {

@@ -38,6 +38,7 @@ func newFixture(t *testing.T, s *Store) treeFixture {
 }
 
 func TestCreateAndListTrees(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	setup(t, s)
 	a := admin(t, s)
@@ -70,6 +71,7 @@ func TestCreateAndListTrees(t *testing.T) {
 }
 
 func TestMemberPermissions(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	f := newFixture(t, s)
 	// A fifth account whom the owner may add, remove and re-role.
@@ -125,6 +127,7 @@ func TestMemberPermissions(t *testing.T) {
 }
 
 func TestAddMember(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	f := newFixture(t, s)
 	a := admin(t, s)
@@ -158,6 +161,7 @@ func TestAddMember(t *testing.T) {
 }
 
 func TestLastOwner(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	f := newFixture(t, s)
 	if _, err := s.SetMemberRole(ctx, f.owner.ID, f.tree, f.owner.ID, RoleEditor); !errors.Is(err, ErrLastOwner) {
@@ -188,6 +192,7 @@ func TestLastOwner(t *testing.T) {
 }
 
 func TestRemoveMemberClearsSessions(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	f := newFixture(t, s)
 	other, err := s.CreateTree(ctx, f.ed.ID, "Second")
@@ -226,6 +231,7 @@ func TestRemoveMemberClearsSessions(t *testing.T) {
 }
 
 func TestRoleChangeAppliesImmediately(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	f := newFixture(t, s)
 	tok, err := s.CreateSession(ctx, f.ed.ID, "x")
@@ -248,6 +254,7 @@ func TestRoleChangeAppliesImmediately(t *testing.T) {
 }
 
 func TestSwitchTreeAndNextSession(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	setup(t, s)
 	a := admin(t, s)
@@ -306,6 +313,7 @@ func TestSwitchTreeAndNextSession(t *testing.T) {
 }
 
 func TestMemberChangesAreLogged(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	f := newFixture(t, s)
 	if _, err := s.RenameTree(ctx, f.owner.ID, f.tree, "Renamed"); err != nil {
@@ -348,6 +356,7 @@ func TestMemberChangesAreLogged(t *testing.T) {
 // TestLastOwnerRace has both owners leave the tree at the same time. The
 // owner count runs inside the write transaction, so one of them must stay.
 func TestLastOwnerRace(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	f := newFixture(t, s)
 	if _, err := s.SetMemberRole(ctx, f.owner.ID, f.tree, f.ed.ID, RoleOwner); err != nil {

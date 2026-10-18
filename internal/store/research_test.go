@@ -6,6 +6,7 @@ import (
 )
 
 func TestResearchTasks(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	anna := mustPerson(t, s, a, "Anna", "Weber")
@@ -83,6 +84,7 @@ func TestResearchTasks(t *testing.T) {
 }
 
 func TestResearchLinksFollowDeletes(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	anna := mustPerson(t, s, a, "Anna", "")
@@ -100,6 +102,7 @@ func TestResearchLinksFollowDeletes(t *testing.T) {
 }
 
 func TestSuggestions(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	old := mustPerson(t, s, a, "Old", "Weber")

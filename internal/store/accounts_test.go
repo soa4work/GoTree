@@ -30,6 +30,7 @@ func mustAccount(t *testing.T, s *Store, by User, name, role string) Account {
 }
 
 func TestAccountsAdminOnly(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	setup(t, s)
 	u := User{ID: 2, Role: "user"}
@@ -47,6 +48,7 @@ func TestAccountsAdminOnly(t *testing.T) {
 }
 
 func TestCreateAccount(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	setup(t, s)
 	by := admin(t, s)
@@ -75,6 +77,7 @@ func TestCreateAccount(t *testing.T) {
 }
 
 func TestUpdateAccountLastAdmin(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	setup(t, s)
 	first := admin(t, s)
@@ -98,6 +101,7 @@ func TestUpdateAccountLastAdmin(t *testing.T) {
 }
 
 func TestResetPassword(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	setup(t, s)
 	by := admin(t, s)
@@ -135,6 +139,7 @@ func TestResetPassword(t *testing.T) {
 }
 
 func TestDeleteAccount(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	setup(t, s)
 	a := admin(t, s)
@@ -174,6 +179,7 @@ func TestDeleteAccount(t *testing.T) {
 }
 
 func TestDeleteAdminRules(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	setup(t, s)
 	a := admin(t, s)
@@ -195,6 +201,7 @@ func TestDeleteAdminRules(t *testing.T) {
 }
 
 func TestListAccounts(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	act := setup(t, s)
 	a := admin(t, s)
@@ -222,6 +229,7 @@ func TestListAccounts(t *testing.T) {
 // time; one of them must stay an administrator. The loser is refused either
 // as the last administrator or as no longer an administrator.
 func TestLastAdminRace(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	setup(t, s)
 	a := admin(t, s)
@@ -246,6 +254,7 @@ func TestLastAdminRace(t *testing.T) {
 // TestDemotedAdminLosesRightsAtOnce: a caller whose role is stale (demoted
 // after their session was read) is refused inside the transaction.
 func TestDemotedAdminLosesRightsAtOnce(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	setup(t, s)
 	a := admin(t, s)

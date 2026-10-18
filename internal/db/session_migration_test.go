@@ -7,6 +7,7 @@ import (
 )
 
 func TestSessionIDMigrationKeepsSessions(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {

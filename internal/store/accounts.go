@@ -165,7 +165,7 @@ func (s *Store) CreateAccount(ctx context.Context, by User, in AccountInput) (Ac
 	if err := v.err(); err != nil {
 		return Account{}, err
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), BcryptCost)
 	if err != nil {
 		return Account{}, err
 	}
@@ -257,7 +257,7 @@ func (s *Store) ResetPassword(ctx context.Context, by User, id int64, password s
 	if err := v.err(); err != nil {
 		return err
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), BcryptCost)
 	if err != nil {
 		return err
 	}

@@ -15,6 +15,7 @@ func clockAt(s *Store, t0 time.Time, d time.Duration) {
 }
 
 func TestSessionAbsoluteLifetime(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	t0 := s.Now()
@@ -51,6 +52,7 @@ func TestSessionAbsoluteLifetime(t *testing.T) {
 }
 
 func TestSessionByTokenGivesID(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	var ids []int64
@@ -74,6 +76,7 @@ func TestSessionByTokenGivesID(t *testing.T) {
 }
 
 func TestListAndDeleteSessions(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	b := otherTree(t, s)
@@ -175,6 +178,7 @@ func TestListAndDeleteSessions(t *testing.T) {
 }
 
 func TestChangePassword(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	keep, err := s.CreateSession(ctx, a.UserID, "keep")
@@ -218,6 +222,7 @@ func TestChangePassword(t *testing.T) {
 }
 
 func TestPruneSessions(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	now := s.Now()
@@ -257,6 +262,7 @@ func TestPruneSessions(t *testing.T) {
 }
 
 func TestSessionExtensionReportsCookieLifetime(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	t0 := s.Now()

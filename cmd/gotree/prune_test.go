@@ -4,22 +4,17 @@ import (
 	"context"
 	"io"
 	"log/slog"
-	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/praetorianer777/gotree/internal/db"
+	"github.com/praetorianer777/gotree/internal/db/dbtest"
 	"github.com/praetorianer777/gotree/internal/store"
 )
 
 func TestPruneSessionsRunsPeriodically(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	conn, err := db.Open(ctx, filepath.Join(t.TempDir(), "test.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
+	conn := dbtest.Open(t)
 	st := store.New(conn)
 	u, err := st.Setup(ctx, store.SetupInput{Username: "admin", Password: "correct horse battery"})
 	if err != nil {

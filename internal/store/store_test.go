@@ -3,24 +3,18 @@ package store
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/praetorianer777/gotree/internal/db"
+	"github.com/praetorianer777/gotree/internal/db/dbtest"
 )
 
 var ctx = context.Background()
 
 func newStore(t *testing.T) *Store {
 	t.Helper()
-	conn, err := db.Open(ctx, filepath.Join(t.TempDir(), "test.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { conn.Close() })
-	s := New(conn)
+	s := New(dbtest.Open(t))
 	s.Now = func() time.Time { return time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC) }
 	return s
 }
@@ -85,6 +79,7 @@ func validationField(t *testing.T, err error, field string) {
 }
 
 func TestSetupAndAuthentication(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	need, err := s.NeedsSetup(ctx)
 	if err != nil || !need {
@@ -149,6 +144,7 @@ func TestSetupAndAuthentication(t *testing.T) {
 }
 
 func TestPersonsAndSearch(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 
@@ -223,6 +219,7 @@ func TestPersonsAndSearch(t *testing.T) {
 }
 
 func TestLivingInference(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 
@@ -259,6 +256,7 @@ func TestLivingInference(t *testing.T) {
 }
 
 func TestPlaces(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 
@@ -309,6 +307,7 @@ func TestPlaces(t *testing.T) {
 }
 
 func TestEventsDatesAndParticipants(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	head := mustPerson(t, s, a, "Johann", "Weber")
@@ -382,6 +381,7 @@ func TestEventsDatesAndParticipants(t *testing.T) {
 }
 
 func TestFamilies(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	father := mustPerson(t, s, a, "Hans", "Weber")
@@ -469,6 +469,7 @@ func TestFamilies(t *testing.T) {
 }
 
 func TestTreeIsolation(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	b := otherTree(t, s)
@@ -504,6 +505,7 @@ func TestTreeIsolation(t *testing.T) {
 }
 
 func TestChangeLog(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	p := mustPerson(t, s, a, "Logged", "")
@@ -546,6 +548,7 @@ func TestChangeLog(t *testing.T) {
 }
 
 func TestPersonNameNotes(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	p, err := s.CreatePerson(ctx, a, PersonInput{GivenNames: "Anna", Surname: "Weber", NameNotes: "  spelled Maier ",

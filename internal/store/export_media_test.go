@@ -9,6 +9,7 @@ import (
 )
 
 func TestExportMediaRoundTrip(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	p := mustPerson(t, s, a, "Anna", "")
@@ -67,6 +68,7 @@ func TestExportMediaRoundTrip(t *testing.T) {
 }
 
 func TestExportDropsDanglingMediaPointer(t *testing.T) {
+	t.Parallel()
 	// A pointer to a media object, kept under a citation, is only valid in an
 	// export that contains the object.
 	src := strings.Join([]string{

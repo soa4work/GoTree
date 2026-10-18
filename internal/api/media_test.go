@@ -55,9 +55,10 @@ func (c *client) upload(path, name string, data []byte) (int, []byte) {
 }
 
 func TestMediaUpload(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
-	srv := testServers[ts]
+	srv := serverOf(ts)
 
 	var anna store.Person
 	c.call("POST", "/api/persons", map[string]any{"givenNames": "Anna"}, http.StatusCreated, &anna)

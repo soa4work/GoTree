@@ -43,6 +43,7 @@ func buildCousinMarriage(t *testing.T, s *Store, a Actor) cousinMarriage {
 }
 
 func TestTreeCousinMarriage(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	m := buildCousinMarriage(t, s, a)
@@ -79,6 +80,7 @@ func TestTreeCousinMarriage(t *testing.T) {
 }
 
 func TestShareDescendantsFollowsCousinMarriage(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	m := buildCousinMarriage(t, s, a)

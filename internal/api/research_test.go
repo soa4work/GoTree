@@ -9,6 +9,7 @@ import (
 )
 
 func TestResearchEndpoints(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	var anna store.Person

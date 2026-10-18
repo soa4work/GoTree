@@ -122,7 +122,19 @@
     "count_other": "{{count}} people",
     "found_one": "{{count}} person found",
     "found_other": "{{count}} people found",
-    "more": "Show more"
+    "more": "Show more",
+    "sortBy": "Sort by",
+    "sort_name": "Surname",
+    "sort_relevance": "Best match",
+    "sort_birth": "Birth, oldest first",
+    "sort_birthDesc": "Birth, youngest first",
+    "sort_updated": "Recently changed",
+    "sexFilter": "Sex",
+    "livingFilter": "Status",
+    "all": "All",
+    "living": "Living",
+    "deceased": "Deceased",
+    "noMatch": "No one matches these filters."
   },
   "person": {
     "birth": "Birth (optional)",
@@ -428,7 +440,10 @@
     "citations": "Citations",
     "noCitations": "Nothing cites this source yet.",
     "noPage": "No page given",
-    "supports": "Supports:"
+    "supports": "Supports:",
+    "more": "Show more sources",
+    "countShown_one": "First {{count}} source shown",
+    "countShown_other": "First {{count}} sources shown"
   },
   "media": {
     "section": "Photos and documents",
@@ -478,7 +493,8 @@
     "camera": "From the camera",
     "takenAt": "Taken {{date}}",
     "location": "Location {{lat}}, {{lng}} (map)",
-    "addAsEvent": "Add as event for {{name}}"
+    "addAsEvent": "Add as event for {{name}}",
+    "more": "Show more"
   },
   "transfer": {
     "importTitle": "Import a GEDCOM file",

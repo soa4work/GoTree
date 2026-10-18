@@ -9,6 +9,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- People list: sort by surname, birth (oldest or youngest first) or recent changes, and filter by
+  sex and living or deceased, kept in the address; the sources list and the media gallery load more
+  with a "Show more" button instead of stopping at 100 sources and 200 media (#60)
+
 - Account page: change your password (your other devices are then signed out), see the devices you are signed in on and sign any of them out, or sign out everywhere (#57)
 
 - `GOTREE_TRUSTED_PROXIES` names the reverse proxies whose X-Forwarded-For is trusted, so behind a proxy failed logins are counted per real client (#57)
@@ -112,6 +116,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 - Deleting a medium while the same file is uploaded again no longer leaves the new upload without
   its file (#58)
+
+- GEDCOM files saved as IBM PC (code pages 437 and 850), Macintosh or Latin-1 text are read with
+  their own character set, so umlauts and accents come through, and a GEDCOM 7 note line that
+  starts with "@" is no longer lost on export and import (#54)
 
 - A session ends at the latest 90 days after logging in, however often it is used, and expired sessions are removed every hour instead of only at startup; sessions older than 90 days end with this update (#57)
 

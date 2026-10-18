@@ -40,21 +40,25 @@ func writeNode(w *bufio.Writer, n *Node, level int, opt WriteOptions) error {
 	}
 	prefix += n.Tag
 
-	var value string
+	value := n.Value
 	if n.Pointer != "" {
 		value = "@" + n.Pointer + "@"
-	} else {
-		value = escape(n.Value, opt.Version7)
 	}
 
 	for i, line := range strings.Split(value, "\n") {
+		if n.Pointer == "" {
+			// Every line is a line of its own, so every line is escaped.
+			line = escape(line, opt.Version7)
+		}
 		head := prefix
 		if i > 0 {
 			head = fmt.Sprintf("%d CONT", level+1)
 		}
 		chunks := []string{line}
 		if !opt.Version7 {
-			chunks = splitForCONC(line, maxLine551-len(head)-1)
+			// CONC lines may have a longer head than a short tag.
+			conc := len(fmt.Sprintf("%d CONC", level+1))
+			chunks = splitForCONC(line, maxLine551-max(len(head), conc)-1)
 		}
 		for j, chunk := range chunks {
 			h := head
@@ -79,7 +83,7 @@ func writeNode(w *bufio.Writer, n *Node, level int, opt WriteOptions) error {
 
 // calendarEscape matches 5.5.1 escape sequences such as @#DJULIAN@,
 // which stay as they are.
-var calendarEscape = regexp.MustCompile(`@#[A-Z][^@]*@`)
+var calendarEscape = regexp.MustCompile(`@#D[A-Z][A-Z ]*@`)
 
 // escape doubles @ the way each version requires: every @ in 5.5.1 text
 // except in escape sequences, only a leading @ in GEDCOM 7.
@@ -120,6 +124,17 @@ func splitForCONC(s string, max int) []string {
 		if cut <= 1 {
 			cut = max
 			for cut > 0 && !utf8.RuneStart(s[cut]) {
+				cut--
+			}
+		}
+		// Never cut an escaped "@@" in two: a piece starting with a lone @
+		// could read as a pointer.
+		if s[cut] == '@' {
+			run := 0
+			for run < cut && s[cut-1-run] == '@' {
+				run++
+			}
+			if run%2 == 1 && cut > 1 && s[cut-2] != ' ' {
 				cut--
 			}
 		}

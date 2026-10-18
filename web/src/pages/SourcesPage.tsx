@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router'
@@ -8,14 +8,23 @@ import { PageHeading } from '../components/PageHeading'
 import { useDebounced } from '../hooks/useDebounced'
 import { SourceDialog } from '../sources/SourceDialog'
 
+const pageSize = 100
+
 export function SourcesPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
   const q = useDebounced(query.trim())
-  const sources = useQuery({ queryKey: ['sources', 'list', q], queryFn: ({ signal }) => listSources(q, signal) })
-  const items = sources.data ?? []
+  const sources = useInfiniteQuery({
+    queryKey: ['sources', 'list', q],
+    queryFn: ({ pageParam, signal }) => listSources(q, signal, { limit: pageSize, offset: pageParam }),
+    initialPageParam: 0,
+    // A full page may be the last one: with exactly 100 sources the button shows once and the
+    // next page comes back empty, which hides it again.
+    getNextPageParam: (last, pages) => (last.length < pageSize ? undefined : pages.length * pageSize),
+  })
+  const items = sources.data?.pages.flat() ?? []
 
   return (
     <div className="max-w-3xl space-y-5">
@@ -38,7 +47,11 @@ export function SourcesPage() {
         />
       </search>
       <p id="sources-status" role="status" className="text-sm text-slate-600 dark:text-slate-400">
-        {sources.isPending ? t('common.searching') : sources.isError ? t('common.loadFailed') : t('source.count', { count: items.length })}
+        {sources.isPending
+          ? t('common.searching')
+          : sources.isError
+            ? t('common.loadFailed')
+            : t(sources.hasNextPage ? 'source.countShown' : 'source.count', { count: items.length })}
       </p>
       {items.length > 0 && (
         <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
@@ -53,6 +66,11 @@ export function SourcesPage() {
             </li>
           ))}
         </ul>
+      )}
+      {sources.hasNextPage && (
+        <Button variant="secondary" onClick={() => void sources.fetchNextPage()} busy={sources.isFetchingNextPage}>
+          {t('source.more')}
+        </Button>
       )}
       <SourceDialog open={creating} onClose={() => setCreating(false)} onSaved={(s) => navigate(`/sources/${s.id}`)} />
     </div>

@@ -88,6 +88,16 @@ func TestWriteLongLines(t *testing.T) {
 	}
 }
 
+func TestWriteLongLinesShortTag(t *testing.T) {
+	// "1 _X" is shorter than the "2 CONC" of its continuation lines.
+	out := write(t, []*Node{{Xref: "I1", Tag: "INDI", Children: []*Node{{Tag: "_X", Value: strings.Repeat("ab", 400)}}}}, false)
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if len(line) > maxLine551 {
+			t.Errorf("line of %d bytes: %q", len(line), line[:20])
+		}
+	}
+}
+
 func TestSplitForCONC(t *testing.T) {
 	for _, s := range []string{strings.Repeat("ü", 300), strings.Repeat("a ", 200), strings.Repeat("x", 1000)} {
 		parts := splitForCONC(s, 100)
@@ -105,5 +115,47 @@ func TestSplitForCONC(t *testing.T) {
 func TestEscapeKeepsCalendars(t *testing.T) {
 	if got := escape("@#DJULIAN@ 4 OCT 1582 by me@home", false); got != "@#DJULIAN@ 4 OCT 1582 by me@@home" {
 		t.Errorf("got %q", got)
+	}
+	if got := escape("@#DFRENCH R@ 1 VEND 1 and @#Idea@", false); got != "@#DFRENCH R@ 1 VEND 1 and @@#Idea@@" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestWriteEscapesEveryLine(t *testing.T) {
+	recs := []*Node{{Xref: "N1", Tag: "NOTE", Value: "a\n@b\nc@d"}}
+	out := write(t, recs, true)
+	if !strings.Contains(out, "1 CONT @@b\n") || !strings.Contains(out, "1 CONT c@d\n") {
+		t.Errorf("7.0 output:\n%s", out)
+	}
+	roundTrip := func(value string, v7 bool) (string, string) {
+		out := write(t, []*Node{{Xref: "N1", Tag: "NOTE", Value: value}}, v7)
+		ver := "5.5.1"
+		if v7 {
+			ver = "7.0"
+		}
+		doc, err := Parse([]byte("0 HEAD\n1 GEDC\n2 VERS " + ver + "\n" + out))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out, doc.Records[0].Value
+	}
+	for _, v7 := range []bool{false, true} {
+		if _, got := roundTrip("a\n@b\nc@d\n@I1@\n@", v7); got != "a\n@b\nc@d\n@I1@\n@" {
+			t.Errorf("v7=%v: round trip %q", v7, got)
+		}
+	}
+
+	long := strings.Repeat("@", 600)
+	out, got := roundTrip(long, false)
+	if got != long {
+		t.Errorf("long @ run changed: %d characters", len(got))
+	}
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if len(line) > maxLine551 {
+			t.Errorf("line of %d bytes", len(line))
+		}
+		if v, ok := strings.CutPrefix(line, "1 CONC "); ok && strings.HasPrefix(v, "@") && !strings.HasPrefix(v, "@@") {
+			t.Errorf("CONC starts with a lone @: %q", line)
+		}
 	}
 }

@@ -38,8 +38,8 @@ type Node struct {
 	// Xref is the record identifier without the @ signs, e.g. "I1".
 	Xref string
 	Tag  string
-	// Value is the line value with CONC/CONT continuation lines joined
-	// and @@ unescaped. For pointers it is empty and Pointer is set.
+	// Value is the line value with CONC/CONT continuation lines joined,
+	// trailing spaces removed and @@ unescaped. For pointers it is empty and Pointer is set.
 	Value string
 	// Pointer is the referenced xref without @ signs, e.g. "F2", or
 	// "VOID" for a GEDCOM 7 void pointer.
@@ -264,7 +264,8 @@ func (d *Document) parseLines(text string) error {
 	return nil
 }
 
-// parseLine splits "level [@xref@] TAG [value]".
+// parseLine splits "level [@xref@] TAG [value]"; extra spaces between the
+// parts are tolerated.
 func parseLine(line string) (*Node, bool) {
 	i := 0
 	for i < len(line) && line[i] >= '0' && line[i] <= '9' {
@@ -277,7 +278,7 @@ func parseLine(line string) (*Node, bool) {
 	for _, c := range line[:i] {
 		level = level*10 + int(c-'0')
 	}
-	rest := line[i+1:]
+	rest := strings.TrimLeft(line[i+1:], " ")
 	n := &Node{Level: level}
 
 	if strings.HasPrefix(rest, "@") {
@@ -286,7 +287,7 @@ func parseLine(line string) (*Node, bool) {
 			return nil, false
 		}
 		n.Xref = rest[1 : end+1]
-		rest = rest[end+3:]
+		rest = strings.TrimLeft(rest[end+2:], " ")
 	}
 
 	tag, value, _ := strings.Cut(rest, " ")
@@ -301,8 +302,9 @@ func parseLine(line string) (*Node, bool) {
 	}
 	n.Tag = strings.ToUpper(tag)
 
-	if len(value) > 2 && value[0] == '@' && value[len(value)-1] == '@' && !strings.Contains(value[1:len(value)-1], "@") && value[1] != '#' {
-		n.Pointer = value[1 : len(value)-1]
+	pv := strings.TrimSpace(value)
+	if len(pv) > 2 && pv[0] == '@' && pv[len(pv)-1] == '@' && !strings.Contains(pv[1:len(pv)-1], "@") && pv[1] != '#' {
+		n.Pointer = pv[1 : len(pv)-1]
 	} else {
 		n.Value = value
 	}
@@ -334,6 +336,7 @@ func joinContinuations(n *Node, v7 bool) {
 	if joined {
 		n.Value = b.String()
 	}
+	n.Value = strings.TrimRight(n.Value, " \t")
 	if v7 {
 		if strings.HasPrefix(n.Value, "@@") {
 			n.Value = n.Value[1:]

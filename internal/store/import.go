@@ -749,7 +749,7 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 		}
 		allNames = append(allNames, n.given, n.surname, n.nickname)
 	}
-	if _, err := im.insertFTS.ExecContext(ctx, pid, strings.Join(allNames, " ")); err != nil {
+	if _, err := im.insertFTS.ExecContext(ctx, pid, searchFold.Replace(strings.Join(allNames, " "))); err != nil {
 		return err
 	}
 	if primaryNode != nil {

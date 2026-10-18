@@ -148,7 +148,7 @@ func (s *Store) ListRepositories(ctx context.Context, a Actor, q string) ([]Repo
 	}
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id, name, address, url, notes, created_at, updated_at FROM repositories
-		WHERE tree_id = ?`+filter+` ORDER BY name COLLATE NOCASE LIMIT 200`, args...)
+		WHERE tree_id = ?`+filter+` ORDER BY name COLLATE NAMES LIMIT 200`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +297,7 @@ func (s *Store) ListSources(ctx context.Context, a Actor, q string, limit int) (
 	args = append(args, limit)
 	rows, err := s.DB.QueryContext(ctx, `SELECT `+sourceColumns+`
 		FROM sources s LEFT JOIN repositories r ON r.id = s.repository_id
-		WHERE s.tree_id = ?`+filter+` ORDER BY s.title COLLATE NOCASE LIMIT ?`, args...)
+		WHERE s.tree_id = ?`+filter+` ORDER BY s.title COLLATE NAMES LIMIT ?`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -571,7 +571,7 @@ func (s *Store) getCitation(ctx context.Context, q queryer, a Actor, id int64) (
 func (s *Store) loadCitations(ctx context.Context, q queryer, a Actor, where string, args ...any) ([]Citation, error) {
 	rows, err := q.QueryContext(ctx, `
 		SELECT c.id, c.source_id, c.page, c.quality, c.text, c.notes, c.created_at, c.updated_at
-		FROM citations c WHERE c.tree_id = ? AND `+where+` ORDER BY c.page COLLATE NOCASE, c.id`,
+		FROM citations c WHERE c.tree_id = ? AND `+where+` ORDER BY c.page COLLATE NAMES, c.id`,
 		append([]any{a.TreeID}, args...)...)
 	if err != nil {
 		return nil, err
@@ -686,7 +686,7 @@ func citationRefs(ctx context.Context, q queryer, a Actor, entityType string, id
 		JOIN citations c ON c.id = l.citation_id
 		JOIN sources s ON s.id = c.source_id
 		WHERE l.entity_type = ? AND c.tree_id = ? AND l.entity_id IN (`+placeholders(len(ids))+`)
-		ORDER BY c.quality IS NULL, c.quality DESC, s.title COLLATE NOCASE, c.id`, args...)
+		ORDER BY c.quality IS NULL, c.quality DESC, s.title COLLATE NAMES, c.id`, args...)
 	if err != nil {
 		return nil, err
 	}

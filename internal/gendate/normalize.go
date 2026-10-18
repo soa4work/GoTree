@@ -32,8 +32,8 @@ var keywordAliases = map[string]string{
 // noiseWords are year markers that carry no information once the date is
 // read: "1850 г.", "1850 года", "в 1850 году", "1850 ж.", "1850 жылы".
 var noiseWords = map[string]bool{
-	"г": true, "гг": true, "год": true, "года": true, "году": true, "годов": true,
-	"ж": true, "жж": true, "жыл": true, "жылы": true, "жылдан": true, "жылға": true, "жылдың": true,
+	"г": true, "гг": true, "год": true, "года": true, "году": true, "годов": true, "годами": true, "годах": true,
+	"ж": true, "жж": true, "жыл": true, "жылы": true, "жылдың": true,
 }
 
 var monthAliases = map[string]string{
@@ -54,25 +54,25 @@ var monthAliases = map[string]string{
 func init() {
 	// Russian: nominative, genitive and abbreviations (ё is folded to е).
 	for mon, words := range map[string][]string{
-		"JAN": {"январь", "января", "янв"},
-		"FEB": {"февраль", "февраля", "февр", "фев"},
-		"MAR": {"март", "марта", "мар"},
-		"APR": {"апрель", "апреля", "апр"},
-		"MAY": {"май", "мая"},
-		"JUN": {"июнь", "июня", "июн"},
-		"JUL": {"июль", "июля", "июл"},
-		"AUG": {"август", "августа", "авг"},
-		"SEP": {"сентябрь", "сентября", "сент", "сен"},
-		"OCT": {"октябрь", "октября", "окт"},
-		"NOV": {"ноябрь", "ноября", "нояб", "ноя"},
-		"DEC": {"декабрь", "декабря", "дек"},
+		"JAN": {"январь", "января", "январе", "янв"},
+		"FEB": {"февраль", "февраля", "феврале", "февр", "фев"},
+		"MAR": {"март", "марта", "марте", "мар"},
+		"APR": {"апрель", "апреля", "апреле", "апр"},
+		"MAY": {"май", "мая", "мае"},
+		"JUN": {"июнь", "июня", "июне", "июн"},
+		"JUL": {"июль", "июля", "июле", "июл"},
+		"AUG": {"август", "августа", "августе", "авг"},
+		"SEP": {"сентябрь", "сентября", "сентябре", "сент", "сен"},
+		"OCT": {"октябрь", "октября", "октябре", "окт"},
+		"NOV": {"ноябрь", "ноября", "ноябре", "нояб", "ноя"},
+		"DEC": {"декабрь", "декабря", "декабре", "дек"},
 	} {
 		for _, w := range words {
 			monthAliases[w] = mon
 		}
 	}
 	// Kazakh: the bare month name plus the locative and genitive forms
-	// that show up in "12 наурызда" and "наурыздың 12-і".
+	// that show up in "12 наурызда" and "наурыздың" in longer phrases.
 	for mon, stem := range map[string]string{
 		"JAN": "қаңтар", "FEB": "ақпан", "MAR": "наурыз", "APR": "сәуір",
 		"MAY": "мамыр", "JUN": "маусым", "JUL": "шілде", "AUG": "тамыз",
@@ -184,18 +184,32 @@ func rewriteKazakh(toks []string) []string {
 	case "аралығында":
 		for i, t := range head {
 			if t == "және" {
-				return concat([]string{"BET"}, head[:i], []string{"AND"}, head[i+1:])
+				return concat([]string{"BET"}, trimYearCase(head[:i]), []string{"AND"}, trimYearCase(head[i+1:]))
 			}
 		}
 	case "дейін":
 		for i, t := range head {
 			if t == "жылдан" {
-				return concat([]string{"FROM"}, head[:i], []string{"TO"}, head[i+1:])
+				return concat([]string{"FROM"}, head[:i], []string{"TO"}, trimYearCase(head[i+1:]))
 			}
 		}
-		return concat([]string{"BEF"}, head)
+		return concat([]string{"BEF"}, trimYearCase(head))
 	case "кейін":
-		return concat([]string{"AFT"}, head)
+		return concat([]string{"AFT"}, trimYearCase(head))
+	case "бұрын":
+		return concat([]string{"BEF"}, trimYearCase(head))
+	case "бастап", "жылдан":
+		return concat([]string{"FROM"}, trimYearCase(head))
+	}
+	// A bare "1900 жылға" is left as is so that it is rejected.
+	return toks
+}
+
+// trimYearCase drops a trailing ablative or dative year marker
+// ("1850 жылдан", "1900 жылға") that belongs to the postposition.
+func trimYearCase(toks []string) []string {
+	if n := len(toks); n > 0 && (toks[n-1] == "жылдан" || toks[n-1] == "жылға") {
+		return toks[:n-1]
 	}
 	return toks
 }

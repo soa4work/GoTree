@@ -3,8 +3,9 @@ import i18n from '../i18n'
 import { formatDay } from './dates'
 import { detectLanguage, languageStorageKey } from './language'
 
-afterEach(() => {
+afterEach(async () => {
   localStorage.clear()
+  await i18n.changeLanguage('en')
   vi.unstubAllGlobals()
 })
 

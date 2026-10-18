@@ -2,6 +2,7 @@ export type Language = 'ru' | 'kk' | 'en'
 
 /** The languages the switcher offers. English stays a hidden fallback and is never listed. */
 export const selectableLanguages = ['ru', 'kk'] as const
+export type SelectableLanguage = (typeof selectableLanguages)[number]
 
 /** The localStorage key of the saved choice; unit tests and Playwright set it to 'en'. */
 export const languageStorageKey = 'gotree-lang'

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GopherCredit } from '../components/GopherCredit'
+import { LanguageSwitch } from '../components/LanguageSwitch'
 import { PageHeading } from '../components/PageHeading'
 
 export function AuthCard({ title, intro, children }: { title: string; intro?: string; children: ReactNode }) {
@@ -14,6 +15,9 @@ export function AuthCard({ title, intro, children }: { title: string; intro?: st
         <div className="flex items-center gap-3">
           <img src="/icons/icon-192.png" alt="" width={48} height={48} className="size-12 rounded-lg" />
           <span className="text-xl font-semibold text-brand-700 dark:text-brand-100">{t('app.name')}</span>
+          <div className="ml-auto">
+            <LanguageSwitch />
+          </div>
         </div>
         <div className="space-y-2">
           <PageHeading title={title}>{title}</PageHeading>

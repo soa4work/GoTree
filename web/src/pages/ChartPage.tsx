@@ -12,6 +12,7 @@ import { Button } from '../components/Button'
 import { SelectField } from '../components/Field'
 import { PageHeading } from '../components/PageHeading'
 import { TextField } from '../components/TextField'
+import { formatDecimal } from '../lib/collate'
 import { formatDay } from '../lib/dates'
 import { mapLimit } from '../lib/mapLimit'
 import { fullName } from '../lib/people'
@@ -118,7 +119,7 @@ export function ChartPage() {
     )
     const a = document.createElement('a')
     a.href = url
-    a.download = `${chartTitle || 'family-tree'}.svg`.replace(/[\\/:*?"<>|]/g, '-')
+    a.download = `${chartTitle || t('chart.fileName')}.svg`.replace(/[\\/:*?"<>|]/g, '-')
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -247,7 +248,7 @@ export function ChartPage() {
                         paper: paper === 'custom' ? `${size.w} × ${size.h} mm` : paper,
                       }),
                       t(fit.landscape ? 'chart.orientation_landscape' : 'chart.orientation_portrait'),
-                      t('chart.textSize', { pt: fit.namePt.toFixed(1) }),
+                      t('chart.textSize', { pt: formatDecimal(fit.namePt, 1) }),
                       tree.data?.truncated ? t('tree.truncated') : '',
                     ]
                       .filter(Boolean)
@@ -256,7 +257,7 @@ export function ChartPage() {
         </p>
         {fit && fit.namePt < MIN_READABLE_PT && (
           <p role="alert" className="font-medium text-amber-900 dark:text-amber-200">
-            {t('chart.tooSmall', { pt: fit.namePt.toFixed(1) })}
+            {t('chart.tooSmall', { pt: formatDecimal(fit.namePt, 1) })}
           </p>
         )}
         {fit && (

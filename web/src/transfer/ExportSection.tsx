@@ -6,6 +6,7 @@ import { getAuthState } from '../api/client'
 import { Button } from '../components/Button'
 import { Choice } from '../components/Choice'
 import { errorText } from '../lib/errors'
+import { dropReasonText } from './reportText'
 
 export function ExportSection() {
   const { t } = useTranslation()
@@ -109,7 +110,7 @@ export function ExportSection() {
             <ul className="mt-2 list-disc pl-5 text-sm">
               {verify.data.dropped.map((d) => (
                 <li key={d.path}>
-                  {d.path} ({d.count}): {d.reason}
+                  {d.path} ({d.count}): {dropReasonText(t, d)}
                 </li>
               ))}
             </ul>

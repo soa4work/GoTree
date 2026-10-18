@@ -1,11 +1,14 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
-import type { ImportReport, TagStat } from '../api/types'
+import type { ImportReport, ReportLine, TagStat } from '../api/types'
+import { formatDecimal } from '../lib/collate'
+import { dropReasonText, reportLineText } from './reportText'
 
 const countKeys = ['persons', 'families', 'events', 'places', 'sources', 'repositories', 'citations'] as const
 
 export function ImportReportView({ report }: { report: ImportReport }) {
   const { t } = useTranslation()
+  const lineTexts = (lines: ReportLine[]) => lines.map((w) => reportLineText(t, w))
   const byOutcome = (o: TagStat['outcome']) => report.tags.filter((x) => x.outcome === o)
   const kept = byOutcome('kept')
   const dropped = byOutcome('dropped')
@@ -20,7 +23,7 @@ export function ImportReportView({ report }: { report: ImportReport }) {
           source: report.source || t('transfer.unknownProgram'),
           version: report.version || '?',
           encoding: report.encoding,
-          seconds: (report.durationMs / 1000).toFixed(1),
+          seconds: formatDecimal(report.durationMs / 1000, 1),
         })}
       </p>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-4">
@@ -39,17 +42,17 @@ export function ImportReportView({ report }: { report: ImportReport }) {
 
       {report.invalidDates > 0 && (
         <Problem title={t('transfer.invalidDates', { count: report.invalidDates })} hint={t('transfer.invalidDatesHint')}>
-          {report.invalidDateExamples}
+          {lineTexts(report.invalidDateExamples)}
         </Problem>
       )}
       {report.brokenReferences.length > 0 && (
         <Problem title={t('transfer.brokenRefs', { count: report.brokenReferences.length })} hint={t('transfer.brokenRefsHint')}>
-          {report.brokenReferences}
+          {lineTexts(report.brokenReferences)}
         </Problem>
       )}
       {report.childrenFromFamc > 0 && (
         <Problem title={t('transfer.famcChildren', { count: report.childrenFromFamc })} hint={t('transfer.famcChildrenHint')}>
-          {report.childrenFromFamcExamples}
+          {lineTexts(report.childrenFromFamcExamples)}
         </Problem>
       )}
       {(report.shareLinksLost?.length ?? 0) > 0 && (
@@ -60,7 +63,7 @@ export function ImportReportView({ report }: { report: ImportReport }) {
       {(report.shareLinksKept ?? 0) > 0 && <p>{t('transfer.shareLinksKept', { count: report.shareLinksKept })}</p>}
       {report.warnings.length > 0 && (
         <Problem title={t('transfer.warnings', { count: report.warnings.length })}>
-          {report.warnings.map((w) => (w.line ? t('transfer.atLine', { line: w.line, message: w.message }) : w.message))}
+          {lineTexts(report.warnings)}
         </Problem>
       )}
 
@@ -83,8 +86,9 @@ function Problem({ title, hint, children }: { title: string; hint?: string; chil
       <p className="font-medium">{title}</p>
       {hint && <p className="text-sm text-slate-700 dark:text-slate-300">{hint}</p>}
       <ul className="mt-1 list-disc pl-5 text-sm">
-        {children.slice(0, 20).map((line) => (
-          <li key={line}>{line}</li>
+        {children.slice(0, 20).map((line, i) => (
+          // Translated lines can repeat, so the text is no key.
+          <li key={i}>{line}</li>
         ))}
       </ul>
     </div>
@@ -115,7 +119,7 @@ function TagTable({ title, tags }: { title: string; tags: TagStat[] }) {
           <tr key={`${tag.path}-${tag.outcome}`} className="border-t border-slate-200 dark:border-slate-800">
             <td className="py-1 pr-3 font-mono">{tag.path}</td>
             <td className="py-1 pr-3 text-right">{tag.count}</td>
-            <td className="py-1">{tag.reason ?? ''}</td>
+            <td className="py-1">{dropReasonText(t, tag)}</td>
           </tr>
         ))}
       </tbody>

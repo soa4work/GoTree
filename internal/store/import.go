@@ -61,7 +61,13 @@ type ImportReport struct {
 	// it. The examples show a few.
 	ChildrenFromFAMC         int      `json:"childrenFromFamc"`
 	ChildrenFromFAMCExamples []string `json:"childrenFromFamcExamples"`
-	DurationMS               int64    `json:"durationMs"`
+	// ShareLinksKept counts working links to a branch whose person was
+	// found again in the file (same GEDCOM ID and name); ShareLinksLost
+	// are the labels of working links whose person was not, and which
+	// were deleted with the old tree. Only a replacing import sets them.
+	ShareLinksKept int      `json:"shareLinksKept"`
+	ShareLinksLost []string `json:"shareLinksLost"`
+	DurationMS     int64    `json:"durationMs"`
 }
 
 // keptNode is a GEDCOM line stored verbatim in extra_json, so an export can
@@ -191,7 +197,7 @@ func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document,
 		Version: doc.Version, Encoding: doc.Encoding, Source: doc.Source,
 		Counts: map[string]int{}, Warnings: doc.Warnings,
 		InvalidDateExamples: []string{}, BrokenReferences: []string{},
-		ChildrenFromFAMCExamples: []string{},
+		ChildrenFromFAMCExamples: []string{}, ShareLinksLost: []string{},
 	}
 	if report.Warnings == nil {
 		report.Warnings = []gedcom.Warning{}
@@ -208,8 +214,16 @@ func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document,
 	}
 
 	err := s.tx(ctx, func(tx *sql.Tx) error {
+		var savedLinks []savedShareLink
 		if mode == ImportReplace {
+			var err error
+			if savedLinks, err = saveShareLinks(ctx, tx, a.TreeID); err != nil {
+				return err
+			}
 			if err := clearTree(ctx, tx, a.TreeID); err != nil {
+				return err
+			}
+			if err := clearTranscriptionPeople(ctx, tx, a.TreeID); err != nil {
 				return err
 			}
 		} else {
@@ -238,6 +252,9 @@ func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document,
 		if err := im.run(ctx); err != nil {
 			return err
 		}
+		if err := restoreShareLinks(ctx, tx, a.TreeID, savedLinks, s.Now(), &report); err != nil {
+			return err
+		}
 		summary, _ := json.Marshal(map[string]any{"source": doc.Source, "version": doc.Version, "counts": report.Counts})
 		_, err := tx.ExecContext(ctx, `
 			INSERT INTO change_log (tree_id, user_id, entity_type, entity_id, action, after_json, at)
@@ -249,7 +266,8 @@ func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document,
 }
 
 // clearTree removes the genealogy data of a tree. Media stay, without
-// their links.
+// their links. Transcription drafts and share links to a branch are handled
+// by ImportGEDCOM around it.
 func clearTree(ctx context.Context, tx *sql.Tx, treeID int64) error {
 	for _, q := range []string{
 		`DELETE FROM persons_fts WHERE rowid IN (SELECT id FROM persons WHERE tree_id = ?)`,
@@ -1263,7 +1281,8 @@ func (im *importer) linkFAMCChildren(ctx context.Context) error {
 
 // eventDateText reads a DATE line together with the DATE.PHRASE that
 // GoTree's 7.0 export writes beside it: the text of a date that is not a
-// date, the explanation of an INT date, or the second year of a dual date.
+// date, the explanation of an INT date, or a dual date, whose value carries
+// the later year (older GoTree files: the earlier one).
 // usedPhrase says whether the phrase went into the text; when it did not,
 // the caller has to keep it elsewhere.
 func eventDateText(n *gedcom.Node) (text string, usedPhrase bool) {
@@ -1283,11 +1302,14 @@ func eventDateText(n *gedcom.Node) (text string, usedPhrase bool) {
 		return value, false
 	}
 	// The phrase of a dual date is the date as 5.5.1 writes it ("12 FEB 1750/51").
+	// The value carries the later year ("12 FEB 1751"); files written by older
+	// GoTree versions carry the earlier one ("12 FEB 1750"), so both are read.
 	if p, err := gendate.Parse(phrase); err == nil && p.Qualifier == gendate.QualifierNone && p.Start.DualYear != 0 {
 		for _, sd := range []*gendate.SimpleDate{d.End, d.Start} {
-			if sd != nil && sd.DualYear == 0 && sd.Calendar == p.Start.Calendar && sd.Year == p.Start.Year &&
+			if sd != nil && sd.DualYear == 0 && sd.Calendar == p.Start.Calendar &&
+				(sd.Year == p.Start.DualYear || sd.Year == p.Start.Year) &&
 				sd.Month == p.Start.Month && sd.Day == p.Start.Day && sd.BC == p.Start.BC {
-				sd.DualYear = p.Start.DualYear
+				sd.Year, sd.DualYear = p.Start.Year, p.Start.DualYear
 				return d.String(), true
 			}
 		}

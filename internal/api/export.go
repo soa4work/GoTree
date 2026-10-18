@@ -2,6 +2,7 @@ package api
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -66,11 +67,14 @@ func (s *Server) exportGEDCOM(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		err = gedcom.Write(gw, ex.Records, opt)
 	}
+	// Exports without living people are meant for sharing, so they never carry
+	// photo locations; a full export does unless the instance keeps them.
+	strip := !s.KeepPhotoLocation || (q.Get("privacy") != "" && q.Get("privacy") != store.PrivacyAll)
 	for _, m := range ex.Media {
 		if err != nil {
 			break
 		}
-		err = s.addToZip(zw, m)
+		err = s.addToZip(zw, m, strip)
 	}
 	if err == nil {
 		err = zw.Close()
@@ -81,10 +85,25 @@ func (s *Server) exportGEDCOM(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) addToZip(zw *zip.Writer, m store.MediaFile) error {
-	path, err := s.Files.Path(m.SHA256)
+func (s *Server) addToZip(zw *zip.Writer, m store.MediaFile, strip bool) error {
+	var path string
+	var err error
+	if strip {
+		path, err = s.Files.WithoutLocation(m.SHA256, m.Mime)
+	} else {
+		path, err = s.Files.Path(m.SHA256)
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		s.Log.Warn("media file missing from export", "sha", m.SHA256)
+		return nil
+	}
 	if err != nil {
-		return err
+		if !strip {
+			return err
+		}
+		// Fail closed: leave the file out rather than ship the original.
+		s.Log.Error("media file left out of export", "sha", m.SHA256, "err", err)
+		return nil
 	}
 	f, err := os.Open(path)
 	if err != nil {

@@ -113,3 +113,33 @@ test('delete a person after confirming', async ({ page }) => {
   await page.getByRole('searchbox', { name: 'Search people' }).fill(name)
   await expect(page.locator('#people-status')).toHaveText('0 people found')
 })
+
+test('sort and filter the people list', async ({ page }) => {
+  await login(page)
+  const surname = unique('Sorted', page)
+  const make = async (givenNames: string, sex: string, year: string) => {
+    const res = await page.request.post('/api/persons', {
+      data: { givenNames, surname, sex, birth: { date: year } },
+    })
+    expect(res.ok()).toBe(true)
+  }
+  await make('Mid', 'M', '1900')
+  await make('Late', 'F', '1950')
+  await make('Early', 'M', '1850')
+
+  await page.goto('/people')
+  await page.getByRole('searchbox', { name: 'Search people' }).fill(surname)
+  const rows = page.getByRole('main').getByRole('list').getByRole('link')
+  await expect(rows).toHaveCount(3)
+
+  await page.getByLabel('Sort by').selectOption({ label: 'Birth, oldest first' })
+  await expect(rows.nth(0)).toContainText('Early')
+  await expect(rows.nth(1)).toContainText('Mid')
+  await expect(rows.nth(2)).toContainText('Late')
+  await expect(page).toHaveURL(/sort=birth/)
+
+  await page.getByLabel('Sex').selectOption({ label: 'Female' })
+  await expect(rows).toHaveCount(1)
+  await expect(rows.first()).toContainText('Late')
+  await expectAccessible(page)
+})

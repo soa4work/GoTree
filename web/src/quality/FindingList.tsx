@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { createTask } from '../api/endpoints'
 import type { CheckReport, Finding } from '../api/types'
 import { Button } from '../components/Button'
+import { errorText } from '../lib/errors'
 import { fullName } from '../lib/people'
 import { useFindingText } from './findingText'
 
@@ -67,6 +68,11 @@ export function FindingList({ report, currentPersonId }: Props) {
                       {fullName(report.persons[id] ?? { givenNames: '', surname: '' }) ?? t('person.unknown')}
                     </Link>
                   ))}
+                </p>
+              )}
+              {makeTask.isError && makeTask.variables?.origin === f.origin && (
+                <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-400">
+                  {t('common.saveFailed', { message: errorText(makeTask.error, t) })}
                 </p>
               )}
             </div>

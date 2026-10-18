@@ -55,7 +55,8 @@ func (s *Store) scopeOf(ctx context.Context, sh Share) (*shareScope, error) {
 }
 
 // descendantsWithPartners is root, everyone descending from root, and the
-// partners of all of them.
+// partners of all of them. A partner who is also a descendant (cousins who
+// married) is expanded when reached as a child.
 func (s *Store) descendantsWithPartners(ctx context.Context, a Actor, root int64) (map[int64]bool, error) {
 	fams, err := s.familyLinks(ctx, a)
 	if err != nil {
@@ -69,7 +70,8 @@ func (s *Store) descendantsWithPartners(ctx context.Context, a Actor, root int64
 			}
 		}
 	}
-	out := map[int64]bool{root: true}
+	out := map[int64]bool{root: true}      // shown: descendants and partners
+	expanded := map[int64]bool{root: true} // descendants whose own families were followed
 	queue := []int64{root}
 	for len(queue) > 0 {
 		id := queue[0]
@@ -77,12 +79,13 @@ func (s *Store) descendantsWithPartners(ctx context.Context, a Actor, root int64
 		for _, f := range byPartner[id] {
 			for _, p := range []int64{f.p1, f.p2} {
 				if p != 0 {
-					out[p] = true
+					out[p] = true // a partner is shown, not expanded
 				}
 			}
 			for _, c := range f.children {
-				if !out[c.id] {
-					out[c.id] = true
+				out[c.id] = true
+				if !expanded[c.id] {
+					expanded[c.id] = true
 					queue = append(queue, c.id)
 				}
 			}

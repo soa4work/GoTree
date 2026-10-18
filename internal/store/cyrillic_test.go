@@ -86,7 +86,7 @@ func TestPlacesAndSourcesSortCyrillic(t *testing.T) {
 	if !reflect.DeepEqual(gotPlaces, want) {
 		t.Errorf("places: %v, want %v", gotPlaces, want)
 	}
-	sources, err := s.ListSources(ctx, a, "", 50)
+	sources, err := s.ListSources(ctx, a, "", 50, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +236,7 @@ func TestListSourcesAndRepositoriesSearchIgnoresCyrillicCase(t *testing.T) {
 		{"kirchen", "Kirchenbuch"},
 		{"MÜLLER", "Kirchenbuch"},
 	} {
-		list, err := s.ListSources(ctx, a, c.q, 50)
+		list, err := s.ListSources(ctx, a, c.q, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

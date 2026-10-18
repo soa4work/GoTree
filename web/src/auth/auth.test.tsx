@@ -1,6 +1,9 @@
-import { screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
+import '../i18n'
+import { LoginPage } from './LoginPage'
 import { axeViolations } from '../test/axe'
 import { loggedInState, mockApi, renderApp } from '../test/render'
 
@@ -117,5 +120,25 @@ describe('login', () => {
     await user.type(screen.getByLabelText('Password'), 'whatever')
     await user.click(screen.getByRole('button', { name: 'Log in' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('wait 15 minutes')
+  })
+})
+
+describe('login cache', () => {
+  it('drops data cached for a previous user after logging in', async () => {
+    mockApi({ 'POST /api/auth/login': [204], 'GET /api/auth/state': [200, loggedInState] })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    client.setQueryData(['person', 1], { id: 1, givenNames: 'Previous' })
+    client.setQueryData(['auth'], loggedOut)
+    render(
+      <QueryClientProvider client={client}>
+        <LoginPage />
+      </QueryClientProvider>,
+    )
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Username'), 'admin')
+    await user.type(screen.getByLabelText('Password'), 'pw')
+    await user.click(screen.getByRole('button', { name: 'Log in' }))
+    await waitFor(() => expect(client.getQueryData(['person', 1])).toBeUndefined())
+    expect(client.getQueryData(['auth'])).toBeDefined()
   })
 })

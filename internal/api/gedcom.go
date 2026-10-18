@@ -41,9 +41,7 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			if !writeSlowUpload(w, err) {
-				writeError(w, http.StatusBadRequest, CodeInvalidUpload, "invalid upload")
-			}
+			s.writeUploadReadError(w, err)
 			return
 		}
 		if part.FormName() == "file" {
@@ -51,10 +49,7 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 			data, err = io.ReadAll(part)
 			part.Close()
 			if err != nil {
-				if writeSlowUpload(w, err) {
-					return
-				}
-				writeErrorP(w, http.StatusRequestEntityTooLarge, CodeFileTooLarge, fmt.Sprintf("the file is larger than %d MB", s.MaxUpload>>20), map[string]any{"limitMB": s.MaxUpload >> 20})
+				s.writeUploadReadError(w, err)
 				return
 			}
 			break

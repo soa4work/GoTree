@@ -162,21 +162,31 @@ func (s *Server) cookie(r *http.Request, value string, maxAge int) *http.Cookie 
 	}
 }
 
+// sessionOf resolves the request's session; it answers 401 (or 500) itself
+// and reports false when there is none.
+func (s *Server) sessionOf(w http.ResponseWriter, r *http.Request) (store.Session, bool) {
+	c, err := r.Cookie(sessionCookie)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, CodeNotLoggedIn, "not logged in")
+		return store.Session{}, false
+	}
+	sess, err := s.Store.SessionByToken(r.Context(), c.Value)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusUnauthorized, CodeNotLoggedIn, "not logged in")
+		return store.Session{}, false
+	}
+	if err != nil {
+		writeStoreError(w, s.Log, err)
+		return store.Session{}, false
+	}
+	return sess, true
+}
+
 // requireSession rejects requests without a valid session in a tree.
 func (s *Server) requireSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c, err := r.Cookie(sessionCookie)
-		if err != nil {
-			writeError(w, http.StatusUnauthorized, CodeNotLoggedIn, "not logged in")
-			return
-		}
-		sess, err := s.Store.SessionByToken(r.Context(), c.Value)
-		if errors.Is(err, store.ErrNotFound) {
-			writeError(w, http.StatusUnauthorized, CodeNotLoggedIn, "not logged in")
-			return
-		}
-		if err != nil {
-			writeStoreError(w, s.Log, err)
+		sess, ok := s.sessionOf(w, r)
+		if !ok {
 			return
 		}
 		if sess.TreeID == 0 {
@@ -185,6 +195,95 @@ func (s *Server) requireSession(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), sessionKey, sess)))
 	})
+}
+
+// requireUser rejects requests without a valid session; unlike
+// requireSession it does not need a tree, so account settings work for
+// everyone who can log in.
+func (s *Server) requireUser(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sess, ok := s.sessionOf(w, r)
+		if !ok {
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), sessionKey, sess)))
+	})
+}
+
+// listSessions lists the signed-in user's own sessions.
+func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
+	sess := sessionFrom(r.Context())
+	list, err := s.Store.ListSessions(r.Context(), sess.User.ID, sess.ID)
+	if err != nil {
+		writeStoreError(w, s.Log, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+// endSession signs one of the user's devices out.
+func (s *Server) endSession(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	sess := sessionFrom(r.Context())
+	if err := s.Store.DeleteUserSession(r.Context(), sess.User.ID, id); err != nil {
+		writeStoreError(w, s.Log, err)
+		return
+	}
+	if id == sess.ID {
+		http.SetCookie(w, s.cookie(r, "", -1))
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// logoutAll ends every session of the user, this one included.
+func (s *Server) logoutAll(w http.ResponseWriter, r *http.Request) {
+	sess := sessionFrom(r.Context())
+	if err := s.Store.DeleteUserSessions(r.Context(), sess.User.ID, 0); err != nil {
+		writeStoreError(w, s.Log, err)
+		return
+	}
+	s.Log.Info("signed out everywhere", "user", sess.User.Username)
+	http.SetCookie(w, s.cookie(r, "", -1))
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type passwordInput struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
+// changePassword sets a new password and signs the other devices out. A
+// wrong current password answers 422, not 401: the client treats every 401
+// as a logout.
+func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
+	sess := sessionFrom(r.Context())
+	var in passwordInput
+	if !decode(w, r, &in) {
+		return
+	}
+	// Guessing the current password with a stolen cookie counts like a failed login.
+	ip, username := s.clientIP(r), sess.User.Username
+	if !s.throttle.allow(ip, username) {
+		writeTooManyLogins(w)
+		return
+	}
+	err := s.Store.ChangePassword(r.Context(), sess.User.ID, sess.ID, in.CurrentPassword, in.NewPassword)
+	var ve *store.ValidationError
+	if errors.As(err, &ve) {
+		if _, wrong := ve.Fields["currentPassword"]; wrong {
+			s.throttle.fail(ip, username)
+		}
+	}
+	if err != nil {
+		writeStoreError(w, s.Log, err)
+		return
+	}
+	s.throttle.succeed(username)
+	s.Log.Info("password changed", "user", username)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // requireEditor lets viewers read but not change anything.

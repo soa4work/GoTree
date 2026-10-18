@@ -14,6 +14,8 @@ const (
 	// Request-level errors.
 	CodeInvalidJSON       = "invalid_json"
 	CodeTrailingData      = "trailing_data"
+	CodeRequestTooLarge   = "request_too_large"
+	CodeRequestTimeout    = "request_timeout"
 	CodeInvalidInput      = "invalid_input"
 	CodeNotFound          = "not_found"
 	CodeMethodNotAllowed  = "method_not_allowed"
@@ -93,6 +95,7 @@ const (
 	FieldPersonOrNew    = "person_or_new"
 	FieldPasswordShort  = "password_too_short"
 	FieldPasswordLong   = "password_too_long"
+	FieldWrongPassword  = "wrong_password"
 	FieldUsernameFormat = "username_format"
 	FieldCoordsTogether = "coords_together"
 	FieldReasonRequired = "reason_required"
@@ -124,6 +127,7 @@ type FieldError struct {
 var exactFields = map[string]string{
 	"is required":                    FieldRequired,
 	"must be a date":                 FieldInvalidDate,
+	"is not your current password":   FieldWrongPassword,
 	"must not be in the past":        FieldDateInPast,
 	"month and day are out of range": FieldDateOutOfRange,
 	"use 2–64 letters, digits, dots, dashes or underscores":               FieldUsernameFormat,

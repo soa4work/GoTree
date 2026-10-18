@@ -45,6 +45,7 @@ func (s *Server) Handler() http.Handler {
 
 	r.Route("/api", func(r chi.Router) {
 		r.Use(middleware.NoCache)
+		r.Use(bodyDeadline)
 		// Refuses state-changing requests from other origins (CSRF), based on
 		// Sec-Fetch-Site and Origin; same-origin requests and non-browser
 		// clients pass.
@@ -56,6 +57,16 @@ func (s *Server) Handler() http.Handler {
 		r.Post("/auth/login", s.login)
 		r.Post("/auth/logout", s.logout)
 		s.shareRoutes(r)
+
+		// Account settings need a login but no tree, and viewers may change
+		// their own password, so these sit outside requireEditor.
+		r.Group(func(r chi.Router) {
+			r.Use(s.requireUser)
+			r.Get("/auth/sessions", s.listSessions)
+			r.Delete("/auth/sessions/{id}", s.endSession)
+			r.Post("/auth/logout-all", s.logoutAll)
+			r.Post("/auth/password", s.changePassword)
+		})
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireSession)

@@ -34,6 +34,7 @@ func (s *Server) shareLinkRoutes(r chi.Router) {
 	r.Get("/share-links", s.listShareLinks)
 	r.Post("/share-links", s.createShareLink)
 	r.Delete("/share-links/{id}", s.revokeShareLink)
+	r.Post("/share-links/{id}/token", s.rotateShareLink)
 	r.Get("/onthisday", s.onThisDay)
 }
 
@@ -108,5 +109,12 @@ func (s *Server) createShareLink(w http.ResponseWriter, r *http.Request) {
 func (s *Server) revokeShareLink(w http.ResponseWriter, r *http.Request) {
 	if id, ok := pathID(w, r, "id"); ok {
 		s.noContent(w, s.Store.RevokeShareLink(r.Context(), actorFrom(r), id))
+	}
+}
+
+func (s *Server) rotateShareLink(w http.ResponseWriter, r *http.Request) {
+	if id, ok := pathID(w, r, "id"); ok {
+		link, err := s.Store.RotateShareLink(r.Context(), actorFrom(r), id)
+		s.respond(w, http.StatusOK, link, err)
 	}
 }

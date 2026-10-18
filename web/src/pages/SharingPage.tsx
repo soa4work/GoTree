@@ -1,9 +1,9 @@
 import type { TFunction } from 'i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ApiError } from '../api/client'
-import { createShareLink, listShareLinks, revokeShareLink } from '../api/endpoints'
+import { createShareLink, listShareLinks, reissueShareLink, revokeShareLink } from '../api/endpoints'
 import type { PersonRef, ShareLink, SharePrivacy, ShareScope } from '../api/types'
 import { Button } from '../components/Button'
 import { Choice } from '../components/Choice'
@@ -12,6 +12,7 @@ import { Dialog } from '../components/Dialog'
 import { Form } from '../components/Form'
 import { PageHeading } from '../components/PageHeading'
 import { TextField } from '../components/TextField'
+import { useCopy } from '../hooks/useCopy'
 import { fullName } from '../lib/people'
 import { PersonPicker } from '../people/PersonPicker'
 import { CalendarFeeds } from '../share/CalendarFeeds'
@@ -23,14 +24,23 @@ const shareUrl = (token: string) => `${window.location.origin}/share/${token}`
 export function SharingPage() {
   const { t } = useTranslation()
   const [creating, setCreating] = useState(false)
-  const [created, setCreated] = useState<ShareLink | null>(null)
+  const [created, setCreated] = useState<{ link: ShareLink; reissued: boolean } | null>(null)
   const [revoking, setRevoking] = useState<ShareLink | null>(null)
+  const [reissuing, setReissuing] = useState<ShareLink | null>(null)
   const queryClient = useQueryClient()
   const links = useQuery({ queryKey: ['share-links'], queryFn: ({ signal }) => listShareLinks(signal) })
   const revoke = useMutation({
     mutationFn: (id: number) => revokeShareLink(id),
     onSuccess: () => {
       setRevoking(null)
+      void queryClient.invalidateQueries({ queryKey: ['share-links'] })
+    },
+  })
+  const reissue = useMutation({
+    mutationFn: (id: number) => reissueShareLink(id),
+    onSuccess: (link) => {
+      setReissuing(null)
+      setCreated({ link, reissued: true })
       void queryClient.invalidateQueries({ queryKey: ['share-links'] })
     },
   })
@@ -44,7 +54,9 @@ export function SharingPage() {
       </div>
       <p className="text-slate-700 dark:text-slate-300">{t('sharing.intro')}</p>
 
-      {created?.token && <CreatedLink link={created} onDone={() => setCreated(null)} />}
+      {created?.link.token && (
+        <CreatedLink link={created.link} reissued={created.reissued} onDone={() => setCreated(null)} />
+      )}
 
       <p role="status" className="text-sm text-slate-600 dark:text-slate-400">
         {links.isPending
@@ -71,10 +83,22 @@ export function SharingPage() {
                 <p className="text-sm text-slate-600 dark:text-slate-400">{describe(t, l)}</p>
               </div>
               {!l.revokedAt && (
-                <Button variant="ghost" onClick={() => setRevoking(l)}>
-                  {t('sharing.revoke')}
-                  <span className="sr-only">: {l.label}</span>
-                </Button>
+                <div className="flex flex-wrap gap-1">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      reissue.reset()
+                      setReissuing(l)
+                    }}
+                  >
+                    {t('sharing.reissue')}
+                    <span className="sr-only">: {l.label}</span>
+                  </Button>
+                  <Button variant="ghost" onClick={() => setRevoking(l)}>
+                    {t('sharing.revoke')}
+                    <span className="sr-only">: {l.label}</span>
+                  </Button>
+                </div>
               )}
             </li>
           ))}
@@ -88,7 +112,7 @@ export function SharingPage() {
           onClose={() => setCreating(false)}
           onCreated={(l) => {
             setCreating(false)
-            setCreated(l)
+            setCreated({ link: l, reissued: false })
             void queryClient.invalidateQueries({ queryKey: ['share-links'] })
           }}
         />
@@ -102,6 +126,16 @@ export function SharingPage() {
         error={revoke.error ? t('common.saveFailed', { message: errorText(revoke.error, t) }) : null}
         onConfirm={() => revoking && revoke.mutate(revoking.id)}
         onClose={() => setRevoking(null)}
+      />
+      <ConfirmDialog
+        open={reissuing !== null}
+        title={t('sharing.reissueTitle')}
+        message={t('sharing.reissueConfirm', { label: reissuing?.label ?? '' })}
+        confirmLabel={t('sharing.reissue')}
+        busy={reissue.isPending}
+        error={reissue.error ? t('common.saveFailed', { message: errorText(reissue.error, t) }) : null}
+        onConfirm={() => reissuing && reissue.mutate(reissuing.id)}
+        onClose={() => setReissuing(null)}
       />
     </div>
   )
@@ -124,15 +158,37 @@ function describe(t: TFunction, l: ShareLink): string {
   ].join(' · ')
 }
 
-function CreatedLink({ link, onDone }: { link: ShareLink; onDone: () => void }) {
+function CreatedLink({ link, reissued, onDone }: { link: ShareLink; reissued: boolean; onDone: () => void }) {
   const { t } = useTranslation()
   const id = useId()
-  const [copied, setCopied] = useState(false)
+  const { state, copy, reset } = useCopy()
+  const sectionRef = useRef<HTMLElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const url = shareUrl(link.token!)
+  // A new address replaces the old one on screen: bring it into view. The
+  // focus waits a tick: the confirm dialog closes in its own effect, which
+  // runs after this one, and until then the page behind it is inert and its
+  // closing would move the focus back to the button that opened it.
+  useEffect(() => {
+    reset()
+    const timer = setTimeout(() => {
+      sectionRef.current?.focus()
+      sectionRef.current?.scrollIntoView?.({ block: 'nearest' })
+    })
+    return () => clearTimeout(timer)
+  }, [link.token, reset])
+  useEffect(() => {
+    if (state === 'failed') inputRef.current?.select()
+  }, [state])
   return (
-    <section aria-labelledby={id} className="space-y-3 rounded-xl border-2 border-brand-500 p-4">
+    <section
+      ref={sectionRef}
+      tabIndex={-1}
+      aria-labelledby={id}
+      className="space-y-3 rounded-xl border-2 border-brand-500 p-4"
+    >
       <h2 id={id} className="text-lg font-semibold">
-        {t('sharing.createdTitle', { label: link.label })}
+        {t(reissued ? 'sharing.reissuedTitle' : 'sharing.createdTitle', { label: link.label })}
       </h2>
       <p>{t('sharing.createdHint')}</p>
       <label htmlFor={`${id}-url`} className="sr-only">
@@ -140,26 +196,26 @@ function CreatedLink({ link, onDone }: { link: ShareLink; onDone: () => void }) 
       </label>
       <input
         id={`${id}-url`}
+        ref={inputRef}
         readOnly
         value={url}
         onFocus={(e) => e.target.select()}
         className="block min-h-11 w-full rounded-lg border border-slate-400 bg-white px-3 font-mono text-sm dark:border-slate-600 dark:bg-slate-900"
       />
       <div className="flex flex-wrap gap-2">
-        <Button
-          onClick={() => {
-            void navigator.clipboard?.writeText(url).then(() => setCopied(true))
-          }}
-        >
-          {t('sharing.copy')}
-        </Button>
+        <Button onClick={() => void copy(url)}>{t('sharing.copy')}</Button>
         <Button variant="secondary" onClick={onDone}>
           {t('sharing.done')}
         </Button>
       </div>
       <p role="status" className="text-sm font-medium text-green-800 dark:text-green-300">
-        {copied ? t('sharing.copied') : ''}
+        {state === 'copied' ? t('sharing.copied') : ''}
       </p>
+      {state === 'failed' && (
+        <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-400">
+          {t('sharing.copyFailed')}
+        </p>
+      )}
     </section>
   )
 }

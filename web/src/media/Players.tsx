@@ -7,14 +7,14 @@ interface Props {
 
 export function AudioPlayer({ src, label }: Props) {
   return (
-    // biome-ignore lint/a11y/useMediaCaption: the transcript next to the player is the text alternative
+    // No captions: the transcript next to the player is the text alternative.
     <audio controls preload="metadata" src={src} className="w-full" aria-label={label} />
   )
 }
 
 export function VideoPlayer({ src, label }: Props) {
   return (
-    // biome-ignore lint/a11y/useMediaCaption: the transcript next to the player is the text alternative
+    // No captions: the transcript next to the player is the text alternative.
     <video controls preload="metadata" src={src} className="max-h-[70dvh] w-full" aria-label={label} />
   )
 }

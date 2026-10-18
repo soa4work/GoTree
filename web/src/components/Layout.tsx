@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GopherCredit } from './GopherCredit'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
-import { getAuthState, logout } from '../api/client'
+import { ApiError, getAuthState, logout } from '../api/client'
 import { mdQuery, useMediaQuery } from '../hooks/useMediaQuery'
 import { useShortcuts } from '../hooks/useShortcuts'
 import { Button } from './Button'
@@ -102,13 +102,18 @@ export function Layout() {
   const firstRender = useRef(true)
   const queryClient = useQueryClient()
   const auth = useQuery({ queryKey: ['auth'], queryFn: ({ signal }) => getAuthState(signal), staleTime: Infinity })
+  const signedOut = () => {
+    // Drop everything the previous user loaded, but keep the auth query
+    // mounted so its refetch switches to the login screen.
+    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' })
+    void queryClient.invalidateQueries({ queryKey: ['auth'] })
+  }
   const logoutMutation = useMutation({
     mutationFn: logout,
-    onSuccess: () => {
-      // Drop everything the previous user loaded, but keep the auth query
-      // mounted so its refetch switches to the login screen.
-      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' })
-      void queryClient.invalidateQueries({ queryKey: ['auth'] })
+    onSuccess: () => signedOut(),
+    // The session was already gone, so the user is effectively logged out.
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 401) signedOut()
     },
   })
   const user = auth.data?.user
@@ -165,6 +170,12 @@ export function Layout() {
             <span aria-hidden="true" className="hidden text-sm text-slate-600 sm:inline dark:text-slate-400">
               {user.displayName || user.username}
             </span>
+            {logoutMutation.isError &&
+              !(logoutMutation.error instanceof ApiError && logoutMutation.error.status === 401) && (
+                <span role="alert" className="text-sm font-medium text-red-700 dark:text-red-400">
+                  {t('app.logOutFailed')}
+                </span>
+              )}
             <Button variant="secondary" onClick={() => logoutMutation.mutate()} busy={logoutMutation.isPending}>
               {t('app.logOut')}
             </Button>

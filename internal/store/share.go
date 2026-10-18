@@ -146,6 +146,44 @@ func (s *Store) RevokeShareLink(ctx context.Context, a Actor, id int64) error {
 	})
 }
 
+// RotateShareLink gives an active link a new token; the old address stops
+// working. The token is returned once, like from CreateShareLink. Revoked
+// links cannot be revived; expired ones get a new address but stay expired.
+func (s *Store) RotateShareLink(ctx context.Context, a Actor, id int64) (ShareLink, error) {
+	if a.Role != RoleOwner {
+		return ShareLink{}, ErrOwnerOnly
+	}
+	token, err := newToken()
+	if err != nil {
+		return ShareLink{}, err
+	}
+	var link ShareLink
+	err = s.tx(ctx, func(tx *sql.Tx) error {
+		before, err := s.shareLinks(ctx, tx, a, `l.id = ? AND l.revoked_at IS NULL`, id)
+		if err != nil {
+			return err
+		}
+		if len(before) == 0 {
+			return ErrNotFound
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE share_links SET token_hash = ? WHERE id = ? AND tree_id = ?`,
+			hashToken(token), id, a.TreeID); err != nil {
+			return err
+		}
+		after, err := s.shareLinks(ctx, tx, a, `l.id = ?`, id)
+		if err != nil {
+			return err
+		}
+		link = after[0]
+		return s.logChange(ctx, tx, a, "share_link", id, "update", before[0], after[0])
+	})
+	if err != nil {
+		return ShareLink{}, err
+	}
+	link.Token = token
+	return link, nil
+}
+
 func (s *Store) shareLinks(ctx context.Context, q queryer, a Actor, where string, args ...any) ([]ShareLink, error) {
 	rows, err := q.QueryContext(ctx, `
 		SELECT l.id, l.label, l.scope, l.root_person_id, l.privacy, l.expires_at, l.revoked_at, l.last_used_at, l.created_at

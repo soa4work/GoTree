@@ -9,10 +9,10 @@ export function GopherCredit({ className = '' }: { className?: string }) {
       <Trans
         i18nKey="app.gopherCredit"
         components={{
-          // biome-ignore lint/a11y/useAnchorContent: Trans fills in the content
+          // No content here: Trans fills it in.
           // eslint-disable-next-line jsx-a11y/anchor-has-content
           author: <a href="https://reneefrench.blogspot.com/" className={link} />,
-          // biome-ignore lint/a11y/useAnchorContent: Trans fills in the content
+          // No content here: Trans fills it in.
           // eslint-disable-next-line jsx-a11y/anchor-has-content
           license: <a href="https://creativecommons.org/licenses/by/4.0/" className={link} />,
         }}

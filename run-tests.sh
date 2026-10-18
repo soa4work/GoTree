@@ -10,6 +10,8 @@ cd "$(dirname "$0")"
 
 echo "🐚 Shell tests"
 ./tests/test-release.sh
+./tests/test-image-tags.sh
+./tests/test-pins.sh
 ./.claude/hooks/tests/branch-guard-test.sh
 
 # The backend and frontend arrive in later milestones; until then each stage

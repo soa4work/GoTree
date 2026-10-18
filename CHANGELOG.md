@@ -160,6 +160,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Docker images: `latest` and `X.Y` move only to the newest release, so re-running an older
+  release or publishing a prerelease no longer moves them back, and the image is built from base
+  images pinned by digest; prereleases are marked as such on GitHub (#62)
+
 - Dates read as plain English ("26 February 1820", "about 1850", "between 1850 and 1860") on the
   timeline, heirlooms and in the date field preview, and can be typed that way in events,
   heirlooms, media and transcriptions (saved as GEDCOM when needed, so the preview matches what is

@@ -2,6 +2,12 @@
 # step is written to survive a re-run of the same tag, because a release that
 # fails halfway must be fixable by pressing the button again rather than by
 # deleting and re-cutting the tag.
+#
+# The jobs hold only the permissions they use (#62): the full test suite runs
+# first with a read-only token, the binaries are built read-only, only the
+# image job can write packages and only the publish job, which runs no
+# third-party install scripts, can write releases. No checkout keeps its token
+# in .git/config for the steps after it.
 name: Release
 
 on:
@@ -18,28 +24,52 @@ on:
         description: The tag to build, for example v1.2.3
         required: true
 
-permissions:
-  contents: write
-  packages: write
+permissions: {}
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+  IMAGE: ghcr.io/${{ github.repository_owner }}/gotree
 
 jobs:
-  release:
+  # Nothing is published from a tag that does not pass the same gate as a PR.
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      TAG: ${{ inputs.tag || github.ref_name }}
-      IMAGE: ghcr.io/${{ github.repository_owner }}/gotree
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          ref: ${{ inputs.tag || github.ref_name }}
+          ref: ${{ env.TAG }}
+          persist-credentials: false
 
       - name: Check the tag against VERSION
         run: |
           tag="${TAG#v}"
           file="$(tr -d '[:space:]' < VERSION)"
           [[ "$tag" == "$file" ]] || echo "::warning::tag $tag != VERSION $file"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - run: ./run-tests.sh
+
+  binaries:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          persist-credentials: false
 
       - uses: actions/setup-go@v5
         with:
@@ -75,8 +105,35 @@ jobs:
             for f in artifacts/gotree-*; do
               echo "| $(basename "$f") | \`$(sha256sum "$f" | cut -d' ' -f1)\` |"
             done
-          } | tee -a "$GITHUB_STEP_SUMMARY" > SHA256SUMS.md
+          } | tee -a "$GITHUB_STEP_SUMMARY" > artifacts/SHA256SUMS.md
           (cd artifacts && sha256sum gotree-* > SHA256SUMS)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: artifacts/
+          if-no-files-found: error
+
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # All tags are needed to tell whether this one is the newest.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # :latest and :X.Y move only forward: re-running an old tag or
+      # releasing a prerelease leaves them where they are. The script comes
+      # from the workflow's own commit, since an older tag does not have it.
+      - id: moving
+        run: git tag -l 'v*' | bash <(git show "$GITHUB_SHA:.github/scripts/image-tags.sh") "$TAG" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -87,14 +144,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
+      # latest=false stops metadata-action from adding :latest on its own.
       - id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE }}
+          flavor: latest=false
           tags: |
             type=semver,pattern={{version}},value=${{ env.TAG }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }}
-            type=raw,value=latest
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }},enable=${{ steps.moving.outputs.minor }}
+            type=raw,value=latest,enable=${{ steps.moving.outputs.latest }}
 
       # Pushing the same tags again simply overwrites them, which keeps a
       # re-run of the workflow harmless.
@@ -107,6 +166,29 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: VERSION=${{ env.TAG }}
 
+  publish:
+    needs: [binaries, image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      # The tag message is the fallback for the release notes and lives in
+      # the tag object, which a shallow checkout does not fetch.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: artifacts
+
+      - id: moving
+        run: git tag -l 'v*' | bash <(git show "$GITHUB_SHA:.github/scripts/image-tags.sh") "$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Resolve release notes
         run: |
           if [[ -f "release-notes-${TAG}.md" ]]; then
@@ -118,13 +200,17 @@ jobs:
             echo ""
             echo "Docker: \`docker pull ${IMAGE}:${TAG#v}\`"
             echo ""
-            cat SHA256SUMS.md
+            cat artifacts/SHA256SUMS.md
           } >> notes.md
+          rm artifacts/SHA256SUMS.md
 
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ steps.moving.outputs.latest }}
+          PRERELEASE: ${{ steps.moving.outputs.prerelease }}
         run: |
           gh release view "$TAG" >/dev/null 2>&1 \
-            || gh release create "$TAG" --title "$TAG" --notes-file notes.md
+            || gh release create "$TAG" --title "$TAG" --notes-file notes.md \
+                 --latest="$LATEST" --prerelease="$PRERELEASE"
           gh release upload "$TAG" artifacts/* --clobber

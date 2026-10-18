@@ -67,9 +67,10 @@ import; a status on the first (main) name is not kept, since the main name has n
 ## _cust
 
 `_HEIRLOOM._CUST [@I…@]` — one holder of the object, in order. The pointer is left out when the
-holder is not in the file (not in the tree, or a living person left out for privacy); a `NOTE` then
-says who it was. `TYPE` is how they got it: `inherited`, `gift`, `purchased`, `made`, `found` or
-`other`.
+holder is not in the tree; a `NOTE` then says who it was. A holder hidden by an export without
+living people keeps only `TYPE`. A living holder exported by name only keeps the pointer and `TYPE`.
+Dates and notes would tell when they lived, and a note often names them. `TYPE` is how they got it:
+`inherited`, `gift`, `purchased`, `made`, `found` or `other`.
 
 ## _from
 

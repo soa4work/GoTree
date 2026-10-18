@@ -102,6 +102,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A GEDCOM export without living people (or with their names only) no longer writes the dates and
+  notes of a living heirloom holder (#56)
+
 - Replacing the tree by a GEDCOM import keeps share links to a branch when the file has the same
   person (same GEDCOM ID and name) and lists the links it had to delete; the import page warns
   about such links first. Transcription drafts forget the people of the old tree, and ids of

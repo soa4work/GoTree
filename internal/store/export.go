@@ -1076,14 +1076,31 @@ func (ex *exporter) heirloomRecords(ctx context.Context) ([]*gedcom.Node, error)
 				crow.Close()
 				return nil, err
 			}
+			// A holder left out for privacy (excluded, or a living person
+			// shown by name only) keeps only how the object was passed on:
+			// the dates and the note would tell when they lived, and the
+			// note often names them.
 			c := node("_CUST", "")
-			if pid.Valid && ex.included[pid.Int64] {
-				c = pointer("_CUST", personXref(pid.Int64))
+			hidden := false
+			if pid.Valid {
+				switch {
+				case !ex.included[pid.Int64]:
+					hidden = true
+				case ex.nameOnly[pid.Int64]:
+					c = pointer("_CUST", personXref(pid.Int64)) // the name is in the file anyway
+					hidden = true
+				default:
+					c = pointer("_CUST", personXref(pid.Int64))
+				}
 			}
-			add(c, "_FROM", ex.textDate(from))
-			add(c, "_TO", ex.textDate(to))
+			if !hidden {
+				add(c, "_FROM", ex.textDate(from))
+				add(c, "_TO", ex.textDate(to))
+			}
 			add(c, "TYPE", how)
-			add(c, "NOTE", notes)
+			if !hidden {
+				add(c, "NOTE", notes)
+			}
 			r.Children = append(r.Children, c)
 		}
 		crow.Close()

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/praetorianer777/gotree/internal/gendate"
 )
 
 // CalendarFeed is a secret subscription URL for birthdays, wedding
@@ -214,9 +216,10 @@ func (s *Store) CalendarByToken(ctx context.Context, token string) (Calendar, er
 		if !show {
 			continue
 		}
+		y, m, d := gendate.SplitKey(int(key))
 		e := CalendarEntry{
 			UID:  "gotree-" + strconv.FormatInt(a.TreeID, 10) + "-" + strconv.FormatInt(eventID, 10),
-			Kind: kind, Year: int(key / 10000), Month: int(key / 100 % 100), Day: int(key % 100),
+			Kind: kind, Year: y, Month: m, Day: d,
 		}
 		found = append(found, pending{e, people})
 		ids = append(ids, people...)

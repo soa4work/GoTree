@@ -1014,7 +1014,7 @@ func (s *Store) livingAll(ctx context.Context, a Actor) (map[int64]bool, error) 
 		case dead:
 			out[id] = false
 		case birthSort.Valid:
-			out[id] = int(birthSort.Int64/10000) > thisYear-livingCutoffYears
+			out[id] = gendate.KeyYear(int(birthSort.Int64)) > thisYear-livingCutoffYears
 		default:
 			out[id] = true
 		}

@@ -25,6 +25,7 @@ func TestNormalize(t *testing.T) {
 		{"zwischen 1850 und 1860", "BET 1850 AND 1860"},
 		{"von 1914 bis 1918", "FROM 1914 TO 1918"},
 		{"est. 1700", "EST 1700"},
+		{"29 февраля 1751/52", "29 FEB 1751/52"},
 	}
 	for _, tt := range tests {
 		d, err := Normalize(tt.in)

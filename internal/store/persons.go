@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/praetorianer777/gotree/internal/db"
+	"github.com/praetorianer777/gotree/internal/gendate"
 )
 
 // AlternateName is a further name of a person: birth name, married name, …
@@ -678,7 +679,7 @@ func (s *Store) personRefs(ctx context.Context, q queryer, a Actor, ids []int64)
 		case dead:
 			r.Living = false
 		case birthSort.Valid:
-			r.Living = int(birthSort.Int64/10000) > thisYear-livingCutoffYears
+			r.Living = gendate.KeyYear(int(birthSort.Int64)) > thisYear-livingCutoffYears
 		default:
 			// Nothing known: treat as living, the safe choice for privacy.
 			r.Living = true

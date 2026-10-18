@@ -18,21 +18,16 @@ type ImportFiles struct {
 	Skipped map[string]string
 }
 
-const (
-	noFilesInUpload = "the file is not in the upload; import a GEDZIP or upload the file in GoTree"
-	webFileReason   = "links to files on the web are not imported"
-)
-
-// missingReason says why a FILE value has no file: a web address is never
+// missingReason gives the drop code of why a FILE value has no file: a web address is never
 // imported, anything else is not in the upload.
 func missingReason(value string) string {
 	lower := strings.ToLower(strings.TrimSpace(value))
 	for _, scheme := range []string{"http://", "https://", "ftp://"} {
 		if strings.HasPrefix(lower, scheme) {
-			return webFileReason
+			return DropWebLink
 		}
 	}
-	return noFilesInUpload
+	return DropFileNotInUpload
 }
 
 // objeFate is what happens to an OBJE line under a record.
@@ -265,7 +260,7 @@ func (im *importer) mediaRecords(ctx context.Context, recs []*gedcom.Node) error
 		}
 		reason := ""
 		if f := r.First("FILE"); f == nil {
-			reason = "the media object has no file"
+			reason = DropMediaNoFile
 		} else if why, ok := im.files.Skipped[strings.TrimSpace(f.Value)]; ok {
 			reason = why
 		} else {
@@ -317,11 +312,11 @@ func (im *importer) objeMedia(ctx context.Context, path string, n *gedcom.Node) 
 						if sub.Tag == "TYPE" || sub.Tag == "MEDI" {
 							im.mapped(path + ".FILE.FORM." + sub.Tag)
 						} else {
-							im.tag(path+".FILE.FORM."+sub.Tag, TagDropped, "not kept on a media file")
+							im.tag(path+".FILE.FORM."+sub.Tag, TagDropped, DropMediaFileField)
 						}
 					}
 				default:
-					im.tag(path+".FILE."+fc.Tag, TagDropped, "not kept on a media file")
+					im.tag(path+".FILE."+fc.Tag, TagDropped, DropMediaFileField)
 				}
 			}
 		case "TITL": // GEDCOM 5.5
@@ -336,7 +331,7 @@ func (im *importer) objeMedia(ctx context.Context, path string, n *gedcom.Node) 
 			notes = append(notes, im.noteText(c))
 			im.mapped(path + "." + c.Tag)
 		case "BLOB":
-			im.tag(path+".BLOB", TagDropped, "embedded BLOB data is not read")
+			im.tag(path+".BLOB", TagDropped, DropBlob)
 		default:
 			im.other(path, c, &kept)
 		}
@@ -419,7 +414,7 @@ func (im *importer) linkMedia(ctx context.Context) error {
 			id, ok = im.eventNodes[l.event]
 		}
 		if !ok {
-			im.tag(l.path+".OBJE", TagDropped, "the record it belongs to was not imported")
+			im.tag(l.path+".OBJE", TagDropped, DropMediaRecordSkipped)
 			continue
 		}
 		if err := im.linkOne(ctx, l, id); err != nil {
@@ -439,14 +434,14 @@ func (im *importer) linkOne(ctx context.Context, l objeLink, owner int64) error 
 		var ok bool
 		if ids, ok = im.mediaByXref[c.Pointer]; !ok {
 			if c.Pointer == "VOID" {
-				im.tag(path, TagDropped, "it points to no media object")
+				im.tag(path, TagDropped, DropMediaNoObject)
 			} else {
 				im.broken(c, "the media object")
 			}
 			return nil
 		}
 		if len(ids) == 0 {
-			im.tag(path, TagDropped, "the media file was not imported")
+			im.tag(path, TagDropped, DropMediaFileMissing)
 			return nil
 		}
 		for _, sub := range c.Children {
@@ -462,9 +457,9 @@ func (im *importer) linkOne(ctx context.Context, l objeLink, owner int64) error 
 				primary = strings.EqualFold(strings.TrimSpace(sub.Value), "Y")
 				im.mapped(path + "._PRIM")
 			case "CROP":
-				im.tag(path+".CROP", TagDropped, "cropping a linked photo is not kept")
+				im.tag(path+".CROP", TagDropped, DropMediaCrop)
 			default:
-				im.tag(path+"."+sub.Tag, TagDropped, "not kept on a media link")
+				im.tag(path+"."+sub.Tag, TagDropped, DropMediaLinkField)
 			}
 		}
 	} else {
@@ -473,7 +468,7 @@ func (im *importer) linkOne(ctx context.Context, l objeLink, owner int64) error 
 			return err
 		}
 		if len(res.ids) == 0 {
-			im.tag(path, TagDropped, "the media file was not imported")
+			im.tag(path, TagDropped, DropMediaFileMissing)
 			return nil
 		}
 		ids, primary = res.ids, res.primary

@@ -6,6 +6,7 @@ import { createTree, listTrees } from '../api/endpoints'
 import { Button } from '../components/Button'
 import { TextField } from '../components/TextField'
 import { errorText, fieldErrors } from '../lib/errors'
+import { treeDisplayName } from '../lib/treeName'
 import { useSwitchTree } from './useSwitchTree'
 
 /**
@@ -64,7 +65,7 @@ export function TreePicker({ onDone }: { onDone?: () => void }) {
                     : 'border-slate-400 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-800',
                 ].join(' ')}
               >
-                <span className="min-w-0 break-words font-medium">{tree.name}</span>
+                <span className="min-w-0 break-words font-medium">{treeDisplayName(tree.name, t)}</span>
                 <span className="flex shrink-0 items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                   {tree.current && (
                     <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-semibold text-slate-800 dark:bg-slate-700 dark:text-slate-100">

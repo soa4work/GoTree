@@ -13,6 +13,7 @@ const person = (sex: 'M' | 'F' | 'U'): PersonDetail => ({
   namePrefix: '',
   nameSuffix: '',
   nickname: '',
+  nameNotes: '',
   sex,
   isLiving: null,
   living: false,

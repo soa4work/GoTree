@@ -102,8 +102,12 @@ func TestEveryDroppedTagHasReasonCode(t *testing.T) {
 			if tg.Outcome == TagDropped && (!known[tg.ReasonCode] || tg.Reason == "") {
 				t.Errorf("%s: dropped %s has reason %q, code %q", name, tg.Path, tg.Reason, tg.ReasonCode)
 			}
-			if tg.Outcome != TagDropped && (tg.Reason != "" || tg.ReasonCode != "") {
+			// A kept line may say why its files were not imported.
+			if tg.Outcome != TagDropped && tg.Outcome != TagKept && (tg.Reason != "" || tg.ReasonCode != "") {
 				t.Errorf("%s: %s %s carries a reason", name, tg.Outcome, tg.Path)
+			}
+			if tg.Outcome == TagKept && tg.ReasonCode != "" && !known[tg.ReasonCode] {
+				t.Errorf("%s: kept %s has unknown code %q", name, tg.Path, tg.ReasonCode)
 			}
 		}
 	}

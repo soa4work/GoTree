@@ -116,7 +116,7 @@ function TagTable({ title, tags }: { title: string; tags: TagStat[] }) {
       </thead>
       <tbody>
         {tags.map((tag) => (
-          <tr key={`${tag.path}-${tag.outcome}`} className="border-t border-slate-200 dark:border-slate-800">
+          <tr key={`${tag.path}-${tag.outcome}-${tag.reasonCode ?? ''}`} className="border-t border-slate-200 dark:border-slate-800">
             <td className="py-1 pr-3 font-mono">{tag.path}</td>
             <td className="py-1 pr-3 text-right">{tag.count}</td>
             <td className="py-1">{dropReasonText(t, tag)}</td>

@@ -12,13 +12,13 @@ describe('tree name in the header', () => {
     await i18n.changeLanguage('ru')
     mockApi({ 'GET /api/auth/state': [200, withTree('Family tree')] })
     renderApp('/no-such-page')
-    expect(await screen.findByText('· Семейное дерево')).toBeInTheDocument()
+    expect(await screen.findByText('Семейное дерево')).toBeInTheDocument()
   })
 
   it('shows a chosen name unchanged', async () => {
     await i18n.changeLanguage('ru')
     mockApi({ 'GET /api/auth/state': [200, withTree('Weber family')] })
     renderApp('/no-such-page')
-    expect(await screen.findByText('· Weber family')).toBeInTheDocument()
+    expect(await screen.findByText('Weber family')).toBeInTheDocument()
   })
 })

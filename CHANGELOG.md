@@ -9,6 +9,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Kazakh translation of the interface (to be proofread by a native speaker) (#24)
+
 - Language switcher (Russian and Kazakh) next to the theme switch: the choice is saved in the
   browser, the first visit follows the browser language and falls back to Russian, the page
   language and dates follow it; the translations themselves come in later changes (#24)

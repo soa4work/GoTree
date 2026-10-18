@@ -95,23 +95,21 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 			s.writeImportError(w, err)
 			return
 		}
-		var finish func(failed bool)
+		var finish func()
 		files, finish, err = s.stageGedzipMedia(r.Context(), zr, gedName, len(data), store.MediaPaths(doc))
 		if err != nil {
 			s.Log.Error("store gedzip media", "err", err)
 			writeError(w, http.StatusInternalServerError, CodeStoreFileFailed, "could not store the file")
 			return
 		}
-		// finish releases the file locks, and removes the files that the
-		// failed import left without a medium.
-		failed := true
-		defer func() { finish(failed) }()
+		// finish removes the files that the import left without a medium,
+		// all of them when it failed, and releases the file locks.
+		defer finish()
 		report, err := s.Store.ImportGEDCOMFiles(r.Context(), actorFrom(r), doc, mode, files)
 		if err != nil {
 			s.writeImportError(w, err)
 			return
 		}
-		failed = false
 		s.logImported(name, report)
 		writeJSON(w, http.StatusOK, report)
 		return

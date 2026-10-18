@@ -231,3 +231,55 @@ func TestImportGedzipReplaceKeepsFileOfExistingMedia(t *testing.T) {
 		t.Errorf("media %+v, files %d", list, storedFiles(t, srv.Files.Root))
 	}
 }
+
+func TestImportGedzipCapsUnpackedSizeAndStaysInsideTheZip(t *testing.T) {
+	ts := newServer(t, builtFrontend)
+	c := loggedIn(t, ts)
+	srv := testServers[ts]
+	outside := t.TempDir()
+
+	// Six distinct files of 900 KB each zip to almost nothing but unpack to
+	// more than the import limit (4 x 1 MB).
+	entries := map[string][]byte{}
+	order := []string{"gedcom.ged"}
+	var ged strings.Builder
+	ged.WriteString("0 HEAD\n1 GEDC\n2 VERS 5.5.1\n1 CHAR UTF-8\n0 @I1@ INDI\n1 NAME Anna /Weber/\n")
+	for i := range 6 {
+		name := fmt.Sprintf("p%d.jpg", i)
+		entries[name] = append(append(jpegBytes(t, 8, 8), make([]byte, 900<<10)...), byte(i))
+		order = append(order, name)
+		fmt.Fprintf(&ged, "1 OBJE\n2 FILE %s\n", name)
+	}
+	// Paths that leave the zip resolve to nothing, or to an entry of the zip.
+	entries["../evil.jpg"] = jpegBytes(t, 9, 9)
+	order = append(order, "../evil.jpg")
+	for _, v := range []string{"../evil.jpg", "../../etc/passwd", "/etc/passwd", filepath.Join(outside, "x.jpg")} {
+		fmt.Fprintf(&ged, "1 OBJE\n2 FILE %s\n", v)
+	}
+	ged.WriteString("0 TRLR\n")
+	entries["gedcom.ged"] = []byte(ged.String())
+
+	status, body := c.upload("/api/import/gedcom", "x.zip", buildZip(t, entries, order...))
+	if status != http.StatusOK {
+		t.Fatalf("import: %d %s", status, body)
+	}
+	var report store.ImportReport
+	_ = json.Unmarshal(body, &report)
+	seen := map[string]bool{}
+	for _, ts := range report.Tags {
+		if ts.Path == "INDI.OBJE.FILE" && ts.Outcome == store.TagDropped {
+			seen[ts.Reason] = true
+		}
+	}
+	if !seen["the zip unpacks to more than the import limit"] || !seen["the file is not in the zip"] {
+		t.Errorf("reasons: %+v", report.Tags)
+	}
+	// The files under the limit and the zip's own ../evil.jpg are stored by
+	// their hash below the media root, and nothing is written elsewhere.
+	if got := report.Counts["media"]; got < 1 || got > 5 || storedFiles(t, srv.Files.Root) != got {
+		t.Errorf("media %d, files %d", got, storedFiles(t, srv.Files.Root))
+	}
+	if n := storedFiles(t, outside); n != 0 {
+		t.Errorf("%d files written outside the media root", n)
+	}
+}

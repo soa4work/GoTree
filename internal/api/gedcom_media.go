@@ -99,10 +99,10 @@ type stagedFile struct {
 // zip unpacks to is capped at the import limit, which stops a zip bomb.
 //
 // The files are committed to the store under the hash locks of an upload and
-// stay locked until the returned finish is called. With failed set, finish
-// removes the files that no medium uses, which is safe because the locks are
-// still held. It must be called exactly once.
-func (s *Server) stageGedzipMedia(ctx context.Context, zr *zip.Reader, gedName string, gedSize int, values []string) (store.ImportFiles, func(failed bool), error) {
+// stay locked until the returned finish is called. finish removes the files
+// that no medium uses (all of them after a failed import), which is safe
+// because the locks are still held. It must be called exactly once.
+func (s *Server) stageGedzipMedia(ctx context.Context, zr *zip.Reader, gedName string, gedSize int, values []string) (store.ImportFiles, func(), error) {
 	files := store.ImportFiles{Media: map[string]store.NewMedia{}, Skipped: map[string]string{}}
 	ix := newZipIndex(zr, gedName)
 	staged := map[*zip.File]*stagedFile{}
@@ -159,9 +159,23 @@ func (s *Server) stageGedzipMedia(ctx context.Context, zr *zip.Reader, gedName s
 	for _, sha := range shas {
 		unlocks = append(unlocks, s.fileLocks.Lock(sha))
 	}
+	// removeUnused deletes the committed files that no medium uses, while
+	// the locks are still held.
+	removeUnused := func() {
+		for _, sha := range shas {
+			if used, err := s.Store.MediaFileUsed(context.WithoutCancel(ctx), sha); err != nil {
+				s.Log.Warn("check media file", "sha", sha, "err", err)
+			} else if !used {
+				if err := s.Files.Remove(sha); err != nil {
+					s.Log.Warn("remove media file", "sha", sha, "err", err)
+				}
+			}
+		}
+	}
 	for _, sf := range staged {
 		if err := sf.staged.Commit(); err != nil {
 			discard()
+			removeUnused()
 			unlock()
 			return files, nil, err
 		}
@@ -177,20 +191,12 @@ func (s *Server) stageGedzipMedia(ctx context.Context, zr *zip.Reader, gedName s
 		}
 		files.Media[value] = in
 	}
-	finish := func(failed bool) {
+	// Even a successful import can leave a file without a medium, when the
+	// record that held its OBJE line was not imported, so finish always
+	// removes the unused ones.
+	finish := func() {
 		defer unlock()
-		if !failed {
-			return
-		}
-		for _, sha := range shas {
-			if used, err := s.Store.MediaFileUsed(context.WithoutCancel(ctx), sha); err != nil {
-				s.Log.Warn("check media file", "sha", sha, "err", err)
-			} else if !used {
-				if err := s.Files.Remove(sha); err != nil {
-					s.Log.Warn("remove media file", "sha", sha, "err", err)
-				}
-			}
-		}
+		removeUnused()
 	}
 	return files, finish, nil
 }

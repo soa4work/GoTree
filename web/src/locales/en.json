@@ -5,6 +5,7 @@
     "mainNavigation": "Main navigation",
     "loading": "Loading…",
     "logOut": "Log out",
+    "logOutFailed": "Could not log out. Try again.",
     "signedInAs": "Signed in as {{name}}",
     "updateReady": "A new version of GoTree is ready.",
     "reload": "Reload now",

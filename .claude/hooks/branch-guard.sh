@@ -139,10 +139,22 @@ sub heredocs {
       push @keep, $line if $code; next;
     }
     push @keep, $line;
-    while ($line =~ /<<-?\s*(['"]?)(\w+)\1/g) {
-      my $term = $2; my $before = substr($line, 0, $-[0]);
-      my $code = $before =~ m{(?:^|[;&|(\s])(?:\S*/)?(?:ba|da|z|k|a)?sh(?:\s+-[A-Za-z]+)*\s*$} ? 1 : 0;
-      push @pending, [$term, $code];
+    # A heredoc operator is "<<" outside quotes followed by a word that starts
+    # with a letter or underscore: "<<X" in a string, $((1<<2)) and the here
+    # string <<< open nothing, and must not hide the lines after them.
+    my ($q, $i) = ('', 0);
+    while ($i < length $line) {
+      my $c = substr($line, $i, 1);
+      if ($q) { if ($c eq '\\' && $q eq '"') { $i += 2; next; } $q = '' if $c eq $q; $i++; next; }
+      if ($c eq "'" || $c eq '"') { $q = $c; $i++; next; }
+      if ($c eq '\\') { $i += 2; next; }
+      if (substr($line, $i, 3) eq '<<<') { $i += 3; next; }
+      if (substr($line, $i) =~ /^<<-?\s*(['"]?)([A-Za-z_]\w*)\1/) {
+        my ($term, $len) = ($2, length $&); my $before = substr($line, 0, $i);
+        my $code = $before =~ m{(?:^|[;&|(\s])(?:\S*/)?(?:ba|da|z|k|a)?sh(?:\s+-[A-Za-z]+)*\s*$} ? 1 : 0;
+        push @pending, [$term, $code]; $i += $len; next;
+      }
+      $i++;
     }
   }
   return join("\n", @keep);

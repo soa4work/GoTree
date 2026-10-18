@@ -75,6 +75,15 @@ EOF
 $G add -A"
 check deny  Bash  "echo a
 $G $C -m x"
+# A "<<" that opens no heredoc must not hide the lines after it.
+check deny  Bash  "echo \"<<X\"
+$G $C -m x"
+check deny  Bash  "echo '<<X'
+$G $C -m x"
+check deny  Bash  "echo \$((1<<2))
+$G $C -m x"
+check deny  Bash  "cat <<<word
+$G $C -m x"
 check allow Bash  "$G -C /tmp/other $C -m x"
 check deny  Bash  "$G -C . $C -m x"
 check deny  Bash  "time $G $C -m x"

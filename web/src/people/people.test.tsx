@@ -62,6 +62,7 @@ const paul: PersonDetail = {
   isLiving: null,
   living: false,
   notes: 'Worked as a weaver.',
+  nameNotes: '',
   alternateNames: [],
   citations: [],
   portrait: null,
@@ -260,6 +261,59 @@ describe('person page', () => {
     await waitFor(() => expect(bodies).toHaveLength(1))
     expect(bodies[0]).toMatchObject({ givenNames: 'Paul', birth: { date: '12.3.1890', placeId: null } })
     expect(bodies[0]).not.toHaveProperty('death')
+  })
+
+  it('shows, edits and keeps the notes on names', async () => {
+    const withNotes: PersonDetail = {
+      ...paul,
+      nameNotes: 'spelled Maier',
+      alternateNames: [
+        {
+          id: 7,
+          type: 'married',
+          givenNames: 'Paula',
+          surname: 'Schmidt',
+          namePrefix: '',
+          nameSuffix: '',
+          nickname: '',
+          status: 'accepted',
+          statusReason: '',
+          sortOrder: 0,
+          notes: 'after 1890',
+          citations: [],
+        },
+      ],
+    }
+    const bodies: unknown[] = []
+    mockApi({
+      'GET /api/persons/1': [200, withNotes],
+      'PUT /api/persons/1': (body) => {
+        bodies.push(body)
+        return [200, withNotes]
+      },
+    })
+    const user = userEvent.setup()
+    renderApp('/people/1')
+    await screen.findByRole('heading', { level: 1, name: 'Paul Weber' })
+    expect(screen.getByText('About the name: spelled Maier')).toBeInTheDocument()
+    expect(screen.getByText('after 1890')).toBeInTheDocument()
+
+    // Saving without a change sends the notes back unchanged.
+    await user.keyboard('e')
+    let dialog = await screen.findByRole('dialog', { name: 'Edit person' })
+    expect(within(dialog).getByLabelText('Notes on the name')).toHaveValue('spelled Maier')
+    await user.click(within(dialog).getByRole('button', { name: /^Save/ }))
+    await waitFor(() => expect(bodies).toHaveLength(1))
+    expect(bodies[0]).toMatchObject({ nameNotes: 'spelled Maier', alternateNames: [{ id: 7, notes: 'after 1890' }] })
+
+    // Editing both notes sends the new text.
+    await user.keyboard('e')
+    dialog = await screen.findByRole('dialog', { name: 'Edit person' })
+    await user.type(within(dialog).getByLabelText('Notes on the name'), ' twice')
+    await user.type(within(dialog).getByLabelText('Note on this name'), ' (second)')
+    await user.click(within(dialog).getByRole('button', { name: /^Save/ }))
+    await waitFor(() => expect(bodies).toHaveLength(2))
+    expect(bodies[1]).toMatchObject({ nameNotes: 'spelled Maier twice', alternateNames: [{ id: 7, notes: 'after 1890 (second)' }] })
   })
 
   it('shows server field errors in the event dialog and previews dates', async () => {

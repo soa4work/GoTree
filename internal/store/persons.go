@@ -24,6 +24,7 @@ type AlternateName struct {
 	Status       string        `json:"status"`
 	StatusReason string        `json:"statusReason"`
 	SortOrder    int           `json:"sortOrder"`
+	Notes        string        `json:"notes"`
 	Citations    []CitationRef `json:"citations"`
 }
 
@@ -39,8 +40,10 @@ type Person struct {
 	// IsLiving is what was stated; nil means "infer from the events".
 	IsLiving *bool `json:"isLiving"`
 	// Living is the effective value, stated or inferred.
-	Living         bool            `json:"living"`
-	Notes          string          `json:"notes"`
+	Living bool   `json:"living"`
+	Notes  string `json:"notes"`
+	// NameNotes are notes on the main name (GEDCOM NAME.NOTE).
+	NameNotes      string          `json:"nameNotes"`
 	AlternateNames []AlternateName `json:"alternateNames"`
 	// Citations support the person as a whole.
 	Citations []CitationRef `json:"citations"`
@@ -77,6 +80,7 @@ type AlternateNameInput struct {
 	Nickname     string `json:"nickname"`
 	Status       string `json:"status"`
 	StatusReason string `json:"statusReason"`
+	Notes        string `json:"notes"`
 }
 
 // PersonInput is the editable part of a Person. AlternateNames replaces the
@@ -90,6 +94,7 @@ type PersonInput struct {
 	Sex            string               `json:"sex"`
 	IsLiving       *bool                `json:"isLiving"`
 	Notes          string               `json:"notes"`
+	NameNotes      string               `json:"nameNotes"`
 	AlternateNames []AlternateNameInput `json:"alternateNames"`
 	// Birth and Death record a BIRT or DEAT event together with a new
 	// person. Only creating a person reads them; UpdatePerson ignores them
@@ -152,7 +157,7 @@ func (in *PersonInput) normalize() {
 	if in.Sex == "" {
 		in.Sex = "U"
 	}
-	in.Notes = trim(in.Notes)
+	in.Notes, in.NameNotes = trim(in.Notes), trim(in.NameNotes)
 	for i := range in.AlternateNames {
 		n := &in.AlternateNames[i]
 		n.Type = strings.ToLower(trim(n.Type))
@@ -160,6 +165,7 @@ func (in *PersonInput) normalize() {
 		n.NamePrefix, n.NameSuffix, n.Nickname = trim(n.NamePrefix), trim(n.NameSuffix), trim(n.Nickname)
 		n.Status = defaultStatus(n.Status)
 		n.StatusReason = trim(n.StatusReason)
+		n.Notes = trim(n.Notes)
 	}
 }
 
@@ -176,6 +182,7 @@ func (in PersonInput) validate() error {
 	long("nameSuffix", in.NameSuffix, 50)
 	long("nickname", in.Nickname, 100)
 	long("notes", in.Notes, 100_000)
+	long("nameNotes", in.NameNotes, 100_000)
 	v.check(oneOf(in.Sex, "M", "F", "U", "X"), "sex", "must be M, F, U or X")
 	v.check(len(in.AlternateNames) <= 50, "alternateNames", "too many names")
 	for _, n := range in.AlternateNames {
@@ -184,6 +191,7 @@ func (in PersonInput) validate() error {
 		v.check(validStatus(n.Status), "alternateNames", "unknown status "+n.Status)
 		v.check(n.Status == StatusAccepted || n.StatusReason != "", "alternateNames", "say why the name is disputed or disproven")
 		long("alternateNames", n.GivenNames+n.Surname, 400)
+		long("alternateNames", n.Notes, 100_000)
 	}
 	return v.err()
 }
@@ -221,9 +229,10 @@ func (s *Store) createPerson(ctx context.Context, tx *sql.Tx, a Actor, in Person
 		now := s.now()
 		res, err := tx.ExecContext(ctx, `
 			INSERT INTO persons (tree_id, given_names, surname, name_prefix, name_suffix, nickname, sex, is_living, notes,
-				created_at, updated_at, created_by, updated_by, surname_key, given_key)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				name_notes, created_at, updated_at, created_by, updated_by, surname_key, given_key)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			a.TreeID, in.GivenNames, in.Surname, in.NamePrefix, in.NameSuffix, in.Nickname, in.Sex, in.IsLiving, in.Notes,
+			in.NameNotes,
 			now, now, nullID(a.UserID), nullID(a.UserID),
 			db.NamesKey(in.Surname), db.NamesKey(in.GivenNames))
 		if err != nil {
@@ -291,9 +300,9 @@ func (s *Store) UpdatePerson(ctx context.Context, a Actor, id int64, in PersonIn
 		}
 		_, err = tx.ExecContext(ctx, `
 			UPDATE persons SET given_names = ?, surname = ?, name_prefix = ?, name_suffix = ?, nickname = ?, sex = ?,
-				is_living = ?, notes = ?, updated_at = ?, updated_by = ?, surname_key = ?, given_key = ?
+				is_living = ?, notes = ?, name_notes = ?, updated_at = ?, updated_by = ?, surname_key = ?, given_key = ?
 			WHERE id = ? AND tree_id = ?`,
-			in.GivenNames, in.Surname, in.NamePrefix, in.NameSuffix, in.Nickname, in.Sex, in.IsLiving, in.Notes,
+			in.GivenNames, in.Surname, in.NamePrefix, in.NameSuffix, in.Nickname, in.Sex, in.IsLiving, in.Notes, in.NameNotes,
 			s.now(), nullID(a.UserID), db.NamesKey(in.Surname), db.NamesKey(in.GivenNames), id, a.TreeID)
 		if err != nil {
 			return err
@@ -362,18 +371,18 @@ func writeAlternateNames(ctx context.Context, tx *sql.Tx, personID int64, names 
 				keep[*n.ID] = true
 				if _, err := tx.ExecContext(ctx, `
 					UPDATE person_names SET type = ?, given_names = ?, surname = ?, name_prefix = ?, name_suffix = ?,
-						nickname = ?, status = ?, status_reason = ?, sort_order = ?
+						nickname = ?, status = ?, status_reason = ?, sort_order = ?, notes = ?
 					WHERE id = ?`,
-					n.Type, n.GivenNames, n.Surname, n.NamePrefix, n.NameSuffix, n.Nickname, n.Status, n.StatusReason, i, *n.ID); err != nil {
+					n.Type, n.GivenNames, n.Surname, n.NamePrefix, n.NameSuffix, n.Nickname, n.Status, n.StatusReason, i, n.Notes, *n.ID); err != nil {
 					return err
 				}
 				continue
 			}
 		}
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO person_names (person_id, type, given_names, surname, name_prefix, name_suffix, nickname, status, status_reason, sort_order)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			personID, n.Type, n.GivenNames, n.Surname, n.NamePrefix, n.NameSuffix, n.Nickname, n.Status, n.StatusReason, i); err != nil {
+			INSERT INTO person_names (person_id, type, given_names, surname, name_prefix, name_suffix, nickname, status, status_reason, sort_order, notes)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			personID, n.Type, n.GivenNames, n.Surname, n.NamePrefix, n.NameSuffix, n.Nickname, n.Status, n.StatusReason, i, n.Notes); err != nil {
 			return err
 		}
 	}
@@ -410,9 +419,9 @@ func (s *Store) getPerson(ctx context.Context, q queryer, a Actor, id int64) (Pe
 	var p Person
 	var living sql.NullInt64
 	err := q.QueryRowContext(ctx, `
-		SELECT id, given_names, surname, name_prefix, name_suffix, nickname, sex, is_living, notes, created_at, updated_at
+		SELECT id, given_names, surname, name_prefix, name_suffix, nickname, sex, is_living, notes, name_notes, created_at, updated_at
 		FROM persons WHERE id = ? AND tree_id = ?`, id, a.TreeID).Scan(
-		&p.ID, &p.GivenNames, &p.Surname, &p.NamePrefix, &p.NameSuffix, &p.Nickname, &p.Sex, &living, &p.Notes,
+		&p.ID, &p.GivenNames, &p.Surname, &p.NamePrefix, &p.NameSuffix, &p.Nickname, &p.Sex, &living, &p.Notes, &p.NameNotes,
 		&p.CreatedAt, &p.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Person{}, ErrNotFound
@@ -426,7 +435,7 @@ func (s *Store) getPerson(ctx context.Context, q queryer, a Actor, id int64) (Pe
 	}
 
 	rows, err := q.QueryContext(ctx, `
-		SELECT id, type, given_names, surname, name_prefix, name_suffix, nickname, status, status_reason, sort_order
+		SELECT id, type, given_names, surname, name_prefix, name_suffix, nickname, status, status_reason, sort_order, notes
 		FROM person_names WHERE person_id = ? ORDER BY sort_order, id`, id)
 	if err != nil {
 		return Person{}, err
@@ -436,7 +445,7 @@ func (s *Store) getPerson(ctx context.Context, q queryer, a Actor, id int64) (Pe
 	for rows.Next() {
 		var n AlternateName
 		if err := rows.Scan(&n.ID, &n.Type, &n.GivenNames, &n.Surname, &n.NamePrefix, &n.NameSuffix, &n.Nickname,
-			&n.Status, &n.StatusReason, &n.SortOrder); err != nil {
+			&n.Status, &n.StatusReason, &n.SortOrder, &n.Notes); err != nil {
 			return Person{}, err
 		}
 		p.AlternateNames = append(p.AlternateNames, n)

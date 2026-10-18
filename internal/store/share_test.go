@@ -408,3 +408,22 @@ func TestOnThisDay(t *testing.T) {
 		t.Error("month 13 accepted")
 	}
 }
+
+func TestShareReducedPersonHidesNameNotes(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	f := shareTree(t, s, a)
+	if _, err := s.UpdatePerson(ctx, a, f.lisa.ID, PersonInput{GivenNames: "Lisa", Surname: "Weber", NameNotes: "secret name note",
+		AlternateNames: []AlternateNameInput{{Type: "other", GivenNames: "Lise", Notes: "secret alternate note"}}}); err != nil {
+		t.Fatal(err)
+	}
+	sh := shareFor(t, s, a, ShareLinkInput{Label: "Hans' line", Scope: ShareScopeDescendants, RootPersonID: &f.hans.ID, Privacy: SharePrivacyLivingNames})
+	lisa, err := s.SharePerson(ctx, sh, f.lisa.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(lisa)
+	if lisa.NameNotes != "" || strings.Contains(string(raw), "secret") {
+		t.Errorf("name notes leaked: %s", raw)
+	}
+}

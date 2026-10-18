@@ -5,7 +5,7 @@ import * as en from './name.en'
 import * as kk from './name.kk'
 import * as ru from './name.ru'
 
-type KinshipPart = Pick<Kinship, 'up' | 'down' | 'half' | 'adoptive'> & { ancestors?: number[] }
+type KinshipPart = Pick<Kinship, 'up' | 'down' | 'half' | 'adoptive'> & { ancestors?: number[]; path?: number[] }
 
 /** The relationship terms of one language. */
 interface Namer {

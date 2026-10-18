@@ -89,7 +89,7 @@ func (s *Store) descendantsWithPartners(ctx context.Context, a Actor, root int64
 func (sc *shareScope) ref(r PersonRef) PersonRef {
 	r.Portrait = nil
 	if sc.reduced(r.ID) {
-		r.BirthDate, r.DeathDate = "", ""
+		r.BirthDate, r.DeathDate, r.BirthSort = "", "", 0
 	}
 	return r
 }

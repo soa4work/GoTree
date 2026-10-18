@@ -146,7 +146,7 @@ func TestShareDescendantsWithLivingNames(t *testing.T) {
 		t.Errorf("visible: %+v", list.Items)
 	}
 	for _, p := range list.Items {
-		if p.ID == f.lisa.ID && p.BirthDate != "" {
+		if p.ID == f.lisa.ID && (p.BirthDate != "" || p.BirthSort != 0) {
 			t.Errorf("living person's birth date: %+v", p)
 		}
 	}

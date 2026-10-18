@@ -88,7 +88,7 @@ made again when first shown.
 
 ## Development
 
-Requires Go and Node.js (LTS).
+Requires Go, a C compiler (for the race detector) and Node.js (LTS).
 
 ```bash
 make dev     # API on :8080, Vite on :5173 with hot reload (proxies /api)

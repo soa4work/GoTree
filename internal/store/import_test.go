@@ -348,7 +348,7 @@ func TestImportLargeFile(t *testing.T) {
 	if report.Counts["persons"] != people || report.Counts["events"] != 2*people+people/3 {
 		t.Errorf("counts: %v", report.Counts)
 	}
-	if took > 30*time.Second {
+	if took > 30*time.Second && !raceEnabled {
 		t.Errorf("import too slow: %v", took)
 	}
 	if res, _ := s.ListPersons(ctx, a, "person4242", 5, 0); res.Total != 1 {

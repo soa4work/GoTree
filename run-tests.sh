@@ -36,8 +36,13 @@ if [[ -f go.mod ]]; then
   echo "🔍 go vet"
   go vet "${go_pkgs[@]}"
 
-  echo "🧪 Go tests"
-  go test "${go_pkgs[@]}"
+  # The race detector needs cgo and so a C compiler.
+  if ! command -v "$(go env CC)" >/dev/null 2>&1; then
+    echo "❌ no C compiler ($(go env CC)) for go test -race — see README 'Development'" >&2
+    exit 1
+  fi
+  echo "🧪 Go tests (race detector)"
+  CGO_ENABLED=1 go test -race "${go_pkgs[@]}"
 fi
 
 if [[ -f web/package.json ]]; then

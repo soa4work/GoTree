@@ -513,14 +513,24 @@ func TestImportNameNotesAndSources(t *testing.T) {
 	if err := s.DB.QueryRow(`SELECT count(*) FROM citations`).Scan(&n); err != nil || n != 3 {
 		t.Errorf("citations: %d %v (the empty name's is not created)", n, err)
 	}
-	if tagOutcome(report, "INDI.NAME.NOTE") != TagMapped {
-		t.Errorf("INDI.NAME.NOTE: %q", tagOutcome(report, "INDI.NAME.NOTE"))
-	}
-	dropped := map[string]TagStat{}
+	dropped, mapped := map[string]TagStat{}, map[string]TagStat{}
 	for _, tg := range report.Tags {
-		if tg.Outcome == TagDropped {
+		switch tg.Outcome {
+		case TagDropped:
 			dropped[tg.Path] = tg
+		case TagMapped:
+			mapped[tg.Path] = tg
 		}
+	}
+	// The empty name's note is dropped, not mapped.
+	if m := mapped["INDI.NAME.NOTE"]; m.Count != 2 {
+		t.Errorf("INDI.NAME.NOTE mapped: %+v", m)
+	}
+	if m := mapped["INDI._MARNM.NOTE"]; m.Count != 1 {
+		t.Errorf("INDI._MARNM.NOTE mapped: %+v", m)
+	}
+	if m := mapped["INDI._MARNM.SOUR"]; m.Count != 1 {
+		t.Errorf("INDI._MARNM.SOUR mapped: %+v", m)
 	}
 	if d := dropped["INDI.NAME.SOUR"]; d.Count != 1 || d.Reason != "the name is empty" {
 		t.Errorf("INDI.NAME.SOUR: %+v", d)

@@ -120,13 +120,13 @@ export function PersonPage() {
             {p.alternateNames.map((n) => (
               <li key={n.id} className="rounded-full bg-slate-100 px-3 py-1 text-sm dark:bg-slate-800">
                 {t(`nameType.${n.type}`)}: {[n.givenNames, n.surname].filter(Boolean).join(' ')}
-                {n.notes && <span className="block text-xs text-slate-600 dark:text-slate-400">{n.notes}</span>}
+                {n.notes && <span className="block whitespace-pre-line text-xs text-slate-600 dark:text-slate-400">{n.notes}</span>}
               </li>
             ))}
           </ul>
         )}
         {p.nameNotes && (
-          <p className="text-sm text-slate-600 dark:text-slate-400">{t('person.nameNotesShown', { notes: p.nameNotes })}</p>
+          <p className="whitespace-pre-line text-sm text-slate-600 dark:text-slate-400">{t('person.nameNotesShown', { notes: p.nameNotes })}</p>
         )}
       </header>
 

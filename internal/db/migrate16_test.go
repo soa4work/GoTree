@@ -405,8 +405,14 @@ func TestMigration16DownAndUpAgain(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if v, err := SchemaVersion(ctx, conn); err != nil || v < 16 {
-		t.Errorf("schema version %d, %v", v, err)
+	provider, err := newProvider(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources := provider.ListSources()
+	newest := sources[len(sources)-1].Version
+	if v, err := SchemaVersion(ctx, conn); err != nil || v != newest {
+		t.Errorf("schema version %d, %v; want %d", v, err, newest)
 	}
 }
 

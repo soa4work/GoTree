@@ -697,12 +697,17 @@ func (im *importer) citationField(ctx context.Context, ctxPath string, c *gedcom
 type parsedName struct {
 	given, surname, prefix, suffix, nickname, nameType string
 	status, statusReason                               string
-	notes                                              []string
-	sources                                            []*gedcom.Node
+	// path is the tag of the name in the report (INDI.NAME or
+	// INDI._MARNM); its notes are reported by person(), which knows
+	// whether the name is kept.
+	path     string
+	notes    []string
+	noteTags []string
+	sources  []*gedcom.Node
 }
 
 func (im *importer) name(n *gedcom.Node, kept *[]keptNode, ctx string, primary bool) parsedName {
-	var p parsedName
+	p := parsedName{path: ctx + ".NAME"}
 	v := n.Value
 	if i := strings.Index(v, "/"); i >= 0 {
 		p.given = strings.TrimSpace(v[:i])
@@ -759,7 +764,8 @@ func (im *importer) name(n *gedcom.Node, kept *[]keptNode, ctx string, primary b
 			}
 			continue
 		case "NOTE", "SNOTE":
-			p.notes = append(p.notes, im.noteText(c))
+			p.notes, p.noteTags = append(p.notes, im.noteText(c)), append(p.noteTags, c.Tag)
+			continue
 		case "SOUR":
 			p.sources = append(p.sources, c) // cited by person()
 			continue
@@ -817,14 +823,13 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 			im.mapped("INDI.NAME")
 		case c.Tag == "_MARNM":
 			// Ancestry's married name: "1 _MARNM Schmidt" or "/Schmidt/".
-			p := parsedName{surname: strings.Trim(strings.TrimSpace(c.Value), "/"), nameType: "married"}
+			p := parsedName{surname: strings.Trim(strings.TrimSpace(c.Value), "/"), nameType: "married", path: "INDI._MARNM"}
 			for _, sub := range c.Children {
 				switch sub.Tag {
 				case "SOUR":
 					p.sources = append(p.sources, sub)
 				case "NOTE", "SNOTE":
-					p.notes = append(p.notes, im.noteText(sub))
-					im.mapped("INDI._MARNM." + sub.Tag)
+					p.notes, p.noteTags = append(p.notes, im.noteText(sub)), append(p.noteTags, sub.Tag)
 				default:
 					im.tag("INDI._MARNM."+sub.Tag, TagDropped, "not kept for a married name")
 				}
@@ -876,15 +881,21 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 	im.mapped("INDI")
 
 	allNames := []string{primary.given, primary.surname, primary.nickname}
+	for _, tag := range primary.noteTags {
+		im.mapped(primary.path + "." + tag)
+	}
 	for i, n := range others {
 		if n.given == "" && n.surname == "" && n.nickname == "" {
 			for range n.sources {
-				im.tag("INDI.NAME.SOUR", TagDropped, "the name is empty")
+				im.tag(n.path+".SOUR", TagDropped, "the name is empty")
 			}
-			for range n.notes {
-				im.tag("INDI.NAME.NOTE", TagDropped, "the name is empty")
+			for _, tag := range n.noteTags {
+				im.tag(n.path+"."+tag, TagDropped, "the name is empty")
 			}
 			continue
+		}
+		for _, tag := range n.noteTags {
+			im.mapped(n.path + "." + tag)
 		}
 		res, err := im.insertName.ExecContext(ctx, pid, n.nameType, n.given, n.surname, n.prefix, n.suffix, n.nickname,
 			defaultStatus(n.status), n.statusReason, i, joinNotes(n.notes))
@@ -893,7 +904,7 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 		}
 		nameID, _ := res.LastInsertId()
 		for _, c := range n.sources {
-			if err := im.citation(ctx, "INDI.NAME", c, "name", nameID); err != nil {
+			if err := im.citation(ctx, n.path, c, "name", nameID); err != nil {
 				return err
 			}
 		}

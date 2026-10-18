@@ -13,7 +13,7 @@ import { formatDay } from '../lib/dates'
 
 /** The feed language follows the interface; the server falls back to English for anything else. */
 const feedLang = (lang: string) => (lang === 'ru' || lang === 'kk' ? lang : 'en')
-const feedUrl = (token: string, lang: string) => `${window.location.origin}/ical/${token}.ics?lang=${lang}`
+const feedUrl = (token: string, lang: string) => `${window.location.origin}/ical/${token}.ics?lang=${encodeURIComponent(lang)}`
 
 /** Secret calendar subscriptions for birthdays and anniversaries. */
 export function CalendarFeeds() {

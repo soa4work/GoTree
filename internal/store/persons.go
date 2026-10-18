@@ -48,14 +48,17 @@ type Person struct {
 
 // PersonRef is the short form of a person used in lists and relations.
 type PersonRef struct {
-	ID         int64        `json:"id"`
-	GivenNames string       `json:"givenNames"`
-	Surname    string       `json:"surname"`
-	Sex        string       `json:"sex"`
-	BirthDate  string       `json:"birthDate"`
-	DeathDate  string       `json:"deathDate"`
-	Living     bool         `json:"living"`
-	Portrait   *PortraitRef `json:"portrait"`
+	ID         int64  `json:"id"`
+	GivenNames string `json:"givenNames"`
+	Surname    string `json:"surname"`
+	Sex        string `json:"sex"`
+	BirthDate  string `json:"birthDate"`
+	// BirthSort is the birth date as YYYYMMDD for ordering people by age
+	// (relationship names by seniority); 0 when no dated birth is known.
+	BirthSort int64        `json:"birthSort,omitempty"`
+	DeathDate string       `json:"deathDate"`
+	Living    bool         `json:"living"`
+	Portrait  *PortraitRef `json:"portrait"`
 }
 
 // AlternateNameInput is the editable part of an AlternateName. ID keeps an
@@ -628,6 +631,7 @@ func (s *Store) personRefs(ctx context.Context, q queryer, a Actor, ids []int64)
 			r.Portrait = &PortraitRef{MediaID: portrait.Int64, RegionID: ptrID(portraitRegion)}
 		}
 		r.BirthDate, r.DeathDate = birth.String, death.String
+		r.BirthSort = birthSort.Int64
 		switch {
 		case stated.Valid:
 			r.Living = stated.Int64 == 1

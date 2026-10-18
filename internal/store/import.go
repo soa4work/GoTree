@@ -497,7 +497,9 @@ func (im *importer) other(ctx string, c *gedcom.Node, kept *[]keptNode) {
 // does not know; the caller keeps such a line verbatim.
 func (im *importer) factStatus(path string, c *gedcom.Node) (status, reason string, ok bool) {
 	status = strings.ToLower(strings.TrimSpace(c.Value))
-	if !validStatus(status) {
+	if !validStatus(status) || (status == StatusAccepted && len(c.Children) > 0) {
+		// GoTree never writes "accepted"; one with a note is another
+		// program's, so keep it rather than drop the note.
 		return "", "", false
 	}
 	var notes []string
@@ -510,9 +512,7 @@ func (im *importer) factStatus(path string, c *gedcom.Node) (status, reason stri
 		im.tag(path+"._STAT."+sub.Tag, TagDropped, "a status has only a reason")
 	}
 	reason = joinNotes(notes)
-	if status == StatusAccepted {
-		reason = ""
-	} else if reason == "" {
+	if reason == "" && status != StatusAccepted {
 		reason = "?" // GoTree requires a reason; the file gave none
 	}
 	im.mapped(path + "._STAT")
@@ -710,9 +710,9 @@ func (im *importer) name(n *gedcom.Node, kept *[]keptNode, ctx string, primary b
 		case "_STAT":
 			st := strings.ToLower(strings.TrimSpace(c.Value))
 			switch {
-			case primary && st == StatusAccepted:
+			case primary && st == StatusAccepted && len(c.Children) == 0:
 				im.mapped(ctx + ".NAME._STAT") // nothing to keep
-			case primary && validStatus(st):
+			case primary && validStatus(st) && st != StatusAccepted:
 				// The main name lives on the person, which has no status.
 				im.tag(ctx+".NAME._STAT", TagDropped, "the main name has no status in GoTree")
 			case !primary && p.status == "":

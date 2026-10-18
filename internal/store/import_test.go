@@ -365,6 +365,7 @@ func TestImportStatusFromFile(t *testing.T) {
 		"1 BIRT", "2 DATE 1850", "2 _STAT disputed",
 		"1 DEAT", "2 DATE 1900", "2 _STAT probable",
 		"1 BURI", "2 _STAT disputed", "3 NOTE @N1@",
+		"1 CHR", "2 _STAT accepted", "3 NOTE checked in 1990",
 		"0 @N1@ NOTE Shared reason",
 		"0 TRLR", "",
 	}, "\n")
@@ -411,6 +412,10 @@ func TestImportStatusFromFile(t *testing.T) {
 	}
 	if !strings.Contains(text, "1 DEAT\n2 DATE 1900\n2 _STAT probable") {
 		t.Errorf("the unknown status was not kept under DEAT:\n%s", text)
+	}
+	// An "accepted" with a note is not GoTree's: keep it, note and all.
+	if !strings.Contains(text, "1 CHR\n2 _STAT accepted\n3 NOTE checked in 1990") {
+		t.Errorf("the accepted status with a note was not kept under CHR:\n%s", text)
 	}
 }
 

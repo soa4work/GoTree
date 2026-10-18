@@ -745,3 +745,25 @@ func TestExportNameTypeRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+func TestDatePhraseKeepsParentheses(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"Frühjahr 1850", "(Frühjahr 1850)"},
+		{"Frühjahr (1850)", "(Frühjahr (1850))"},
+		{"(a) b", "((a) b)"},
+		{"(during the war)", "(during the war)"},
+	}
+	for _, v7 := range []bool{false, true} {
+		ex := &exporter{opt: ExportOptions{Version7: v7}}
+		for _, tt := range tests {
+			if got := ex.textDate(tt.in); got != tt.want {
+				t.Errorf("v7=%v textDate(%q) = %q, want %q", v7, tt.in, got, tt.want)
+			}
+		}
+	}
+	n := node("BIRT", "")
+	(&exporter{}).date(n, "Frühjahr (1850)")
+	if got := n.Text("DATE"); got != "(Frühjahr (1850))" {
+		t.Errorf("5.5.1 DATE = %q", got)
+	}
+}

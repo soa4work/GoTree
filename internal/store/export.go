@@ -709,10 +709,20 @@ func (ex *exporter) date(n *gedcom.Node, raw string) {
 		return
 	}
 	if err != nil {
-		n.Children = append(n.Children, node("DATE", "("+strings.Trim(raw, "()")+")"))
+		n.Children = append(n.Children, node("DATE", datePhrase(raw)))
 		return
 	}
 	n.Children = append(n.Children, node("DATE", d.String()))
+}
+
+// datePhrase wraps text that is not a date in the parentheses of a 5.5.1
+// date phrase. Text already in parentheses stays as it is; any other text
+// keeps all its own parentheses, so "spring (1850)" is not cut short.
+func datePhrase(raw string) string {
+	if strings.HasPrefix(raw, "(") && strings.HasSuffix(raw, ")") {
+		return raw
+	}
+	return "(" + raw + ")"
 }
 
 // textDate renders a date for an extension tag that holds date text
@@ -726,7 +736,7 @@ func (ex *exporter) textDate(raw string) string {
 	}
 	d, err := gendate.Parse(raw)
 	if err != nil {
-		return "(" + strings.Trim(raw, "()") + ")"
+		return datePhrase(raw)
 	}
 	if ex.opt.Version7 {
 		if value, phrase := d.GEDCOM7(); phrase == "" && value != "" {

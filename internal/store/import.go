@@ -1144,7 +1144,11 @@ func (im *importer) linkFAMCChildren(ctx context.Context) error {
 			}
 			continue
 		}
-		rel := relation(l.pedi)
+		pedi := l.pedi
+		if p := im.pedigree[l.childXref][l.family]; p != "" {
+			pedi = p
+		}
+		rel := relation(pedi)
 		var order int
 		if err := im.tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(sort_order), -1) + 1 FROM family_children WHERE family_id = ?`, fid).Scan(&order); err != nil {
 			return err

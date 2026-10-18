@@ -55,6 +55,7 @@ func TestImportChildOnlyInFAMC(t *testing.T) {
 		"0 @I3@ INDI", "1 NAME Paul /Weber/", "1 FAMC @F1@",
 		"0 @I4@ INDI", "1 NAME Lena /Weber/", "1 FAMC @F1@", "2 PEDI adopted", "1 FAMC @F1@",
 		"0 @I5@ INDI", "1 NAME Otto /Weber/", "1 FAMC @F1@ ",
+		"0 @I7@ INDI", "1 NAME Nora /Weber/", "1 FAMC @F1@", "1 FAMC @F1@", "2 PEDI adopted",
 		"0 @I6@ INDI", "1 NAME Emil /Weber/", "1 FAMC @F9@",
 		"0 @F1@ FAM", "1 HUSB @I1@", "1 WIFE @I2@", "1 CHIL @I3@",
 		"0 TRLR",
@@ -82,16 +83,16 @@ func TestImportChildOnlyInFAMC(t *testing.T) {
 		names = append(names, c.Person.GivenNames)
 		rels[c.Person.GivenNames] = [2]string{c.RelationPartner1, c.RelationPartner2}
 	}
-	if got := strings.Join(names, ","); got != "Paul,Lena,Otto" {
-		t.Errorf("children %q, want Paul,Lena,Otto", got)
+	if got := strings.Join(names, ","); got != "Paul,Lena,Otto,Nora" {
+		t.Errorf("children %q, want Paul,Lena,Otto,Nora", got)
 	}
-	if rels["Lena"] != [2]string{"adopted", "adopted"} || rels["Otto"] != [2]string{"birth", "birth"} {
+	if rels["Lena"] != [2]string{"adopted", "adopted"} || rels["Nora"] != [2]string{"adopted", "adopted"} || rels["Otto"] != [2]string{"birth", "birth"} {
 		t.Errorf("relations: %v", rels)
 	}
 	if lena := findPerson(t, s, a, "lena"); len(lena.ParentFamilies) != 1 {
 		t.Errorf("Lena's parent families: %+v", lena.ParentFamilies)
 	}
-	if report.ChildrenFromFAMC != 2 || len(report.ChildrenFromFAMCExamples) != 2 {
+	if report.ChildrenFromFAMC != 3 || len(report.ChildrenFromFAMCExamples) != 3 {
 		t.Fatalf("FAMC children: %d %v", report.ChildrenFromFAMC, report.ChildrenFromFAMCExamples)
 	}
 	ex := strings.Join(report.ChildrenFromFAMCExamples, "\n")

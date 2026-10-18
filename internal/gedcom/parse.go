@@ -39,7 +39,8 @@ type Node struct {
 	Xref string
 	Tag  string
 	// Value is the line value with CONC/CONT continuation lines joined,
-	// trailing spaces removed and @@ unescaped. For pointers it is empty and Pointer is set.
+	// trailing spaces removed and @@ unescaped. For pointers it is empty and
+	// Pointer is set.
 	Value string
 	// Pointer is the referenced xref without @ signs, e.g. "F2", or
 	// "VOID" for a GEDCOM 7 void pointer.

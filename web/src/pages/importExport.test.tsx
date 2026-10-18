@@ -50,14 +50,14 @@ describe('import page', () => {
 
     it('lists children added from their own FAMC in the report', async () => {
       await runImport(2)
-      expect(await screen.findByText('2 children added to families from their own records')).toBeInTheDocument()
+      expect(await screen.findByText('2 children added to families by their INDI.FAMC lines')).toBeInTheDocument()
       expect(screen.getByText('line 20: @I4@ added as a child of family @F1@')).toBeInTheDocument()
     })
 
     it('says nothing when no child was added that way', async () => {
       await runImport(0)
       await screen.findByText('Test', { exact: false })
-      expect(screen.queryByText(/from their own record/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/INDI\.FAMC lines/)).not.toBeInTheDocument()
     })
   })
 

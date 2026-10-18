@@ -12,6 +12,8 @@ type calendarTexts struct {
 	anniversary string // names, year
 	remembrance string // names, year
 	from        string // tree name
+	unknown     string // a person without a name
+	defaultTree string // the tree named store.DefaultTreeName
 }
 
 var calendarLanguages = map[string]calendarTexts{
@@ -20,18 +22,24 @@ var calendarLanguages = map[string]calendarTexts{
 		anniversary: "Wedding anniversary: %s (%d)",
 		remembrance: "Remembrance: %s (died %d)",
 		from:        "From the family tree “%s” in GoTree.",
+		unknown:     "Unknown",
+		defaultTree: "Family tree",
 	},
 	"ru": {
 		birthday:    "День рождения: %s (год рождения %d)",
 		anniversary: "Годовщина свадьбы: %s (%d)",
 		remembrance: "День памяти: %s (год смерти %d)",
 		from:        "Из семейного дерева «%s» в GoTree.",
+		unknown:     "Без имени",
+		defaultTree: "Семейное дерево",
 	},
 	"kk": {
 		birthday:    "Туған күн: %s (туған жылы %d)",
 		anniversary: "Үйлену мерейтойы: %s (%d)",
 		remembrance: "Еске алу күні: %s (қайтыс болған жылы %d)",
 		from:        "GoTree-дегі «%s» шежіресінен.",
+		unknown:     "Аты белгісіз",
+		defaultTree: "Шежіре",
 	},
 }
 

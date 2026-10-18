@@ -95,7 +95,7 @@ func TestImportChildOnlyInFAMC(t *testing.T) {
 	if report.ChildrenFromFAMC != 3 || len(report.ChildrenFromFAMCExamples) != 3 {
 		t.Fatalf("FAMC children: %d %v", report.ChildrenFromFAMC, report.ChildrenFromFAMCExamples)
 	}
-	ex := strings.Join(report.ChildrenFromFAMCExamples, "\n")
+	ex := reportLines(report.ChildrenFromFAMCExamples)
 	for _, want := range []string{"@I4@", "@I5@", "@F1@"} {
 		if !strings.Contains(ex, want) {
 			t.Errorf("examples miss %s: %s", want, ex)
@@ -104,7 +104,7 @@ func TestImportChildOnlyInFAMC(t *testing.T) {
 	if strings.Contains(ex, "@I3@") {
 		t.Errorf("Paul is listed under CHIL and must not be reported: %s", ex)
 	}
-	broken := strings.Join(report.BrokenReferences, "\n")
+	broken := reportLines(report.BrokenReferences)
 	if !strings.Contains(broken, "@F9@") || !strings.Contains(broken, "both a partner and a child of family @F1@") {
 		t.Errorf("broken references: %s", broken)
 	}
@@ -167,7 +167,7 @@ func TestImportAncestry551(t *testing.T) {
 	if death == nil || death.Date.Raw != "12 Dezember 1920" || death.Date.Valid {
 		t.Errorf("death: %+v", death)
 	}
-	if report.InvalidDates != 1 || !strings.Contains(report.InvalidDateExamples[0], "12 Dezember 1920") {
+	if report.InvalidDates != 1 || report.InvalidDateExamples[0].Message != "12 Dezember 1920" {
 		t.Errorf("invalid dates: %d %v", report.InvalidDates, report.InvalidDateExamples)
 	}
 
@@ -270,7 +270,7 @@ func TestImportBrokenFile(t *testing.T) {
 	if report.InvalidDates != 2 {
 		t.Errorf("invalid dates: %d", report.InvalidDates)
 	}
-	joined := strings.Join(report.BrokenReferences, "\n")
+	joined := reportLines(report.BrokenReferences)
 	if !strings.Contains(joined, "@I999@") || !strings.Contains(joined, "both a partner and a child") {
 		t.Errorf("broken references: %v", report.BrokenReferences)
 	}

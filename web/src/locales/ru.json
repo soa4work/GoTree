@@ -8,7 +8,8 @@
     "signedInAs": "Вы вошли как {{name}}",
     "updateReady": "Доступна новая версия GoTree.",
     "reload": "Обновить сейчас",
-    "gopherCredit": "Логотип создан на основе талисмана Go (суслика) работы <author>Рене Френч</author>, лицензия <license>CC BY 4.0</license>."
+    "gopherCredit": "Логотип создан на основе талисмана Go (суслика) работы <author>Рене Френч</author>, лицензия <license>CC BY 4.0</license>.",
+    "description": "GoTree — семейное дерево на своём сервере"
   },
   "nav": {
     "dashboard": "Главная",
@@ -182,7 +183,11 @@
     "noChildren": "Дети не указаны.",
     "pickerHint": "Введите имя для поиска по дереву.",
     "relationshipLink": "Родство с…",
-    "viewInTree": "Показать в дереве"
+    "viewInTree": "Показать в дереве",
+    "living_M": "жив",
+    "living_F": "жива",
+    "deceased_M": "умер",
+    "deceased_F": "умерла"
   },
   "sex": {
     "M": "Мужской",
@@ -385,7 +390,14 @@
     "openPage": "Открыть страницу",
     "addRelative": "Добавить родственника",
     "leafy": "Вид с листвой",
-    "options": "Параметры"
+    "options": "Параметры",
+    "controls": {
+      "panel": "Масштаб схемы",
+      "zoomIn": "Увеличить",
+      "zoomOut": "Уменьшить",
+      "fitView": "Показать всю схему",
+      "interactive": "Закрепить или открепить схему"
+    }
   },
   "citation": {
     "sources": "Источники",
@@ -624,6 +636,46 @@
       "citations": "Ссылки на источники",
       "heirlooms": "Реликвии",
       "custody": "Владельцы реликвий"
+    },
+    "warning": {
+      "not_utf8": "В файле указана кодировка {{declared}}, но это не корректный UTF-8; файл прочитан как Windows-1252.",
+      "unreadable_line": "Нечитаемая строка пропущена: {{text}}",
+      "orphan_line": "Строка уровня {{level}} без записи над ней пропущена.",
+      "level_jump": "Уровень перескакивает с {{from}} на {{to}}; строка присоединена к строке выше.",
+      "no_header": "В файле нет заголовка (HEAD).",
+      "ansel_unreadable_one": "{{count}} символ ANSEL не удалось прочитать, он заменён на �",
+      "ansel_unreadable_few": "{{count}} символа ANSEL не удалось прочитать, они заменены на �",
+      "ansel_unreadable_many": "{{count}} символов ANSEL не удалось прочитать, они заменены на �",
+      "ansel_unreadable_other": "{{count}} символа ANSEL не удалось прочитать, они заменены на �",
+      "broken_reference": "Нет записи @{{xref}}@ ({{what}})",
+      "partner_and_child": "@{{xref}}@ одновременно партнёр и ребёнок в семье @{{family}}@; связь с ребёнком пропущена",
+      "famc_child": "@{{xref}}@ добавлен(а) ребёнком в семью @{{family}}@",
+      "famc_child_unnamed": "Человек добавлен ребёнком в семью @{{family}}@",
+      "invalid_date": "«{{date}}»"
+    },
+    "refKind": {
+      "associatedPerson": "связанный человек",
+      "note": "заметка",
+      "repository": "архив",
+      "source": "источник",
+      "family": "семья",
+      "partner": "партнёр",
+      "child": "ребёнок",
+      "holder": "владелец"
+    },
+    "dropReason": {
+      "own_history": "GoTree ведёт собственную историю изменений",
+      "old_record_number": "номер записи из прежней программы",
+      "follows_from_families": "следует из семей",
+      "own_submitter": "GoTree записывает собственного отправителя",
+      "media_records": "медиафайлы не входят в файл GEDCOM; загрузите их в GoTree",
+      "unknown_record": "неизвестный тип записи",
+      "place_form": "уровни задаёт иерархия мест",
+      "heirloom_date_phrase": "у реликвии нет поля для этого",
+      "heirloom_custody_field": "в GoTree не входит в историю владения реликвией",
+      "heirloom_field": "в GoTree не входит в описание реликвии",
+      "status_only_reason": "у статуса есть только причина",
+      "name_status": "у основного имени в GoTree нет статуса"
     }
   },
   "relationship": {
@@ -1145,7 +1197,8 @@
       "classic": "Классический",
       "heritage": "Старинный (сепия, с засечками)",
       "modern": "Современный (цветная полоса заголовка)"
-    }
+    },
+    "fileName": "семейное-дерево"
   },
   "heirloom": {
     "intro": "Предметы, передававшиеся в семье, — часы, сундук, семейная Библия, — с указанием, кто ими владел и как они ему достались.",
@@ -1299,7 +1352,9 @@
     "status_other": "На карте в {{year}} году {{count}} человека.",
     "legendMarker": "Люди в месте",
     "legendApproximate": "Место показано по объемлющему месту",
-    "legendTrail": "Перемещения до сих пор; более старые бледнеют"
+    "legendTrail": "Перемещения до сих пор; более старые бледнеют",
+    "zoomIn": "Приблизить",
+    "zoomOut": "Отдалить"
   },
   "account": {
     "passwordTitle": "Сменить пароль",
@@ -1317,6 +1372,25 @@
     "signOutEverywhere": "Выйти на всех устройствах",
     "signOutEverywhereTitle": "Выйти на всех устройствах?",
     "signOutEverywhereMessage": "Все сеансы завершатся, включая этот, и нужно будет войти снова."
+  },
+  "clientError": {
+    "network": "Нет связи с сервером. Проверьте подключение и попробуйте снова.",
+    "unavailable": "Сервер сейчас недоступен (ошибка {{status}}). Попробуйте чуть позже.",
+    "http": "Сервер ответил ошибкой {{status}}."
+  },
+  "fieldName": {
+    "withColumn": "{{column}}: {{message}}",
+    "givenNames": "Имя и отчество",
+    "surname": "Фамилия",
+    "sex": "Пол",
+    "notes": "Заметки",
+    "date": "Дата",
+    "placeId": "Место",
+    "description": "Подробности",
+    "type": "Событие",
+    "customLabel": "Название события",
+    "page": "Место в источнике",
+    "text": "Текст"
   },
   "apiError": {
     "invalid_json": "Запрос не является корректным JSON.",

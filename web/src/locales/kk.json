@@ -8,7 +8,8 @@
     "signedInAs": "Кірген пайдаланушы: {{name}}",
     "updateReady": "GoTree-дің жаңа нұсқасы дайын.",
     "reload": "Қазір қайта жүктеу",
-    "gopherCredit": "Логотип <author>Renée French</author> жасаған Go gopher кейіпкерінің негізінде жасалған, лицензиясы — <license>CC BY 4.0</license>."
+    "gopherCredit": "Логотип <author>Рене Френч</author> салған Go талисманы — гофер негізінде жасалған, лицензиясы — <license>CC BY 4.0</license>.",
+    "description": "GoTree — өз серверіңіздегі шежіре"
   },
   "nav": {
     "dashboard": "Басты бет",
@@ -176,7 +177,11 @@
     "noChildren": "Балалары жазылмаған.",
     "pickerHint": "Шежіреден іздеу үшін есімді теріңіз.",
     "relationshipLink": "Туыстығы…",
-    "viewInTree": "Ағаштан көру"
+    "viewInTree": "Ағаштан көру",
+    "living_M": "тірі",
+    "living_F": "тірі",
+    "deceased_M": "қайтыс болған",
+    "deceased_F": "қайтыс болған"
   },
   "sex": {
     "M": "Ер",
@@ -377,7 +382,14 @@
     "openPage": "Бетті ашу",
     "addRelative": "Туыс қосу",
     "leafy": "Жапырақты көрініс",
-    "options": "Параметрлер"
+    "options": "Параметрлер",
+    "controls": {
+      "panel": "Сызба масштабы",
+      "zoomIn": "Үлкейту",
+      "zoomOut": "Кішірейту",
+      "fitView": "Бүкіл сызбаны көрсету",
+      "interactive": "Сызбаны бекіту немесе босату"
+    }
   },
   "citation": {
     "sources": "Дереккөздер",
@@ -592,6 +604,44 @@
       "citations": "Сілтемелер",
       "heirlooms": "Мұралар",
       "custody": "Мұра иелері"
+    },
+    "warning": {
+      "not_utf8": "Файлда {{declared}} кодтауы көрсетілген, бірақ ол жарамды UTF-8 емес; файл Windows-1252 ретінде оқылды.",
+      "unreadable_line": "Оқылмайтын жол өткізіліп жіберілді: {{text}}",
+      "orphan_line": "Үстінде жазба жоқ {{level}} деңгейлі жол өткізіліп жіберілді.",
+      "level_jump": "Деңгей {{from}} → {{to}} болып секіреді; жол жоғарыдағы жолға тіркелді.",
+      "no_header": "Файлда тақырып (HEAD) жоқ.",
+      "ansel_unreadable_one": "{{count}} ANSEL таңбасы оқылмады, олар � белгісімен ауыстырылды",
+      "ansel_unreadable_other": "{{count}} ANSEL таңбасы оқылмады, олар � белгісімен ауыстырылды",
+      "broken_reference": "@{{xref}}@ жазбасы ({{what}}) жоқ",
+      "partner_and_child": "@{{xref}}@ — @{{family}}@ отбасында әрі жұбай, әрі бала; бала байланысы өткізілді",
+      "famc_child": "@{{xref}}@ @{{family}}@ отбасына бала ретінде қосылды",
+      "famc_child_unnamed": "Адам @{{family}}@ отбасына бала ретінде қосылды",
+      "invalid_date": "«{{date}}»"
+    },
+    "refKind": {
+      "associatedPerson": "байланысты адам",
+      "note": "ескертпе",
+      "repository": "мұрағат",
+      "source": "дереккөз",
+      "family": "отбасы",
+      "partner": "жұбайы",
+      "child": "бала",
+      "holder": "иесі"
+    },
+    "dropReason": {
+      "own_history": "GoTree өзгерістер тарихын өзі жүргізеді",
+      "old_record_number": "бұрынғы бағдарламадағы жазба нөмірі",
+      "follows_from_families": "отбасылардан шығады",
+      "own_submitter": "GoTree жіберушіні өзі жазады",
+      "media_records": "медиа файлдар GEDCOM файлына кірмейді; оларды GoTree-ге жүктеңіз",
+      "unknown_record": "белгісіз жазба түрі",
+      "place_form": "деңгейлерді орындар иерархиясы сипаттайды",
+      "heirloom_date_phrase": "мұрада мұны сақтайтын орын жоқ",
+      "heirloom_custody_field": "GoTree-де мұраның иелену тарихына кірмейді",
+      "heirloom_field": "GoTree-де мұраның сипаттамасына кірмейді",
+      "status_only_reason": "мәртебенің тек себебі болады",
+      "name_status": "GoTree-де негізгі есімнің мәртебесі жоқ"
     }
   },
   "relationship": {
@@ -1040,8 +1090,8 @@
     "photos": "Фотоларды көрсету",
     "summary_one": "{{paper}} бетінде {{count}} адам",
     "summary_other": "{{paper}} бетінде {{count}} адам",
-    "textSize": "есімдер {{pt}} pt өлшемімен",
-    "tooSmall": "Есімдер {{pt}} pt өлшемімен басылады, оны оқу қиын. Үлкенірек қағазды немесе азырақ буынды таңдаңыз.",
+    "textSize": "есімдер {{pt}} пт өлшемімен",
+    "tooSmall": "Есімдер {{pt}} пт өлшемімен басылады, оны оқу қиын. Үлкенірек қағазды немесе азырақ буынды таңдаңыз.",
     "print": "Басып шығару немесе PDF ретінде сақтау",
     "downloadSvg": "SVG жүктеп алу",
     "imageLabel_one": "{{title}}: {{count}} адамның сызбасы",
@@ -1061,7 +1111,8 @@
       "classic": "Классикалық",
       "heritage": "Мұра (сепия, сериф)",
       "modern": "Заманауи (түрлі-түсті тақырып жолағы)"
-    }
+    },
+    "fileName": "шежіре"
   },
   "heirloom": {
     "intro": "Отбасында жалғасып келе жатқан заттар — сағат, сандық, отбасылық Інжіл — оларды кім ұстағаны және қалай алғаны туралы.",
@@ -1196,14 +1247,16 @@
     "lookupFailed": "OpenStreetMap-қа қосылу мүмкін болмады. Оның орнына координатаны қолмен енгізіңіз.",
     "lookupNone": "OpenStreetMap бұл орынға сәйкестік таппады.",
     "useCandidate": "Осы координатаны қолдану",
-    "lookupAttribution": "Нәтижелер © OpenStreetMap contributors (Nominatim). Сәйкестік дұрыс орын екеніне көз жеткізіп, сақтаңыз.",
-    "attribution": "Карта тақташалары © OpenStreetMap contributors; оларды жүктеу openstreetmap.org сайтына сұраныс жібереді.",
+    "lookupAttribution": "Нәтижелер © OpenStreetMap қатысушылары (Nominatim). Сәйкестік дұрыс орын екеніне көз жеткізіп, сақтаңыз.",
+    "attribution": "Карта тақташалары © OpenStreetMap қатысушылары; оларды жүктеу openstreetmap.org сайтына сұраныс жібереді.",
     "mapLabel": "{{year}} жылы адамдар тұрған жерлердің картасы",
     "status_one": "{{year}} жылы картада {{count}} адам.",
     "status_other": "{{year}} жылы картада {{count}} адам.",
     "legendMarker": "Орындағы адамдар",
     "legendApproximate": "Қамтитын орында көрсетілген орын",
-    "legendTrail": "Осы кезге дейінгі көшулер; ескілері солғындайды"
+    "legendTrail": "Осы кезге дейінгі көшулер; ескілері солғындайды",
+    "zoomIn": "Жақындату",
+    "zoomOut": "Алыстату"
   },
   "account": {
     "passwordTitle": "Құпиясөзді өзгерту",
@@ -1221,6 +1274,25 @@
     "signOutEverywhere": "Барлық құрылғылардан шығу",
     "signOutEverywhereTitle": "Барлық құрылғылардан шығу керек пе?",
     "signOutEverywhereMessage": "Барлық сеанс, соның ішінде осы сеанс та аяқталады, қайта кіру қажет болады."
+  },
+  "clientError": {
+    "network": "Сервермен байланыс жоқ. Қосылымды тексеріп, қайталап көріңіз.",
+    "unavailable": "Сервер қазір қолжетімсіз (қате {{status}}). Сәлден кейін қайталап көріңіз.",
+    "http": "Сервер {{status}} қатесімен жауап берді."
+  },
+  "fieldName": {
+    "withColumn": "{{column}}: {{message}}",
+    "givenNames": "Аты",
+    "surname": "Тегі",
+    "sex": "Жынысы",
+    "notes": "Ескертпелер",
+    "date": "Күні",
+    "placeId": "Орны",
+    "description": "Мәліметтер",
+    "type": "Оқиға",
+    "customLabel": "Оқиға атауы",
+    "page": "Дереккөздегі орны",
+    "text": "Мәтін"
   },
   "apiError": {
     "invalid_json": "Сұраныс жарамды JSON емес.",

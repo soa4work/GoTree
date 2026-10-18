@@ -86,6 +86,52 @@ func TestCalendarFeedLanguage(t *testing.T) {
 	}
 }
 
+func TestCalendarFeedUnknownNameAndTreeName(t *testing.T) {
+	unfold := func(body string) string { return strings.ReplaceAll(body, "\r\n ", "") }
+	feedFor := func(c *client) store.CalendarFeed {
+		var nobody store.Person
+		c.call("POST", "/api/persons", map[string]any{"sex": "F"}, http.StatusCreated, &nobody)
+		c.call("POST", "/api/events", map[string]any{"personId": nobody.ID, "type": "BIRT", "date": "12 MAR 1850"}, http.StatusCreated, nil)
+		var feed store.CalendarFeed
+		c.call("POST", "/api/calendar-feeds", map[string]any{"label": "Phone", "includeLiving": true}, http.StatusCreated, &feed)
+		return feed
+	}
+
+	// The default tree name and a person without a name follow the language.
+	ts := newServer(t, builtFrontend)
+	c := loggedIn(t, ts)
+	feed := feedFor(c)
+	for _, tc := range []struct {
+		query string
+		want  []string
+	}{
+		{"", []string{"SUMMARY:Birthday: Unknown (born 1850)", "X-WR-CALNAME:Family tree", "“Family tree”"}},
+		{"?lang=ru", []string{"SUMMARY:День рождения: Без имени (год рождения 1850)", "X-WR-CALNAME:Семейное дерево", "«Семейное дерево»"}},
+		{"?lang=kk", []string{"SUMMARY:Туған күн: Аты белгісіз (туған жылы 1850)", "X-WR-CALNAME:Шежіре", "«Шежіре» шежіресінен."}},
+	} {
+		_, body := get(t, ts.URL+"/ical/"+feed.Token+".ics"+tc.query)
+		body = unfold(body)
+		for _, want := range tc.want {
+			if !strings.Contains(body, want) {
+				t.Errorf("%q: feed lacks %q:\n%s", tc.query, want, body)
+			}
+		}
+	}
+
+	// A name the owner chose is shown as it is.
+	ts2 := newServer(t, builtFrontend)
+	c2 := newClient(t, ts2)
+	c2.call("POST", "/api/auth/setup", map[string]string{"username": "admin", "password": testPassword, "treeName": "Weber"}, http.StatusOK, nil)
+	feed2 := feedFor(c2)
+	_, body := get(t, ts2.URL+"/ical/"+feed2.Token+".ics?lang=ru")
+	body = unfold(body)
+	for _, want := range []string{"X-WR-CALNAME:Weber", "«Weber»"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("custom tree name: feed lacks %q:\n%s", want, body)
+		}
+	}
+}
+
 func TestCalendarTexts(t *testing.T) {
 	for _, tc := range []struct {
 		lang, want string
@@ -108,13 +154,16 @@ func TestCalendarLanguagesComplete(t *testing.T) {
 		}
 	}
 	for lang, texts := range calendarLanguages {
-		for name, s := range map[string]string{"birthday": texts.birthday, "anniversary": texts.anniversary, "remembrance": texts.remembrance, "from": texts.from} {
+		for name, s := range map[string]string{"birthday": texts.birthday, "anniversary": texts.anniversary, "remembrance": texts.remembrance, "from": texts.from, "unknown": texts.unknown, "defaultTree": texts.defaultTree} {
 			if strings.TrimSpace(s) == "" {
 				t.Errorf("%s: %s is empty", lang, name)
 			}
 			want := 2
-			if name == "from" {
+			switch name {
+			case "from":
 				want = 1
+			case "unknown", "defaultTree":
+				want = 0
 			}
 			if n := strings.Count(s, "%"); n != want {
 				t.Errorf("%s: %s %q has %d verbs, want %d", lang, name, s, n, want)

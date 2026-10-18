@@ -8,7 +8,8 @@
     "signedInAs": "Signed in as {{name}}",
     "updateReady": "A new version of GoTree is ready.",
     "reload": "Reload now",
-    "gopherCredit": "Logo based on the Go gopher by <author>Renée French</author>, licensed under <license>CC BY 4.0</license>."
+    "gopherCredit": "Logo based on the Go gopher by <author>Renée French</author>, licensed under <license>CC BY 4.0</license>.",
+    "description": "GoTree — self-hosted family tree"
   },
   "nav": {
     "dashboard": "Home",
@@ -176,7 +177,11 @@
     "noChildren": "No children recorded.",
     "pickerHint": "Type a name to search the tree.",
     "relationshipLink": "Relationship to…",
-    "viewInTree": "View in tree"
+    "viewInTree": "View in tree",
+    "living_M": "living",
+    "living_F": "living",
+    "deceased_M": "deceased",
+    "deceased_F": "deceased"
   },
   "sex": {
     "M": "Male",
@@ -377,7 +382,14 @@
     "openPage": "Open page",
     "addRelative": "Add a relative",
     "leafy": "Leafy look",
-    "options": "Options"
+    "options": "Options",
+    "controls": {
+      "panel": "Zoom controls",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fitView": "Show the whole chart",
+      "interactive": "Lock or unlock the chart"
+    }
   },
   "citation": {
     "sources": "Sources",
@@ -592,6 +604,44 @@
       "citations": "Citations",
       "heirlooms": "Heirlooms",
       "custody": "Heirloom holders"
+    },
+    "warning": {
+      "not_utf8": "The file says {{declared}} but is not valid UTF-8; it was read as Windows-1252.",
+      "unreadable_line": "Unreadable line skipped: {{text}}",
+      "orphan_line": "A line at level {{level}} without a record above it was skipped.",
+      "level_jump": "The level jumps from {{from}} to {{to}}; the line was attached to the line above.",
+      "no_header": "The file has no header (HEAD).",
+      "ansel_unreadable_one": "{{count}} ANSEL character could not be read and was replaced with �",
+      "ansel_unreadable_other": "{{count}} ANSEL characters could not be read and were replaced with �",
+      "broken_reference": "{{what}} @{{xref}}@ does not exist",
+      "partner_and_child": "@{{xref}}@ is both a partner and a child of family @{{family}}@; the child link was skipped",
+      "famc_child": "@{{xref}}@ added as a child of family @{{family}}@",
+      "famc_child_unnamed": "A person added as a child of family @{{family}}@",
+      "invalid_date": "{{date}}"
+    },
+    "refKind": {
+      "associatedPerson": "the associated person",
+      "note": "the note",
+      "repository": "the repository",
+      "source": "the source",
+      "family": "the family",
+      "partner": "the partner",
+      "child": "the child",
+      "holder": "the holder"
+    },
+    "dropReason": {
+      "own_history": "GoTree keeps its own change history",
+      "old_record_number": "a record number of the old program",
+      "follows_from_families": "follows from the families",
+      "own_submitter": "GoTree writes its own submitter",
+      "media_records": "media files are not part of a GEDCOM file; upload them in GoTree",
+      "unknown_record": "unknown record type",
+      "place_form": "the place hierarchy describes the levels",
+      "heirloom_date_phrase": "heirlooms have nowhere to keep it",
+      "heirloom_custody_field": "not part of an heirloom's custody in GoTree",
+      "heirloom_field": "not part of an heirloom in GoTree",
+      "status_only_reason": "a status has only a reason",
+      "name_status": "the main name has no status in GoTree"
     }
   },
   "relationship": {
@@ -1061,7 +1111,8 @@
       "classic": "Classic",
       "heritage": "Heritage (sepia, serif)",
       "modern": "Modern (coloured title band)"
-    }
+    },
+    "fileName": "family-tree"
   },
   "heirloom": {
     "intro": "Objects handed down in the family — a watch, a chest, a family Bible — with who held them and how they got them.",
@@ -1203,7 +1254,9 @@
     "status_other": "{{count}} people on the map in {{year}}.",
     "legendMarker": "People at a place",
     "legendApproximate": "Place shown at an enclosing place",
-    "legendTrail": "Moves so far; older ones fade"
+    "legendTrail": "Moves so far; older ones fade",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out"
   },
   "account": {
     "passwordTitle": "Change password",
@@ -1221,6 +1274,25 @@
     "signOutEverywhere": "Sign out everywhere",
     "signOutEverywhereTitle": "Sign out everywhere?",
     "signOutEverywhereMessage": "All sessions end, including this one, and you will need to log in again."
+  },
+  "clientError": {
+    "network": "No connection to the server. Check the connection and try again.",
+    "unavailable": "The server is not available right now (error {{status}}). Try again in a moment.",
+    "http": "The server answered with error {{status}}."
+  },
+  "fieldName": {
+    "withColumn": "{{column}}: {{message}}",
+    "givenNames": "Given names",
+    "surname": "Surname",
+    "sex": "Sex",
+    "notes": "Notes",
+    "date": "Date",
+    "placeId": "Place",
+    "description": "Details",
+    "type": "Event",
+    "customLabel": "Name of the event",
+    "page": "Where in the source",
+    "text": "Text"
   },
   "apiError": {
     "invalid_json": "The request was not valid JSON.",

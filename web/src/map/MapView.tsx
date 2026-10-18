@@ -28,7 +28,10 @@ export default function MapView({ data, positions, year }: Props) {
 
   useEffect(() => {
     if (!box.current) return
-    const m = L.map(box.current, { scrollWheelZoom: false, keyboard: true })
+    const m = L.map(box.current, { scrollWheelZoom: false, keyboard: true, zoomControl: false })
+    L.control.zoom({ zoomInTitle: t('map.zoomIn'), zoomOutTitle: t('map.zoomOut') }).addTo(m)
+    // The default prefix carries an English title; keep the link, which is a proper name.
+    m.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>')
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -39,7 +42,19 @@ export default function MapView({ data, positions, year }: Props) {
       m.remove()
       map.current = null
     }
+    // The map is created once; the effect below follows language changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const set = (cls: string, text: string) => {
+      const a = box.current?.querySelector(`.${cls}`)
+      a?.setAttribute('title', text)
+      a?.setAttribute('aria-label', text)
+    }
+    set('leaflet-control-zoom-in', t('map.zoomIn'))
+    set('leaflet-control-zoom-out', t('map.zoomOut'))
+  }, [t])
 
   // Fit to all places of the data once, not to each year, so the map holds
   // still while it plays.

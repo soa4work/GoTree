@@ -102,6 +102,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Descendants of a person who married a cousin are complete again in the tree, in share links to a
+  branch and on the migration map: the other marriages and children of that cousin were left out (#56)
+
 - Deleting a person, event, family, name or heirloom also deletes citations that supported only
   it, instead of leaving them behind on the source; citations already left without any fact are
   removed on update, and a citation can no longer be created through the API without a fact (#56)

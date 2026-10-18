@@ -110,7 +110,11 @@ func (s *Store) Tree(ctx context.Context, a Actor, rootID int64, opt TreeOptions
 	}
 
 	// Descendants: the partner families of each generation, their partners,
-	// then their children.
+	// then their children. people also holds ancestors, siblings and
+	// partners, so it cannot tell whom the walk has followed: expanded does.
+	// A partner who is also a descendant (cousins who married) is expanded
+	// when reached as a child.
+	expanded := map[int64]bool{rootID: true}
 	frontier = []int64{rootID}
 	for gen := 0; gen < opt.Down && len(frontier) > 0; gen++ {
 		fams, err := s.treeFamilies(ctx, a, partnerFamiliesOf, frontier)
@@ -130,15 +134,17 @@ func (s *Store) Tree(ctx context.Context, a Actor, rootID int64, opt TreeOptions
 				}
 			}
 			for _, c := range f.Children {
-				if people[c.PersonID] {
-					continue
+				if !people[c.PersonID] {
+					if full() {
+						g.Truncated = true
+						continue
+					}
+					people[c.PersonID] = true
 				}
-				if full() {
-					g.Truncated = true
-					continue
+				if !expanded[c.PersonID] {
+					expanded[c.PersonID] = true
+					next = append(next, c.PersonID)
 				}
-				people[c.PersonID] = true
-				next = append(next, c.PersonID)
 			}
 		}
 		frontier = next

@@ -25,13 +25,13 @@ var calendarLanguages = map[string]calendarTexts{
 		birthday:    "День рождения: %s (год рождения %d)",
 		anniversary: "Годовщина свадьбы: %s (%d)",
 		remembrance: "День памяти: %s (год смерти %d)",
-		from:        "Из семейного древа «%s» в GoTree.",
+		from:        "Из семейного дерева «%s» в GoTree.",
 	},
 	"kk": {
 		birthday:    "Туған күн: %s (туған жылы %d)",
-		anniversary: "Үйлену тойының жылдығы: %s (%d)",
+		anniversary: "Үйлену мерейтойы: %s (%d)",
 		remembrance: "Еске алу күні: %s (қайтыс болған жылы %d)",
-		from:        `GoTree-дегі "%s" шежіресінен.`,
+		from:        "GoTree-дегі «%s» шежіресінен.",
 	},
 }
 

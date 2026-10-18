@@ -9,11 +9,16 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+// BcryptCost is the bcrypt cost of new password hashes. Tests lower it to
+// bcrypt.MinCost before they run; nothing else may change it.
+var BcryptCost = bcrypt.DefaultCost
 
 // User is an account.
 type User struct {
@@ -99,7 +104,7 @@ func (s *Store) Setup(ctx context.Context, in SetupInput) (User, error) {
 		return User{}, err
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), BcryptCost)
 	if err != nil {
 		return User{}, err
 	}
@@ -159,7 +164,10 @@ func validUsername(s string) bool {
 
 // dummyHash makes a login for an unknown user cost as much as one with a
 // wrong password, so response times do not reveal which usernames exist.
-var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("gotree-dummy-password"), bcrypt.DefaultCost)
+var dummyHash = sync.OnceValue(func() []byte {
+	h, _ := bcrypt.GenerateFromPassword([]byte("gotree-dummy-password"), BcryptCost)
+	return h
+})
 
 // Authenticate checks a username and password.
 func (s *Store) Authenticate(ctx context.Context, username, password string) (User, error) {
@@ -169,7 +177,7 @@ func (s *Store) Authenticate(ctx context.Context, username, password string) (Us
 		SELECT id, username, display_name, role, password_hash FROM users WHERE username = ?`,
 		strings.TrimSpace(username)).Scan(&u.ID, &u.Username, &u.DisplayName, &u.Role, &hash)
 	if errors.Is(err, sql.ErrNoRows) {
-		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+		_ = bcrypt.CompareHashAndPassword(dummyHash(), []byte(password))
 		return User{}, ErrBadCredentials
 	}
 	if err != nil {
@@ -381,7 +389,7 @@ func (s *Store) ChangePassword(ctx context.Context, userID, keepSessionID int64,
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(current)) != nil {
 		return &ValidationError{Fields: map[string]string{"currentPassword": "is not your current password"}}
 	}
-	newHash, err := bcrypt.GenerateFromPassword([]byte(next), bcrypt.DefaultCost)
+	newHash, err := bcrypt.GenerateFromPassword([]byte(next), BcryptCost)
 	if err != nil {
 		return err
 	}

@@ -154,6 +154,9 @@ func (s *Store) ExportGEDCOM(ctx context.Context, a Actor, opt ExportOptions) (E
 	if err := ex.load(ctx); err != nil {
 		return Export{}, err
 	}
+	if err := ex.loadMediaXrefs(ctx); err != nil {
+		return Export{}, err
+	}
 	if err := ex.build(ctx); err != nil {
 		return Export{}, err
 	}
@@ -416,6 +419,29 @@ func (ex *exporter) load(ctx context.Context) error {
 		rows.Close()
 	}
 	return nil
+}
+
+// loadMediaXrefs maps the GEDCOM IDs of imported media objects to the ones
+// the export writes, so that kept pointers to them stay valid. Without media
+// in the export there are no such objects, and those pointers are dropped.
+func (ex *exporter) loadMediaXrefs(ctx context.Context) error {
+	if !ex.opt.WithMedia {
+		return nil
+	}
+	rows, err := ex.s.DB.QueryContext(ctx, `SELECT id, gedcom_xref FROM media WHERE tree_id = ? AND gedcom_xref <> ''`, ex.a.TreeID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var xref string
+		if err := rows.Scan(&id, &xref); err != nil {
+			return err
+		}
+		ex.xrefMap[xref] = fmt.Sprintf("O%d", id)
+	}
+	return rows.Err()
 }
 
 func personXref(id int64) string { return fmt.Sprintf("I%d", id) }
@@ -947,6 +973,13 @@ func (ex *exporter) fromKept(k keptNode) *gedcom.Node {
 				return nil
 			}
 		}
+		if strings.HasPrefix(mapped, "O") {
+			// A kept pointer to a media object (under a citation, say) needs
+			// the object in the file.
+			var id int64
+			fmt.Sscanf(mapped, "O%d", &id)
+			ex.used[id] = true
+		}
 	}
 	for _, c := range k.Children {
 		if cn := ex.fromKept(c); cn != nil {
@@ -1064,7 +1097,7 @@ var mediaExt = map[string]string{
 
 func (ex *exporter) mediaRecords(ctx context.Context) ([]*gedcom.Node, error) {
 	rows, err := ex.s.DB.QueryContext(ctx, `
-		SELECT id, sha256, mime, kind, title FROM media WHERE tree_id = ? ORDER BY id`, ex.a.TreeID)
+		SELECT id, sha256, mime, kind, title, description, extra_json FROM media WHERE tree_id = ? ORDER BY id`, ex.a.TreeID)
 	if err != nil {
 		return nil, err
 	}
@@ -1072,8 +1105,8 @@ func (ex *exporter) mediaRecords(ctx context.Context) ([]*gedcom.Node, error) {
 	var out []*gedcom.Node
 	for rows.Next() {
 		var id int64
-		var sha, mime, kind, title string
-		if err := rows.Scan(&id, &sha, &mime, &kind, &title); err != nil {
+		var sha, mime, kind, title, description, extra string
+		if err := rows.Scan(&id, &sha, &mime, &kind, &title, &description, &extra); err != nil {
 			return nil, err
 		}
 		// Media linked only to records that were left out for privacy stay out,
@@ -1098,7 +1131,10 @@ func (ex *exporter) mediaRecords(ctx context.Context) ([]*gedcom.Node, error) {
 			file.Children = append(file.Children, form)
 			add(file, "TITL", title)
 		}
-		out = append(out, &gedcom.Node{Xref: fmt.Sprintf("O%d", id), Tag: "OBJE", Children: []*gedcom.Node{file}})
+		obje := &gedcom.Node{Xref: fmt.Sprintf("O%d", id), Tag: "OBJE", Children: []*gedcom.Node{file}}
+		add(obje, "NOTE", description)
+		obje.Children = append(obje.Children, ex.kept(extra)...)
+		out = append(out, obje)
 		ex.out.Media = append(ex.out.Media, MediaFile{SHA256: sha, Path: path, Mime: mime})
 		ex.out.Counts["media"]++
 	}

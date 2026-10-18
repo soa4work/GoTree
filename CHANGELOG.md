@@ -9,6 +9,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- GEDCOM import reads photos and documents: the files in a GEDZIP or zip become media with their
+  title and description, attached to the people, events, families, sources and heirlooms that point
+  to them, and a primary photo becomes the portrait; an export without media no longer points to
+  media records it does not contain (#54)
+
 - Accounts, trees and members over the API (#59): administrators create and delete accounts,
   change their role and reset passwords (which signs the account out everywhere); owners add
   existing accounts to a tree as owner, editor or viewer, change roles and remove members, and a

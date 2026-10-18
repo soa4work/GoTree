@@ -131,7 +131,8 @@ type CalendarEntry struct {
 	Kind string // BIRT, MARR or DEAT
 	// Year, Month and Day are the Gregorian date of the original event.
 	Year, Month, Day int
-	Names            []string
+	// Names is empty for a person without a name.
+	Names []string
 }
 
 // Calendar is the content of a feed.
@@ -234,10 +235,9 @@ func (s *Store) CalendarByToken(ctx context.Context, token string) (Calendar, er
 	}
 	for _, p := range found {
 		for _, id := range p.ids {
+			// An empty name stays empty: the API puts "Unknown" in the
+			// language of the feed.
 			name := strings.TrimSpace(refs[id].GivenNames + " " + refs[id].Surname)
-			if name == "" {
-				name = "Unknown"
-			}
 			p.entry.Names = append(p.entry.Names, name)
 		}
 		cal.Entries = append(cal.Entries, p.entry)

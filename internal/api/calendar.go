@@ -56,11 +56,22 @@ func (s *Server) icalFeed(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	out := ical.Calendar{Name: cal.TreeName}
 	texts := calendarTextsFor(r.URL.Query().Get("lang"))
-	from := fmt.Sprintf(texts.from, cal.TreeName)
+	name := cal.TreeName
+	if name == store.DefaultTreeName {
+		name = texts.defaultTree
+	}
+	out := ical.Calendar{Name: name}
+	from := fmt.Sprintf(texts.from, name)
 	for _, e := range cal.Entries {
-		summary := texts.summary(e.Kind, strings.Join(e.Names, " & "), e.Year)
+		names := make([]string, len(e.Names))
+		for i, n := range e.Names {
+			if n == "" {
+				n = texts.unknown
+			}
+			names[i] = n
+		}
+		summary := texts.summary(e.Kind, strings.Join(names, " & "), e.Year)
 		out.Events = append(out.Events, ical.Event{UID: e.UID, Summary: summary, Description: from, Year: e.Year, Month: e.Month, Day: e.Day})
 	}
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")

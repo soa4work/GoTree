@@ -31,10 +31,23 @@ export class ApiError extends Error {
   }
 }
 
+/** The request never got an answer: offline, DNS, a dropped connection, CORS. */
+export class NetworkError extends Error {}
+
+/** fetch, with a failure to get any answer reported as a NetworkError (an abort stays an AbortError). */
+async function send(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init)
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') throw e
+    throw new NetworkError(e instanceof Error ? e.message : String(e))
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
-  const res = await fetch(`/api${path}`, {
+  const res = await send(`/api${path}`, {
     method,
     signal,
     headers,
@@ -61,7 +74,7 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
 export async function uploadFile<T>(path: string, file: File): Promise<T> {
   const body = new FormData()
   body.append('file', file)
-  const res = await fetch(`/api${path}`, { method: 'POST', body, headers: { Accept: 'application/json' } })
+  const res = await send(`/api${path}`, { method: 'POST', body, headers: { Accept: 'application/json' } })
   if (!res.ok) {
     let message = res.statusText
     let body: ErrorBody = {}
@@ -96,11 +109,24 @@ export interface User {
   role: 'admin' | 'user'
 }
 
+export type TreeRole = 'owner' | 'editor' | 'viewer'
+
 export interface AuthState {
   setupRequired: boolean
   user: User | null
-  tree: { id: number; name: string; role: 'owner' | 'editor' | 'viewer' } | null
+  tree: { id: number; name: string; role: TreeRole } | null
 }
+
+/** One tree of the signed-in user; `current` marks the one this session works in. */
+export interface TreeSummary {
+  id: number
+  name: string
+  role: TreeRole
+  current: boolean
+}
+
+/** Moves this session to another tree of the user and answers with the new auth state. */
+export const switchTree = (treeId: number) => putJSON<AuthState>('/auth/tree', { treeId })
 
 export const getAuthState = (signal?: AbortSignal) => getJSON<AuthState>('/auth/state', signal)
 

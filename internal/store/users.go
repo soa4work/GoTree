@@ -77,6 +77,11 @@ func (s *Store) NeedsSetup(ctx context.Context) (bool, error) {
 	return n == 0, err
 }
 
+// DefaultTreeName is the name of a tree created without one. It is stored in
+// English; clients show it in the interface language (web/src/lib/treeName.ts
+// and the calendar feed do).
+const DefaultTreeName = "Family tree"
+
 // Setup creates the first admin and the first tree. It fails with
 // ErrSetupDone once any user exists, so it cannot be used to add accounts.
 func (s *Store) Setup(ctx context.Context, in SetupInput) (User, error) {
@@ -84,7 +89,7 @@ func (s *Store) Setup(ctx context.Context, in SetupInput) (User, error) {
 	in.DisplayName = strings.TrimSpace(in.DisplayName)
 	in.TreeName = strings.TrimSpace(in.TreeName)
 	if in.TreeName == "" {
-		in.TreeName = "Family tree"
+		in.TreeName = DefaultTreeName
 	}
 	var v validator
 	v.check(validUsername(in.Username), "username", "use 2–64 letters, digits, dots, dashes or underscores")

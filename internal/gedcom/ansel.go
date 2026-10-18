@@ -61,7 +61,7 @@ func decodeANSEL(data []byte, doc *Document) string {
 		marks = marks[:0]
 	}
 	if unknown > 0 {
-		doc.warn(0, "%d ANSEL characters could not be read and were replaced with �", unknown)
+		doc.warn(0, WarnANSEL, map[string]any{"count": unknown}, "%d ANSEL characters could not be read and were replaced with �", unknown)
 	}
 	return norm.NFC.String(b.String())
 }

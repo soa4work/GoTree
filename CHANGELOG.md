@@ -9,6 +9,15 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Tree switcher in the header and a screen to pick or create a tree; a Members page where owners
+  rename the tree, add accounts by username as owner, editor or viewer, change roles and remove
+  members, and where every member can leave the tree; viewers can export only without living
+  people (#59)
+
+- Accounts page for administrators: create accounts, change their name and role, reset a
+  password and delete an account; the backup section says that it covers every tree and
+  account (#59)
+
 - GEDCOM import reads photos and documents: the files in a GEDZIP or zip become media with their
   title and description, attached to the people, events, families, sources and heirlooms that point
   to them, and a primary photo becomes the portrait; an export without media no longer points to
@@ -131,6 +140,14 @@ and the versioning [Semantic Versioning](https://semver.org/).
 - GEDCOM export keeps who took part in an event: a participant's own role name and notes are
   written in 5.5.1 and 7.0 and read back, and witnesses of marriages and other family events are no
   longer left out of 5.5.1 files; editing an event no longer clears its participants' notes (#54)
+
+- The interface no longer falls back to English in Russian and Kazakh: tree and map zoom buttons,
+  network and proxy errors, GEDCOM import warnings, dropped-tag reasons and broken references,
+  transcription row errors, the calendar's "Unknown", the default tree name, the page language
+  and description, Kazakh sorting, decimal commas and the chart file name; the person line says
+  «умер»/«умерла» by sex; OpenStreetMap lookups keep one request per second across all places
+  and return names in the interface language; the pages are checked in Russian and Kazakh at
+  phone width (#61)
 
 - GEDCOM import keeps the notes and sources of every name: NAME.NOTE becomes a note on the name,
   shown and editable on the person, sources of other and married names are attached to those names,

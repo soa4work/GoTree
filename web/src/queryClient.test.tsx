@@ -35,6 +35,22 @@ describe('createQueryClient', () => {
     expect(spy).not.toHaveBeenCalled()
   })
 
+  it.each(['not_member', 'view_only'])('re-checks the auth state when a mutation gets a 403 %s', async (code) => {
+    const client = createQueryClient()
+    client.setQueryData(['auth'], state(admin))
+    const spy = vi.spyOn(client, 'invalidateQueries')
+    await failMutation(client, new ApiError(403, 'no', {}, { code }))
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['auth'] })
+  })
+
+  it('ignores a 403 with another code', async () => {
+    const client = createQueryClient()
+    client.setQueryData(['auth'], state(admin))
+    const spy = vi.spyOn(client, 'invalidateQueries')
+    await failMutation(client, new ApiError(403, 'no', {}, { code: 'owner_only' }))
+    expect(spy).not.toHaveBeenCalled()
+  })
+
   it('ignores other errors', async () => {
     const client = createQueryClient()
     client.setQueryData(['auth'], state(admin))

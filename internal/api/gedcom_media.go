@@ -15,15 +15,16 @@ import (
 	"github.com/praetorianer777/gotree/internal/store"
 )
 
-// Why a file of a GEDZIP was not imported; they end up in the import report.
+// Why a file of a GEDZIP was not imported: the drop codes that end up in the
+// import report.
 const (
-	skipWeb       = "links to files on the web are not imported"
-	skipNotInZip  = "the file is not in the zip"
-	skipTooLarge  = "the file is larger than the upload limit"
-	skipBomb      = "the zip unpacks to more than the import limit"
-	skipType      = "this kind of file is not supported"
-	skipPixels    = "the image is larger than the pixel limit"
-	skipUnreadble = "the file in the zip cannot be read"
+	skipWeb       = store.DropWebLink
+	skipNotInZip  = store.DropFileNotInZip
+	skipTooLarge  = store.DropFileTooLarge
+	skipBomb      = store.DropZipTooLarge
+	skipType      = store.DropFileType
+	skipPixels    = store.DropImagePixels
+	skipUnreadble = store.DropFileUnreadable
 )
 
 // zipIndex finds the files of a zip by the paths a GEDCOM file writes.

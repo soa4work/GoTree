@@ -80,9 +80,28 @@ func (n *Node) Text(tag string) string {
 
 // Warning is a problem found while reading that did not stop it.
 type Warning struct {
-	Line    int    `json:"line"`
+	Line int `json:"line"`
+	// Code names the kind of problem (one of WarningCodes or, in an import
+	// report, of store.ReportCodes); clients translate it with Params.
+	Code   string         `json:"code,omitempty"`
+	Params map[string]any `json:"params,omitempty"`
+	// Message is the English text without the "line N:" prefix; clients
+	// show it when they do not know the code.
 	Message string `json:"message"`
 }
+
+// Codes of the warnings the parser raises.
+const (
+	WarnNotUTF8        = "not_utf8"
+	WarnUnreadableLine = "unreadable_line"
+	WarnOrphanLine     = "orphan_line"
+	WarnLevelJump      = "level_jump"
+	WarnNoHeader       = "no_header"
+	WarnANSEL          = "ansel_unreadable"
+)
+
+// WarningCodes lists every code the parser can raise.
+var WarningCodes = []string{WarnNotUTF8, WarnUnreadableLine, WarnOrphanLine, WarnLevelJump, WarnNoHeader, WarnANSEL}
 
 // Document is a parsed GEDCOM file.
 type Document struct {
@@ -121,9 +140,9 @@ func (d *Document) Is7() bool {
 	return strings.HasPrefix(d.Version, "7")
 }
 
-func (d *Document) warn(line int, format string, args ...any) {
+func (d *Document) warn(line int, code string, params map[string]any, format string, args ...any) {
 	if len(d.Warnings) < 1000 {
-		d.Warnings = append(d.Warnings, Warning{Line: line, Message: fmt.Sprintf(format, args...)})
+		d.Warnings = append(d.Warnings, Warning{Line: line, Code: code, Params: params, Message: fmt.Sprintf(format, args...)})
 	}
 }
 
@@ -208,7 +227,7 @@ func decode(data []byte, doc *Document) (string, error) {
 		}
 		// Many programs write "UTF-8" in the header and then save in the
 		// Windows code page; reading it as such recovers umlauts.
-		doc.warn(0, "the file says %s but is not valid UTF-8; read as Windows-1252", declared)
+		doc.warn(0, WarnNotUTF8, map[string]any{"declared": declared}, "the file says %s but is not valid UTF-8; read as Windows-1252", declared)
 		doc.Encoding = "ANSI"
 		return decodeWith(charmap.Windows1252, data)
 	}
@@ -239,7 +258,7 @@ func (d *Document) parseLines(text string) error {
 			if parsed == 0 && i < 3 {
 				return &ParseError{Kind: ErrNotGedcom, Line: lineNo, msg: fmt.Sprintf("this does not look like a GEDCOM file (line %d)", lineNo)}
 			}
-			d.warn(lineNo, "unreadable line skipped: %q", truncate(line, 80))
+			d.warn(lineNo, WarnUnreadableLine, map[string]any{"text": truncate(line, 80)}, "unreadable line skipped: %q", truncate(line, 80))
 			continue
 		}
 		n.Line = lineNo
@@ -251,12 +270,12 @@ func (d *Document) parseLines(text string) error {
 		if n.Level == 0 {
 			roots = append(roots, n)
 		} else if len(stack) == 0 {
-			d.warn(lineNo, "line at level %d without a record above it skipped", n.Level)
+			d.warn(lineNo, WarnOrphanLine, map[string]any{"level": n.Level}, "line at level %d without a record above it skipped", n.Level)
 			continue
 		} else {
 			parent := stack[len(stack)-1]
 			if n.Level > parent.Level+1 {
-				d.warn(lineNo, "level jumps from %d to %d; attached to the line above", parent.Level, n.Level)
+				d.warn(lineNo, WarnLevelJump, map[string]any{"from": parent.Level, "to": n.Level}, "level jumps from %d to %d; attached to the line above", parent.Level, n.Level)
 				n.Level = parent.Level + 1
 			}
 			parent.Children = append(parent.Children, n)
@@ -287,7 +306,7 @@ func (d *Document) parseLines(text string) error {
 		}
 	}
 	if d.Head == nil {
-		d.warn(1, "the file has no header")
+		d.warn(1, WarnNoHeader, nil, "the file has no header")
 	} else {
 		if s := d.Head.First("SOUR"); s != nil {
 			d.Source = s.Value

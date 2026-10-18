@@ -16,7 +16,10 @@ export default defineConfig({
       manifest: {
         name: 'GoTree',
         short_name: 'GoTree',
-        description: 'Self-hosted family tree',
+        // The manifest is a static file that cannot follow the language switch;
+        // the app defaults to Russian, so it says so. Exception to English UI strings.
+        lang: 'ru',
+        description: 'Семейное дерево на своём сервере',
         theme_color: '#2f5e29',
         background_color: '#faf7ef',
         display: 'standalone',

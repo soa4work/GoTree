@@ -7,6 +7,7 @@ import type { PersonRef } from '../api/types'
 import { Button } from '../components/Button'
 import { SelectField } from '../components/Field'
 import { PageHeading } from '../components/PageHeading'
+import { compareText } from '../lib/collate'
 import { fullName } from '../lib/people'
 import { MissingPlaces } from '../map/MissingPlaces'
 import { useUnmappedPlaces } from '../map/useUnmappedPlaces'
@@ -53,7 +54,7 @@ export function MapPage() {
 
   const places = [...positions.entries()]
     .map(([placeId, ids]) => ({ placeId, ids, place: data.data?.places[placeId] }))
-    .sort((a, b) => b.ids.length - a.ids.length || (a.place?.name ?? '').localeCompare(b.place?.name ?? ''))
+    .sort((a, b) => b.ids.length - a.ids.length || compareText(a.place?.name ?? '', b.place?.name ?? ''))
 
   return (
     <div className="max-w-5xl space-y-5">

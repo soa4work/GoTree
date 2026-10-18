@@ -263,3 +263,63 @@ func TestParseContinuationAt(t *testing.T) {
 		t.Errorf("5.5.1: %q", got)
 	}
 }
+
+func TestWarningCodes(t *testing.T) {
+	// An orphan line first, then a junk line and a level jump; no header.
+	src := "1 NAME orphan\n0 @I1@ INDI\njunk without level\n1 NAME A /B/\n3 GIVN A\n0 TRLR\n"
+	doc, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	byCode := map[string]Warning{}
+	for _, w := range doc.Warnings {
+		if w.Code == "" || w.Message == "" {
+			t.Errorf("warning without code or message: %+v", w)
+		}
+		known := false
+		for _, c := range WarningCodes {
+			known = known || c == w.Code
+		}
+		if !known {
+			t.Errorf("code %q is not in WarningCodes", w.Code)
+		}
+		byCode[w.Code] = w
+	}
+	for _, c := range []string{WarnNoHeader, WarnOrphanLine, WarnUnreadableLine, WarnLevelJump} {
+		if _, ok := byCode[c]; !ok {
+			t.Errorf("missing warning %q in %+v", c, doc.Warnings)
+		}
+	}
+	if p := byCode[WarnLevelJump].Params; p["from"] != 1 || p["to"] != 3 {
+		t.Errorf("level_jump params: %v", p)
+	}
+	if p := byCode[WarnOrphanLine].Params; p["level"] != 1 {
+		t.Errorf("orphan_line params: %v", p)
+	}
+	if p := byCode[WarnUnreadableLine].Params; p["text"] != "junk without level" {
+		t.Errorf("unreadable_line params: %v", p)
+	}
+}
+
+func TestEncodingWarningCodes(t *testing.T) {
+	head := func(char string) string { return "0 HEAD\n1 GEDC\n2 VERS 5.5.1\n1 CHAR " + char + "\n" }
+	bad := append([]byte(head("UTF-8")+"0 @I1@ INDI\n1 NAME J"), 0xE9)
+	bad = append(bad, []byte("rgen /X/\n0 TRLR\n")...)
+	doc, err := Parse(bad)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Warnings) != 1 || doc.Warnings[0].Code != WarnNotUTF8 || doc.Warnings[0].Params["declared"] != "UTF-8" {
+		t.Errorf("not_utf8: %+v", doc.Warnings)
+	}
+
+	ansel := append([]byte(head("ANSEL")+"0 @I1@ INDI\n1 NAME J"), 0xFF, 0xFF)
+	ansel = append(ansel, []byte("/X/\n0 TRLR\n")...)
+	doc, err = Parse(ansel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Warnings) != 1 || doc.Warnings[0].Code != WarnANSEL || doc.Warnings[0].Params["count"] != 2 {
+		t.Errorf("ansel_unreadable: %+v", doc.Warnings)
+	}
+}

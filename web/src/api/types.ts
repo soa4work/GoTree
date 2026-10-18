@@ -382,11 +382,24 @@ export interface RegionInput {
   h: number
 }
 
+/**
+ * A line of an import or check report. `message` is the English text without
+ * the line number; `code` and `params` let the client translate it.
+ */
+export interface ReportLine {
+  line: number
+  code?: string
+  params?: Record<string, string | number>
+  message: string
+}
+
 export interface TagStat {
   path: string
   count: number
   outcome: 'mapped' | 'kept' | 'dropped'
+  /** English reason a line was dropped; `reasonCode` is its translatable code. */
   reason?: string
+  reasonCode?: string
 }
 
 export interface ImportReport {
@@ -395,12 +408,12 @@ export interface ImportReport {
   source: string
   counts: Record<string, number>
   tags: TagStat[]
-  warnings: { line: number; message: string }[]
+  warnings: ReportLine[]
   invalidDates: number
-  invalidDateExamples: string[]
-  brokenReferences: string[]
+  invalidDateExamples: ReportLine[]
+  brokenReferences: ReportLine[]
   childrenFromFamc: number
-  childrenFromFamcExamples: string[]
+  childrenFromFamcExamples: ReportLine[]
   /** Share links to a branch kept because the file has the same person. */
   shareLinksKept: number
   /** Labels of the working share links deleted with the old tree. */
@@ -412,7 +425,7 @@ export interface VerifyReport {
   version: string
   ok: boolean
   rows: { kind: string; tree: number; roundTrip: number }[]
-  warnings: { line: number; message: string }[]
+  warnings: ReportLine[]
   dropped: TagStat[]
 }
 

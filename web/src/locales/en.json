@@ -1211,6 +1211,7 @@
     "store_file_failed": "Could not store the file.",
     "file_missing": "The file is missing on the server.",
     "no_thumbnail": "Only photos have thumbnails.",
+    "export_check_busy": "An export check is already running. Try again in a moment.",
     "thumbnail_too_large": "The image is too large to render a thumbnail.",
     "thumbnail_failed": "Could not render a thumbnail.",
     "replace_owner_only": "Only the owner of the tree can replace it; editors can import into an empty tree.",

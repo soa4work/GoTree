@@ -175,9 +175,45 @@ func TestExportEndpoints(t *testing.T) {
 	}
 
 	var report store.VerifyReport
-	c.call("GET", "/api/export/verify?version=7.0", nil, http.StatusOK, &report)
+	c.call("POST", "/api/export/verify?version=7.0", nil, http.StatusOK, &report)
 	if !report.OK || len(report.Rows) == 0 {
 		t.Errorf("verify: %+v", report)
 	}
 	c.call("GET", "/api/export/gedcom?privacy=nobody", nil, http.StatusUnprocessableEntity, nil)
+}
+
+func TestExportCheckIsPostEditorOneAtATime(t *testing.T) {
+	ts := newServer(t, builtFrontend)
+	c := loggedIn(t, ts)
+	srv := testServers[ts]
+
+	if e := callError(t, c, "GET", "/api/export/verify", nil, http.StatusMethodNotAllowed); e.Code != CodeMethodNotAllowed {
+		t.Errorf("GET code %q", e.Code)
+	}
+
+	srv.verifySlot <- struct{}{}
+	status, _ := c.do("POST", "/api/export/verify", nil)
+	if status != http.StatusTooManyRequests {
+		t.Fatalf("busy: status %d, want 429", status)
+	}
+	e := callError(t, c, "POST", "/api/export/verify", nil, http.StatusTooManyRequests)
+	if e.Code != CodeExportCheckBusy {
+		t.Errorf("busy code %q", e.Code)
+	}
+	<-srv.verifySlot
+	c.call("POST", "/api/export/verify", nil, http.StatusOK, nil)
+	// The slot is released after a check, so the next one is not refused.
+	c.call("POST", "/api/export/verify", nil, http.StatusOK, nil)
+
+	status, _ = c.do("POST", "/api/export/verify", nil, "Sec-Fetch-Site", "cross-site")
+	if status != http.StatusForbidden {
+		t.Errorf("cross-site: status %d, want 403", status)
+	}
+
+	if _, err := srv.Store.DB.Exec(`UPDATE tree_members SET role = 'viewer'`); err != nil {
+		t.Fatal(err)
+	}
+	if e := callError(t, c, "POST", "/api/export/verify", nil, http.StatusForbidden); e.Code != CodeViewOnly {
+		t.Errorf("viewer code %q", e.Code)
+	}
 }

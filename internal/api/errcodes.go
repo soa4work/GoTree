@@ -50,6 +50,7 @@ const (
 	CodeFileMissing       = "file_missing"
 	CodeNoThumbnail       = "no_thumbnail"
 	CodeThumbTooLarge     = "thumbnail_too_large"
+	CodeExportCheckBusy   = "export_check_busy"
 	CodeThumbFailed       = "thumbnail_failed"
 	CodeReplaceOwnerOnly  = "replace_owner_only"
 	CodeGedcomTooLarge    = "gedcom_too_large"

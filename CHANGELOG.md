@@ -157,6 +157,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The export check is a POST request, only editors and owners can run it, and only one runs at a
+  time; a second one is asked to wait (#58)
+
 - Dates read as plain English ("26 February 1820", "about 1850", "between 1850 and 1860") on the
   timeline, heirlooms and in the date field preview, and can be typed that way in events,
   heirlooms, media and transcriptions (saved as GEDCOM when needed, so the preview matches what is

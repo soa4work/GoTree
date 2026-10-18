@@ -192,9 +192,17 @@ func TestExportCheckIsPostEditorOneAtATime(t *testing.T) {
 	}
 
 	srv.verifySlot <- struct{}{}
-	status, _ := c.do("POST", "/api/export/verify", nil)
-	if status != http.StatusTooManyRequests {
-		t.Fatalf("busy: status %d, want 429", status)
+	req, err := http.NewRequest("POST", c.base+"/api/export/verify", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusTooManyRequests || resp.Header.Get("Retry-After") == "" {
+		t.Fatalf("busy: status %d, Retry-After %q; want 429 with Retry-After", resp.StatusCode, resp.Header.Get("Retry-After"))
 	}
 	e := callError(t, c, "POST", "/api/export/verify", nil, http.StatusTooManyRequests)
 	if e.Code != CodeExportCheckBusy {
@@ -205,7 +213,7 @@ func TestExportCheckIsPostEditorOneAtATime(t *testing.T) {
 	// The slot is released after a check, so the next one is not refused.
 	c.call("POST", "/api/export/verify", nil, http.StatusOK, nil)
 
-	status, _ = c.do("POST", "/api/export/verify", nil, "Sec-Fetch-Site", "cross-site")
+	status, _ := c.do("POST", "/api/export/verify", nil, "Sec-Fetch-Site", "cross-site")
 	if status != http.StatusForbidden {
 		t.Errorf("cross-site: status %d, want 403", status)
 	}

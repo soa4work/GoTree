@@ -50,7 +50,6 @@ const (
 	CodeFileMissing       = "file_missing"
 	CodeNoThumbnail       = "no_thumbnail"
 	CodeThumbTooLarge     = "thumbnail_too_large"
-	CodeExportCheckBusy   = "export_check_busy"
 	CodeThumbFailed       = "thumbnail_failed"
 	CodeReplaceOwnerOnly  = "replace_owner_only"
 	CodeGedcomTooLarge    = "gedcom_too_large"
@@ -61,6 +60,7 @@ const (
 	CodeGedcomZipNoFile   = "gedcom_zip_no_ged"
 	CodeGedcomZipSeveral  = "gedcom_zip_several_ged"
 	CodeTreeNotEmpty      = "tree_not_empty"
+	CodeExportCheckBusy   = "export_check_busy"
 )
 
 // Codes of per-field validation messages (the "fieldCodes" of a 422).

@@ -1,6 +1,8 @@
 # The PR gate. It holds nothing but run-tests.sh on purpose: whatever gates a
 # push locally through the branch-guard hook is exactly what gates it here, so
-# the two can never drift apart.
+# the two can never drift apart. GOTREE_AUDIT adds the dependency audits
+# (govulncheck, npm audit), which need the network and change with every new
+# advisory, so they run here and nightly rather than before every local push.
 name: CI
 
 on:
@@ -21,13 +23,16 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
+      # The same Go as the release and the Docker image: the one go.mod names.
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version-file: go.mod
           cache: ${{ hashFiles('go.sum') != '' }}
 
       - uses: actions/setup-node@v4
@@ -35,3 +40,5 @@ jobs:
           node-version: lts/*
 
       - run: ./run-tests.sh
+        env:
+          GOTREE_AUDIT: "1"

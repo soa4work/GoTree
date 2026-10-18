@@ -97,7 +97,8 @@ make test    # ./run-tests.sh — the same gate the pre-push hook and CI use
 ```
 
 The end-to-end tests (`web/e2e`, Playwright) use the installed Chrome or Chromium; set
-`CHROME_PATH` if it is not found in the usual places.
+`CHROME_PATH` if it is not found in the usual places. `GOTREE_AUDIT=1 ./run-tests.sh` also runs
+govulncheck and `npm audit` (CI does this on every PR and nightly).
 
 Layout: `cmd/gotree` (entry point), `internal/` (`config`, `db` + migrations, `gendate` GEDCOM
 dates, `store` domain logic, `api` HTTP handlers), `web/` (React app, embedded into the binary

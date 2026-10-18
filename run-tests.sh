@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # The one entry point for the whole suite: the branch-guard hook runs this
-# before every push, and ci.yml has no other step.
+# before every push, and ci.yml has no other step (it only sets GOTREE_AUDIT=1).
+#
+# GOTREE_AUDIT=1 adds govulncheck and npm audit. They need the network and
+# their result changes with every new advisory, so they would make the local
+# pre-push gate flaky: CI and the nightly schedule run them, the hook does not.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -43,6 +47,11 @@ if [[ -f go.mod ]]; then
   fi
   echo "🧪 Go tests (race detector)"
   CGO_ENABLED=1 go test -race "${go_pkgs[@]}"
+
+  if [[ "${GOTREE_AUDIT:-}" == 1 ]]; then
+    echo "🛡️  govulncheck"
+    go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 "${go_pkgs[@]}"
+  fi
 fi
 
 if [[ -f web/package.json ]]; then
@@ -53,6 +62,11 @@ if [[ -f web/package.json ]]; then
 
   echo "📦 npm ci"
   (cd web && npm ci --no-audit --no-fund)
+
+  if [[ "${GOTREE_AUDIT:-}" == 1 ]]; then
+    echo "🛡️  npm audit"
+    (cd web && npm audit --audit-level=high)
+  fi
 
   echo "🔍 Lint & types"
   (cd web && npm run lint && npm run typecheck)

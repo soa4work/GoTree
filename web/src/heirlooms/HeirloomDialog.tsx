@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ApiError } from '../api/client'
 import { createHeirloom, updateHeirloom } from '../api/endpoints'
 import type { CustodyHow, Heirloom, HeirloomKind, PersonRef, PlaceRef } from '../api/types'
 import { Button } from '../components/Button'
@@ -12,6 +11,7 @@ import { TextField } from '../components/TextField'
 import { PersonPicker } from '../people/PersonPicker'
 import { PlaceField } from '../people/PlaceField'
 import { CitationEditor, type PendingCitation } from '../sources/CitationEditor'
+import { errorText, fieldErrors } from '../lib/errors'
 
 const kinds: HeirloomKind[] = ['jewellery', 'furniture', 'document', 'photo_album', 'tool', 'textile', 'other']
 const ways: CustodyHow[] = ['inherited', 'gift', 'purchased', 'made', 'found', 'other']
@@ -88,7 +88,7 @@ export function HeirloomDialog({ heirloom, holder, onClose, onSaved }: Props) {
       onClose()
     },
   })
-  const fields = save.error instanceof ApiError ? save.error.fields : {}
+  const fields = fieldErrors(save.error, t)
   const set = (uid: number, patch: Partial<Holder>) =>
     setHolders((prev) => prev.map((h) => (h.uid === uid ? { ...h, ...patch } : h)))
   const move = (i: number) =>
@@ -108,7 +108,7 @@ export function HeirloomDialog({ heirloom, holder, onClose, onSaved }: Props) {
         busy={save.isPending}
         error={
           save.error && Object.keys(fields).length === 0
-            ? t('common.saveFailed', { message: save.error.message })
+            ? t('common.saveFailed', { message: errorText(save.error, t) })
             : null
         }
       >

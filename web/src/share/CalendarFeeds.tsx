@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ApiError } from '../api/client'
 import { createCalendarFeed, listCalendarFeeds, revokeCalendarFeed } from '../api/endpoints'
 import type { CalendarFeed } from '../api/types'
 import { Button } from '../components/Button'
@@ -10,6 +9,7 @@ import { Dialog } from '../components/Dialog'
 import { Form } from '../components/Form'
 import { TextField } from '../components/TextField'
 import { formatDay } from '../lib/dates'
+import { errorText, fieldErrors } from '../lib/errors'
 
 /** The feed language follows the interface; the server falls back to English for anything else. */
 const feedLang = (lang: string) => (lang === 'ru' || lang === 'kk' ? lang : 'en')
@@ -90,7 +90,7 @@ export function CalendarFeeds() {
         message={t('calendar.revokeConfirm', { label: revoking?.label ?? '' })}
         confirmLabel={t('sharing.revoke')}
         busy={revoke.isPending}
-        error={revoke.error ? t('common.saveFailed', { message: revoke.error.message }) : null}
+        error={revoke.error ? t('common.saveFailed', { message: errorText(revoke.error, t) }) : null}
         onConfirm={() => revoking && revoke.mutate(revoking.id)}
         onClose={() => setRevoking(null)}
       />
@@ -147,7 +147,7 @@ function CreateFeedDialog({ onClose, onCreated }: { onClose: () => void; onCreat
   const [label, setLabel] = useState('')
   const [includeLiving, setIncludeLiving] = useState(false)
   const create = useMutation({ mutationFn: () => createCalendarFeed({ label, includeLiving }), onSuccess: onCreated })
-  const fields = create.error instanceof ApiError ? create.error.fields : {}
+  const fields = fieldErrors(create.error, t)
   return (
     <Dialog open onClose={onClose} title={t('calendar.new')}>
       <Form
@@ -157,7 +157,7 @@ function CreateFeedDialog({ onClose, onCreated }: { onClose: () => void; onCreat
         busy={create.isPending}
         error={
           create.error && Object.keys(fields).length === 0
-            ? t('common.saveFailed', { message: create.error.message })
+            ? t('common.saveFailed', { message: errorText(create.error, t) })
             : null
         }
       >

@@ -4,6 +4,7 @@ import { createSource, listSources } from '../api/endpoints'
 import type { Source } from '../api/types'
 import { Button } from '../components/Button'
 import { SearchSelect } from '../components/SearchSelect'
+import { errorText } from '../lib/errors'
 
 interface Props {
   value: Source | null
@@ -39,7 +40,7 @@ export function SourcePicker({ value, onChange, error }: Props) {
       )}
       value={value}
       onChange={onChange}
-      error={error ?? (create.error ? t('common.saveFailed', { message: create.error.message }) : undefined)}
+      error={error ?? (create.error ? t('common.saveFailed', { message: errorText(create.error, t) }) : undefined)}
       footer={(q) =>
         q && (
           <Button type="button" variant="ghost" className="mt-2" busy={create.isPending} onClick={() => create.mutate(q)}>

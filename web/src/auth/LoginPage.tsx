@@ -6,6 +6,7 @@ import { Button } from '../components/Button'
 import { TextField } from '../components/TextField'
 import { AuthCard } from './AuthCard'
 import { FormError } from './FormError'
+import { errorText } from '../lib/errors'
 
 export function LoginPage() {
   const { t } = useTranslation()
@@ -22,9 +23,9 @@ export function LoginPage() {
   if (mutation.error instanceof ApiError) {
     if (mutation.error.status === 401) formError = t('auth.badCredentials')
     else if (mutation.error.status === 429) formError = t('auth.throttled')
-    else formError = t('auth.loginFailed', { message: mutation.error.message })
+    else formError = t('auth.loginFailed', { message: errorText(mutation.error, t) })
   } else if (mutation.error) {
-    formError = t('auth.loginFailed', { message: mutation.error.message })
+    formError = t('auth.loginFailed', { message: errorText(mutation.error, t) })
   }
 
   const submit = (e: FormEvent) => {

@@ -9,6 +9,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Error messages from the server are shown in the interface language (#24)
+
 - Kazakh relationship names (to be proofread by a native speaker) (#24)
 
 - Russian relationship names (#24): the relationship page names kin in correct Russian with gender,

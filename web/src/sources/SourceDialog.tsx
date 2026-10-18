@@ -7,8 +7,8 @@ import { Dialog } from '../components/Dialog'
 import { TextAreaField } from '../components/Field'
 import { Form } from '../components/Form'
 import { TextField } from '../components/TextField'
-import { formErrors } from '../lib/errors'
 import { RepositoryField } from './RepositoryField'
+import { formErrors } from '../lib/errors'
 
 interface Props {
   open: boolean
@@ -48,7 +48,7 @@ function SourceForm({ source, onClose, onSaved }: Omit<Props, 'open'>) {
       onSaved(s)
     },
   })
-  const errors = formErrors(save.error, (m) => t('common.saveFailed', { message: m }))
+  const errors = formErrors(save.error, t, (m) => t('common.saveFailed', { message: m }))
 
   return (
     <Form onSubmit={() => save.mutate()} onCancel={onClose} submitLabel={t('common.save')} busy={save.isPending} error={errors.form}>

@@ -73,10 +73,10 @@ func (s *Server) Handler() http.Handler {
 		})
 
 		r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
-			writeError(w, http.StatusNotFound, "not found")
+			writeError(w, http.StatusNotFound, CodeNotFound, "not found")
 		})
 		r.MethodNotAllowed(func(w http.ResponseWriter, _ *http.Request) {
-			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			writeError(w, http.StatusMethodNotAllowed, CodeMethodNotAllowed, "method not allowed")
 		})
 	})
 

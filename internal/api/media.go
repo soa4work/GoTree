@@ -41,7 +41,7 @@ func (s *Server) listMedia(w http.ResponseWriter, r *http.Request) {
 	if t := q.Get("entityType"); t != "" {
 		var err error
 		if entityID, err = strconv.ParseInt(q.Get("entityId"), 10, 64); err != nil {
-			writeError(w, http.StatusBadRequest, "entityId is required with entityType")
+			writeError(w, http.StatusBadRequest, CodeEntityIDRequired, "entityId is required with entityType")
 			return
 		}
 	}
@@ -64,7 +64,7 @@ func writeSlowUpload(w http.ResponseWriter, err error) bool {
 	if !errors.Is(err, os.ErrDeadlineExceeded) {
 		return false
 	}
-	writeError(w, http.StatusRequestTimeout, "the upload took too long; check the connection and try again")
+	writeError(w, http.StatusRequestTimeout, CodeUploadTimeout, "the upload took too long; check the connection and try again")
 	return true
 }
 
@@ -89,7 +89,7 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 	if t := r.URL.Query().Get("entityType"); t != "" {
 		id, err := strconv.ParseInt(r.URL.Query().Get("entityId"), 10, 64)
 		if err != nil {
-			writeError(w, http.StatusBadRequest, "entityId is required with entityType")
+			writeError(w, http.StatusBadRequest, CodeEntityIDRequired, "entityId is required with entityType")
 			return
 		}
 		link = &store.MediaLinkInput{EntityType: t, EntityID: id}
@@ -98,19 +98,19 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 	s.limitUpload(w, r)
 	mr, err := r.MultipartReader()
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "expected a multipart upload")
+		writeError(w, http.StatusBadRequest, CodeExpectedMultipart, "expected a multipart upload")
 		return
 	}
 	var part *multipart.Part
 	for {
 		part, err = mr.NextPart()
 		if errors.Is(err, io.EOF) {
-			writeError(w, http.StatusBadRequest, "no file in the upload")
+			writeError(w, http.StatusBadRequest, CodeNoFile, "no file in the upload")
 			return
 		}
 		if err != nil {
 			if !writeSlowUpload(w, err) {
-				writeError(w, http.StatusBadRequest, "invalid upload")
+				writeError(w, http.StatusBadRequest, CodeInvalidUpload, "invalid upload")
 			}
 			return
 		}
@@ -124,7 +124,7 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 	head, _ := buffered.Peek(512)
 	mimeType, kind, ok := media.Detect(head, part.FileName())
 	if !ok {
-		writeError(w, http.StatusUnsupportedMediaType, "this kind of file is not supported; use JPEG, PNG, GIF, WebP, PDF, MP3, M4A, OGG, WAV, MP4 or WebM")
+		writeError(w, http.StatusUnsupportedMediaType, CodeUnsupportedMedia, "this kind of file is not supported; use JPEG, PNG, GIF, WebP, PDF, MP3, M4A, OGG, WAV, MP4 or WebM")
 		return
 	}
 	var check func(path string) error
@@ -140,11 +140,11 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 	}
 	stored, err := s.Files.SaveChecked(buffered, s.MaxUpload, check)
 	if errors.Is(err, media.ErrImageTooLarge) {
-		writeError(w, http.StatusUnprocessableEntity, fmt.Sprintf("the image is larger than %d megapixels", media.MaxImagePixels/1_000_000))
+		writeErrorP(w, http.StatusUnprocessableEntity, CodeImageTooLarge, fmt.Sprintf("the image is larger than %d megapixels", media.MaxImagePixels/1_000_000), map[string]any{"megapixels": media.MaxImagePixels / 1_000_000})
 		return
 	}
 	if errors.Is(err, media.ErrTooLarge) {
-		writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("the file is larger than %d MB", s.MaxUpload>>20))
+		writeErrorP(w, http.StatusRequestEntityTooLarge, CodeFileTooLarge, fmt.Sprintf("the file is larger than %d MB", s.MaxUpload>>20), map[string]any{"limitMB": s.MaxUpload >> 20})
 		return
 	}
 	if writeSlowUpload(w, err) {
@@ -152,7 +152,7 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		s.Log.Error("store upload", "err", err)
-		writeError(w, http.StatusInternalServerError, "could not store the file")
+		writeError(w, http.StatusInternalServerError, CodeStoreFileFailed, "could not store the file")
 		return
 	}
 
@@ -251,7 +251,7 @@ func (s *Server) mediaFile(w http.ResponseWriter, r *http.Request) {
 	f, err := os.Open(path)
 	if err != nil {
 		s.Log.Error("open media file", "id", id, "err", err)
-		writeError(w, http.StatusNotFound, "the file is missing on the server")
+		writeError(w, http.StatusNotFound, CodeFileMissing, "the file is missing on the server")
 		return
 	}
 	defer f.Close()
@@ -306,7 +306,7 @@ func (s *Server) mediaThumb(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if m.Kind != string(media.KindImage) {
-		writeError(w, http.StatusNotFound, "only photos have thumbnails")
+		writeError(w, http.StatusNotFound, CodeNoThumbnail, "only photos have thumbnails")
 		return
 	}
 	size := queryInt(r, "size", 256)
@@ -323,10 +323,10 @@ func (s *Server) mediaThumb(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.Log.Warn("thumbnail", "id", id, "err", err)
 		if errors.Is(err, media.ErrImageTooLarge) {
-			writeError(w, http.StatusUnprocessableEntity, "the image is too large to render a thumbnail")
+			writeError(w, http.StatusUnprocessableEntity, CodeThumbTooLarge, "the image is too large to render a thumbnail")
 			return
 		}
-		writeError(w, http.StatusUnprocessableEntity, "could not render a thumbnail")
+		writeError(w, http.StatusUnprocessableEntity, CodeThumbFailed, "could not render a thumbnail")
 		return
 	}
 	// The URL includes the region id but not its box, which can move, so

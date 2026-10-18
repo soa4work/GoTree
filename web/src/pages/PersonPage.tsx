@@ -25,6 +25,7 @@ import { UploadButton } from '../media/UploadButton'
 import { FindingList } from '../quality/FindingList'
 import { ResearchPanel } from '../research/ResearchPanel'
 import { PersonHeirlooms } from '../heirlooms/PersonHeirlooms'
+import { errorText } from '../lib/errors'
 
 type Open =
   | { kind: 'edit' }
@@ -371,7 +372,7 @@ function DeletePerson({ open, onClose, person, name }: { open: boolean; onClose:
       message={t('person.deleteConfirm', { name })}
       confirmLabel={t('common.delete')}
       busy={remove.isPending}
-      error={remove.error ? t('common.deleteFailed', { message: remove.error.message }) : null}
+      error={remove.error ? t('common.deleteFailed', { message: errorText(remove.error, t) }) : null}
       onConfirm={() => remove.mutate()}
       onClose={onClose}
     />

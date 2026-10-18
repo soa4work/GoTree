@@ -34,6 +34,7 @@ import { PlaceField } from '../people/PlaceField'
 import { SourcePicker } from '../sources/SourcePicker'
 import { roleLabel, templateName } from '../transcribe/labels'
 import { NotFound } from './NotFound'
+import { errorText, fieldErrors } from '../lib/errors'
 
 const emptyRow = (): TranscriptionRow => ({ line: '', role: '', values: {}, action: 'new', personId: null })
 
@@ -131,7 +132,7 @@ function Editor({ templates, initial }: { templates: RecordTemplate[]; initial: 
     },
   })
   const error = save.error ?? apply.error
-  const fields = error instanceof ApiError ? error.fields : {}
+  const fields = fieldErrors(error, t)
   const setRow = (i: number, patch: Partial<TranscriptionRow>) =>
     setRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)))
   const heading = readOnly || applied ? t('transcribe.appliedTitle') : t('transcribe.editTitle')
@@ -292,7 +293,7 @@ function Editor({ templates, initial }: { templates: RecordTemplate[]; initial: 
           <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
             {error && Object.keys(fields).length === 0 && (
               <p role="alert" className="font-medium text-red-700 dark:text-red-400">
-                {t('common.saveFailed', { message: error.message })}
+                {t('common.saveFailed', { message: errorText(error, t) })}
               </p>
             )}
             <p role="status" className="text-sm font-medium text-green-800 dark:text-green-300">
@@ -321,7 +322,7 @@ function Editor({ templates, initial }: { templates: RecordTemplate[]; initial: 
         message={t('transcribe.deleteConfirm')}
         confirmLabel={t('common.delete')}
         busy={remove.isPending}
-        error={remove.error ? t('common.deleteFailed', { message: remove.error.message }) : null}
+        error={remove.error ? t('common.deleteFailed', { message: errorText(remove.error, t) }) : null}
         onConfirm={() => remove.mutate()}
         onClose={() => setConfirmDelete(false)}
       />

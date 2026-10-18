@@ -16,6 +16,7 @@ import { fullName } from '../lib/people'
 import { PersonPicker } from '../people/PersonPicker'
 import { CalendarFeeds } from '../share/CalendarFeeds'
 import { formatDay } from '../lib/dates'
+import { errorText, fieldErrors } from '../lib/errors'
 
 const shareUrl = (token: string) => `${window.location.origin}/share/${token}`
 
@@ -98,7 +99,7 @@ export function SharingPage() {
         message={t('sharing.revokeConfirm', { label: revoking?.label ?? '' })}
         confirmLabel={t('sharing.revoke')}
         busy={revoke.isPending}
-        error={revoke.error ? t('common.saveFailed', { message: revoke.error.message }) : null}
+        error={revoke.error ? t('common.saveFailed', { message: errorText(revoke.error, t) }) : null}
         onConfirm={() => revoking && revoke.mutate(revoking.id)}
         onClose={() => setRevoking(null)}
       />
@@ -174,7 +175,7 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
     mutationFn: () => createShareLink({ label, scope, rootPersonId: root?.id ?? null, privacy, expiresOn }),
     onSuccess: onCreated,
   })
-  const fields = create.error instanceof ApiError ? create.error.fields : {}
+  const fields = fieldErrors(create.error, t)
   return (
     <Dialog open onClose={onClose} title={t('sharing.new')}>
       <Form
@@ -184,7 +185,7 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
         busy={create.isPending}
         error={
           create.error && Object.keys(fields).length === 0
-            ? t('common.saveFailed', { message: create.error.message })
+            ? t('common.saveFailed', { message: errorText(create.error, t) })
             : null
         }
       >

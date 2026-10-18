@@ -7,6 +7,7 @@ import type { DateProposal, DateProposals } from '../api/types'
 import { Button } from '../components/Button'
 import { fullName } from '../lib/people'
 import { formatDate } from '../lib/dates'
+import { errorText } from '../lib/errors'
 
 export function DateNormalizer() {
   const { t } = useTranslation()
@@ -51,7 +52,7 @@ export function DateNormalizer() {
       </div>
       {apply.isError && (
         <p role="alert" className="font-medium text-red-700 dark:text-red-400">
-          {t('common.saveFailed', { message: apply.error.message })}
+          {t('common.saveFailed', { message: errorText(apply.error, t) })}
         </p>
       )}
       {items.length === 0 ? (

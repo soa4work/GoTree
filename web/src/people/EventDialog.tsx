@@ -9,13 +9,13 @@ import { Dialog } from '../components/Dialog'
 import { SelectField, TextAreaField } from '../components/Field'
 import { Form } from '../components/Form'
 import { TextField } from '../components/TextField'
-import { formErrors } from '../lib/errors'
 import { familyEventTypes, participantRoles, personEventTypes } from '../lib/eventTypes'
 import { CitationEditor, type PendingCitation } from '../sources/CitationEditor'
 import { fullName } from '../lib/people'
 import { DateField } from './DateField'
 import { PersonPicker } from './PersonPicker'
 import { PlaceField } from './PlaceField'
+import { errorText, formErrors } from '../lib/errors'
 
 export type EventOwner = { personId: number } | { familyId: number }
 
@@ -115,7 +115,7 @@ function EventForm({ owner, event, defaultType, defaultDate, defaultDescription,
       onClose()
     },
   })
-  const errors = formErrors(save.error, (m) => t('common.saveFailed', { message: m }))
+  const errors = formErrors(save.error, t, (m) => t('common.saveFailed', { message: m }))
   const typeLabel = (tag: string) => t(`eventType.${tag}`, { defaultValue: tag })
   const excluded = ['personId' in owner ? owner.personId : 0, ...participants.map((p) => p.person.id)]
 
@@ -239,7 +239,7 @@ function EventForm({ owner, event, defaultType, defaultDate, defaultDescription,
         message={t('event.deleteConfirm', { type: typeLabel(type) })}
         confirmLabel={t('common.delete')}
         busy={remove.isPending}
-        error={remove.error ? t('common.deleteFailed', { message: remove.error.message }) : null}
+        error={remove.error ? t('common.deleteFailed', { message: errorText(remove.error, t) }) : null}
         onConfirm={() => remove.mutate()}
         onClose={() => setConfirmDelete(false)}
       />

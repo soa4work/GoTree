@@ -11,6 +11,7 @@ import { PageHeading } from '../components/PageHeading'
 import { qualityKey } from '../sources/quality'
 import { SourceDialog } from '../sources/SourceDialog'
 import { NotFound } from './NotFound'
+import { errorText } from '../lib/errors'
 
 export function SourcePage() {
   const { t } = useTranslation()
@@ -109,7 +110,7 @@ export function SourcePage() {
         message={t('source.deleteConfirm', { title: s.title, count: s.citationCount })}
         confirmLabel={t('common.delete')}
         busy={remove.isPending}
-        error={remove.error ? t('common.deleteFailed', { message: remove.error.message }) : null}
+        error={remove.error ? t('common.deleteFailed', { message: errorText(remove.error, t) }) : null}
         onConfirm={() => remove.mutate()}
         onClose={() => setDeleting(false)}
       />

@@ -4,6 +4,7 @@ import { createPlace, listPlaces } from '../api/endpoints'
 import type { Place, PlaceRef } from '../api/types'
 import { Button } from '../components/Button'
 import { SearchSelect } from '../components/SearchSelect'
+import { errorText } from '../lib/errors'
 
 interface Props {
   value: PlaceRef | null
@@ -53,7 +54,7 @@ export function PlaceField({ value, onChange, error }: Props) {
       renderItem={(p) => p.fullName}
       value={value}
       onChange={onChange}
-      error={error ?? (create.error ? t('place.createFailed', { message: create.error.message }) : undefined)}
+      error={error ?? (create.error ? t('place.createFailed', { message: errorText(create.error, t) }) : undefined)}
       footer={(q) =>
         q && (
           <Button type="button" variant="ghost" className="mt-2" busy={create.isPending} onClick={() => create.mutate(q)}>

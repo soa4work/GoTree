@@ -15,6 +15,7 @@ import { UploadButton } from '../media/UploadButton'
 import { CitationText } from '../sources/CitationEditor'
 import { NotFound } from './NotFound'
 import { formatDate } from '../lib/dates'
+import { errorText } from '../lib/errors'
 
 export function HeirloomPage() {
   const { t } = useTranslation()
@@ -131,7 +132,7 @@ export function HeirloomPage() {
         message={t('heirloom.deleteConfirm', { name: h.name })}
         confirmLabel={t('common.delete')}
         busy={remove.isPending}
-        error={remove.error ? t('common.deleteFailed', { message: remove.error.message }) : null}
+        error={remove.error ? t('common.deleteFailed', { message: errorText(remove.error, t) }) : null}
         onConfirm={() => remove.mutate()}
         onClose={() => setConfirmDelete(false)}
       />

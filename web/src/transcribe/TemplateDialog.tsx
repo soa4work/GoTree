@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ApiError } from '../api/client'
 import { createTemplate, deleteTemplate, updateTemplate } from '../api/endpoints'
 import type { ColumnKind, RecordTemplate, RoleKind, TemplateRole } from '../api/types'
 import { Button } from '../components/Button'
@@ -11,6 +10,7 @@ import { SelectField } from '../components/Field'
 import { Form } from '../components/Form'
 import { TextField } from '../components/TextField'
 import { familyEventTypes, participantRoles, personEventTypes } from '../lib/eventTypes'
+import { errorText, fieldErrors } from '../lib/errors'
 
 const columnKinds: ColumnKind[] = ['given', 'surname', 'sex', 'age', 'occupation', 'residence', 'birthplace', 'notes']
 const roleKinds: RoleKind[] = ['principal', 'partner', 'parent', 'participant']
@@ -55,7 +55,7 @@ export function TemplateDialog({ template, onClose }: Props) {
     onSuccess: done,
   })
   const remove = useMutation({ mutationFn: () => deleteTemplate(id ?? 0), onSuccess: done })
-  const fields = save.error instanceof ApiError ? save.error.fields : {}
+  const fields = fieldErrors(save.error, t)
   const setRole = (uid: number, patch: Partial<TemplateRole>) =>
     setRoles((prev) => prev.map((r) => (r.uid === uid ? { ...r, ...patch } : r)))
   const columnsId = useId()
@@ -70,7 +70,7 @@ export function TemplateDialog({ template, onClose }: Props) {
           busy={save.isPending}
           error={
             save.error && Object.keys(fields).length === 0
-              ? t('common.saveFailed', { message: save.error.message })
+              ? t('common.saveFailed', { message: errorText(save.error, t) })
               : null
           }
           secondary={
@@ -197,7 +197,7 @@ export function TemplateDialog({ template, onClose }: Props) {
         message={t('transcribe.deleteTemplateConfirm', { name: template?.name ?? '' })}
         confirmLabel={t('common.delete')}
         busy={remove.isPending}
-        error={remove.error ? t('common.deleteFailed', { message: remove.error.message }) : null}
+        error={remove.error ? t('common.deleteFailed', { message: errorText(remove.error, t) }) : null}
         onConfirm={() => remove.mutate()}
         onClose={() => setConfirmDelete(false)}
       />

@@ -80,5 +80,5 @@ test('unsupported files are refused with a message', async ({ page }) => {
     mimeType: 'image/svg+xml',
     buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'),
   })
-  await expect(page.getByRole('alert')).toContainText('evil.svg: this kind of file is not supported')
+  await expect(page.getByRole('alert')).toContainText('evil.svg: This kind of file is not supported')
 })

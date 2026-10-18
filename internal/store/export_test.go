@@ -176,6 +176,7 @@ func TestExportGedcom7DatePhraseRoundTrip(t *testing.T) {
 		{"BAPM", "INT 1850 (nach dem Kirchenbuch)", "INT 1850 (nach dem Kirchenbuch)"},
 		{"DEAT", "12 FEB 1750/51", "12 FEB 1750/51"},
 		{"BURI", "BET 1750/51 AND 1760", "BET 1750/51 AND 1760"},
+		{"CHR", "INT 1750/51", "1750/51"},
 	}
 	for i, d := range dates[:3] {
 		if _, err := s.CreateHeirloom(ctx, a, HeirloomInput{Name: fmt.Sprintf("Heirloom %d", i), MadeDate: d.in}); err != nil {
@@ -216,8 +217,54 @@ func TestExportGedcom7DatePhraseRoundTrip(t *testing.T) {
 			t.Errorf("heirloom %q came back as %q, want %q", d.in, got, d.want)
 		}
 	}
-	if !byType["DEAT"].Valid || byType["BAPM"].Qualifier != "INT" {
+	if !byType["DEAT"].Valid || byType["BAPM"].Qualifier != "INT" || !byType["CHR"].Valid {
 		t.Errorf("dates lost their meaning: %+v", byType)
+	}
+}
+
+// TestExportIntDualYear551 pins that an interpreted date with a dual year
+// keeps both in 5.5.1, and that 7.0 keeps the dual year in a PHRASE.
+func TestExportIntDualYear551(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	p := mustPerson(t, s, a, "Anna", "Weber")
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &p.ID, Type: "CHR", Date: "INT 1750/51"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateHeirloom(ctx, a, HeirloomInput{Name: "Clock", MadeDate: "INT 1750/51"}); err != nil {
+		t.Fatal(err)
+	}
+
+	text := exportText(t, s, a, ExportOptions{})
+	for _, want := range []string{"2 DATE INT 1750/51\n", "1 DATE INT 1750/51\n"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("5.5.1 export lacks %q:\n%s", want, text)
+		}
+	}
+	s2, a2 := reimport(t, text)
+	got := findPerson(t, s2, a2, "anna")
+	var chr *Event
+	for i := range got.Events {
+		if got.Events[i].Type == "CHR" {
+			chr = &got.Events[i]
+		}
+	}
+	if chr == nil || chr.Date.Raw != "INT 1750/51" || chr.Date.Qualifier != "INT" {
+		t.Errorf("5.5.1 CHR came back as %+v", chr)
+	}
+	list, err := s2.ListHeirlooms(ctx, a2, "", 0)
+	if err != nil || len(list) != 1 || list[0].MadeDate != "INT 1750/51" {
+		t.Errorf("5.5.1 heirloom: %+v %v", list, err)
+	}
+
+	text7 := exportText(t, s, a, ExportOptions{Version7: true})
+	if !strings.Contains(text7, "1 DATE 1750\n2 PHRASE 1750/51\n") {
+		t.Errorf("7.0 heirloom made date lacks its dual year:\n%s", text7)
+	}
+	s3, a3 := reimport(t, text7)
+	list, err = s3.ListHeirlooms(ctx, a3, "", 0)
+	if err != nil || len(list) != 1 || list[0].MadeDate != "1750/51" {
+		t.Errorf("7.0 heirloom: %+v %v", list, err)
 	}
 }
 
@@ -492,5 +539,231 @@ func TestVerifyExport(t *testing.T) {
 		if !r.OK {
 			t.Errorf("v7=%v not lossless: %+v dropped %+v", v7, r.Rows, r.Dropped)
 		}
+	}
+}
+
+func TestExportStatusRoundTrip(t *testing.T) {
+	for _, v7 := range []bool{false, true} {
+		t.Run(fmt.Sprintf("v7=%v", v7), func(t *testing.T) {
+			s := newStore(t)
+			a := setup(t, s)
+			anna, err := s.CreatePerson(ctx, a, PersonInput{GivenNames: "Anna", Surname: "Weber", Sex: "F",
+				AlternateNames: []AlternateNameInput{{Type: "aka", GivenNames: "Hanna", Surname: "Weber",
+					Status: "disputed", StatusReason: "only in one letter"}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, e := range []EventInput{
+				{Type: "BIRT", Date: "1850", Status: "disproven", StatusReason: "wrong parish"},
+				{Type: "DEAT", Date: "1900", Status: "disputed", StatusReason: "line one\nline two"},
+				{Type: "OCCU", Description: "Weber"},
+			} {
+				e.PersonID = &anna.ID
+				if _, err := s.CreateEvent(ctx, a, e); err != nil {
+					t.Fatal(err)
+				}
+			}
+			res, err := s.AddRelative(ctx, a, anna.ID, RelativeInput{Relation: RelationPartner,
+				Person: &PersonInput{GivenNames: "Karl", Surname: "Weber"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.CreateEvent(ctx, a, EventInput{FamilyID: &res.Family.ID, Type: "MARR", Date: "1875",
+				Status: "disputed", StatusReason: "no record"}); err != nil {
+				t.Fatal(err)
+			}
+
+			text := exportText(t, s, a, ExportOptions{Version7: v7})
+			for _, want := range []string{"_STAT disproven", "_STAT disputed", "2 _STAT disputed\n3 NOTE only in one letter"} {
+				if !strings.Contains(text, want) {
+					t.Errorf("export lacks %q:\n%s", want, text)
+				}
+			}
+			count := strings.Count(text, "\n2 _STAT ")
+			if count != 4 {
+				t.Errorf("export has %d _STAT lines, want 4:\n%s", count, text)
+			}
+
+			doc, err := gedcom.Parse([]byte(text))
+			if err != nil {
+				t.Fatal(err)
+			}
+			s2 := newStore(t)
+			a2 := setup(t, s2)
+			report, err := s2.ImportGEDCOM(ctx, a2, doc, ImportIntoEmpty)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := findPerson(t, s2, a2, "anna")
+			type st struct{ status, reason string }
+			byType := map[string]st{}
+			for _, e := range got.Events {
+				byType[e.Type] = st{e.Status, e.StatusReason}
+			}
+			for typ, want := range map[string]st{
+				"BIRT": {"disproven", "wrong parish"},
+				"DEAT": {"disputed", "line one\nline two"},
+				"OCCU": {"accepted", ""},
+			} {
+				if byType[typ] != want {
+					t.Errorf("%s came back as %+v, want %+v", typ, byType[typ], want)
+				}
+			}
+			if len(got.AlternateNames) != 1 || got.AlternateNames[0].Status != "disputed" || got.AlternateNames[0].StatusReason != "only in one letter" {
+				t.Errorf("alternate names: %+v", got.AlternateNames)
+			}
+			if len(got.PartnerFamilies) != 1 {
+				t.Fatalf("families: %+v", got.PartnerFamilies)
+			}
+			marr := ""
+			for _, e := range got.PartnerFamilies[0].Events {
+				if e.Type == "MARR" && e.Date.Raw == "1875" {
+					marr = e.Status + "/" + e.StatusReason
+				}
+			}
+			if marr != "disputed/no record" {
+				t.Errorf("MARR came back as %q", marr)
+			}
+			for _, path := range []string{"INDI.BIRT._STAT", "INDI.NAME._STAT", "FAM.MARR._STAT"} {
+				if tagOutcome(report, path) != TagMapped {
+					t.Errorf("%s: %q, want mapped", path, tagOutcome(report, path))
+				}
+			}
+
+			again := exportText(t, s2, a2, ExportOptions{Version7: v7})
+			if n := strings.Count(again, "\n2 _STAT "); n != count {
+				t.Errorf("re-export has %d _STAT lines, want %d:\n%s", n, count, again)
+			}
+			if strings.Contains(again, "\n1 _STAT") {
+				t.Errorf("a status moved to the INDI level:\n%s", again)
+			}
+
+			r, err := s.VerifyExport(ctx, a, v7, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !r.OK {
+				t.Errorf("verify: %+v %+v", r.Rows, r.Dropped)
+			}
+		})
+	}
+}
+
+func TestExportParticipantRolesRoundTrip(t *testing.T) {
+	roles := []struct{ given, role, custom string }{
+		{"Bert", "head", ""}, {"Clara", "sibling", ""}, {"Dora", "relative", ""}, {"Emil", "informant", ""},
+		{"Fritz", "other", "lodger"}, {"Gerd", "godparent", ""}, {"Hans", "witness", ""},
+	}
+	s := newStore(t)
+	a := setup(t, s)
+	anna := mustPerson(t, s, a, "Anna", "Weber")
+	var parts []ParticipantInput
+	for _, r := range roles {
+		p := mustPerson(t, s, a, r.given, "Weber")
+		parts = append(parts, ParticipantInput{PersonID: p.ID, Role: r.role, CustomRole: r.custom})
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &anna.ID, Type: "CENS", Date: "1900", Participants: parts}); err != nil {
+		t.Fatal(err)
+	}
+
+	participants := func(s *Store, a Actor) map[string]Participant {
+		got := map[string]Participant{}
+		for _, e := range findPerson(t, s, a, "anna").Events {
+			if e.Type == "CENS" {
+				for _, p := range e.Participants {
+					got[p.Person.GivenNames] = p
+				}
+			}
+		}
+		return got
+	}
+
+	t551 := exportText(t, s, a, ExportOptions{})
+	for _, want := range []string{"2 RELA head (CENS)", "2 RELA sibling (CENS)", "2 RELA relative (CENS)", "2 RELA informant (CENS)", "2 RELA godparent (CENS)"} {
+		if !strings.Contains(t551, want) {
+			t.Errorf("5.5.1 export lacks %q:\n%s", want, t551)
+		}
+	}
+	s1, a1 := reimport(t, t551)
+	got551 := participants(s1, a1)
+	for _, r := range roles {
+		if got551[r.given].Role != r.role {
+			t.Errorf("5.5.1: %s came back as %q, want %q", r.given, got551[r.given].Role, r.role)
+		}
+	}
+	// Known limit: the 5.5.1 RELA form has no room for a custom role.
+	if got551["Fritz"].CustomRole != "" {
+		t.Errorf("5.5.1 kept a custom role: %+v", got551["Fritz"])
+	}
+
+	t7 := exportText(t, s, a, ExportOptions{Version7: true})
+	for _, want := range []string{
+		"3 ROLE OTHER\n4 PHRASE head", "3 ROLE OTHER\n4 PHRASE sibling", "3 ROLE OTHER\n4 PHRASE relative",
+		"3 ROLE OTHER\n4 PHRASE informant", "3 ROLE OTHER\n4 PHRASE lodger", "3 ROLE GODP", "3 ROLE WITN",
+	} {
+		if !strings.Contains(t7, want) {
+			t.Errorf("7.0 export lacks %q:\n%s", want, t7)
+		}
+	}
+	s2, a2 := reimport(t, t7)
+	got7 := participants(s2, a2)
+	for _, r := range roles {
+		if got7[r.given].Role != r.role || got7[r.given].CustomRole != r.custom {
+			t.Errorf("7.0: %s came back as %q / %q, want %q / %q", r.given, got7[r.given].Role, got7[r.given].CustomRole, r.role, r.custom)
+		}
+	}
+	if again := exportText(t, s2, a2, ExportOptions{Version7: true}); strings.Count(again, "ROLE OTHER\n4 PHRASE") != strings.Count(t7, "ROLE OTHER\n4 PHRASE") ||
+		!strings.Contains(again, "3 ROLE OTHER\n4 PHRASE lodger") || !strings.Contains(again, "3 ROLE OTHER\n4 PHRASE head") {
+		t.Errorf("7.0 round trip is not stable:\n%s", again)
+	}
+}
+
+func TestExportNameTypeRoundTrip(t *testing.T) {
+	for _, v7 := range []bool{false, true} {
+		t.Run(fmt.Sprintf("v7=%v", v7), func(t *testing.T) {
+			s := newStore(t)
+			a := setup(t, s)
+			if _, err := s.CreatePerson(ctx, a, PersonInput{GivenNames: "Anna", Surname: "Weber",
+				AlternateNames: []AlternateNameInput{
+					{Type: "religious", GivenNames: "Anna Maria"},
+					{Type: "other", GivenNames: "Anni"},
+					{Type: "immigrant", GivenNames: "Ann", Surname: "Weaver"},
+				}}); err != nil {
+				t.Fatal(err)
+			}
+			s2, a2 := reimport(t, exportText(t, s, a, ExportOptions{Version7: v7}))
+			got := map[string]string{}
+			for _, n := range findPerson(t, s2, a2, "anna").AlternateNames {
+				got[n.GivenNames] = n.Type
+			}
+			want := map[string]string{"Anna Maria": "religious", "Anni": "other", "Ann": "immigrant"}
+			for name, typ := range want {
+				if got[name] != typ {
+					t.Errorf("%s came back as %q, want %q (all: %v)", name, got[name], typ, got)
+				}
+			}
+		})
+	}
+}
+
+func TestDatePhraseKeepsParentheses(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"Frühjahr 1850", "(Frühjahr 1850)"},
+		{"Frühjahr (1850)", "(Frühjahr (1850))"},
+		{"(a) b", "((a) b)"},
+		{"(during the war)", "(during the war)"},
+	}
+	for _, v7 := range []bool{false, true} {
+		ex := &exporter{opt: ExportOptions{Version7: v7}}
+		for _, tt := range tests {
+			if got := ex.textDate(tt.in); got != tt.want {
+				t.Errorf("v7=%v textDate(%q) = %q, want %q", v7, tt.in, got, tt.want)
+			}
+		}
+	}
+	n := node("BIRT", "")
+	(&exporter{}).date(n, "Frühjahr (1850)")
+	if got := n.Text("DATE"); got != "(Frühjahr (1850))" {
+		t.Errorf("5.5.1 DATE = %q", got)
 	}
 }

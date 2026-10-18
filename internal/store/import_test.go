@@ -355,3 +355,107 @@ func TestImportLargeFile(t *testing.T) {
 		t.Errorf("search after import: %+v", res)
 	}
 }
+
+func TestImportStatusFromFile(t *testing.T) {
+	src := strings.Join([]string{
+		"0 HEAD", "1 GEDC", "2 VERS 5.5.1", "1 CHAR UTF-8",
+		"0 @I1@ INDI",
+		"1 NAME Anna /Weber/", "2 _STAT disputed", "3 NOTE main name doubted",
+		"1 NAME Hanna /Weber/", "2 TYPE aka", "2 _STAT DISPROVEN",
+		"1 BIRT", "2 DATE 1850", "2 _STAT disputed",
+		"1 DEAT", "2 DATE 1900", "2 _STAT probable",
+		"1 BURI", "2 _STAT disputed", "3 NOTE @N1@",
+		"1 CHR", "2 _STAT accepted", "3 NOTE checked in 1990",
+		"0 @N1@ NOTE Shared reason",
+		"0 TRLR", "",
+	}, "\n")
+	doc, err := gedcom.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := newStore(t)
+	a := setup(t, s)
+	report, err := s.ImportGEDCOM(ctx, a, doc, ImportIntoEmpty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := findPerson(t, s, a, "anna")
+	type st struct{ status, reason string }
+	byType := map[string]st{}
+	for _, e := range got.Events {
+		byType[e.Type] = st{e.Status, e.StatusReason}
+	}
+	want := map[string]st{"BIRT": {"disputed", "?"}, "DEAT": {"accepted", ""}, "BURI": {"disputed", "Shared reason"}}
+	for typ, w := range want {
+		if byType[typ] != w {
+			t.Errorf("%s: %+v, want %+v", typ, byType[typ], w)
+		}
+	}
+	if tagOutcome(report, "INDI.DEAT._STAT") != TagKept {
+		t.Errorf("unknown status: %q, want kept", tagOutcome(report, "INDI.DEAT._STAT"))
+	}
+	if len(got.AlternateNames) != 1 || got.AlternateNames[0].Status != "disproven" || got.AlternateNames[0].StatusReason != "?" {
+		t.Errorf("alternate names: %+v", got.AlternateNames)
+	}
+	dropped := false
+	for _, tg := range report.Tags {
+		if tg.Path == "INDI.NAME._STAT" && tg.Outcome == TagDropped {
+			dropped = true
+		}
+	}
+	if !dropped {
+		t.Errorf("the main name's status is not reported as dropped: %+v", report.Tags)
+	}
+	text := exportText(t, s, a, ExportOptions{})
+	if strings.Contains(text, "main name doubted") || strings.Contains(text, "\n1 _STAT") {
+		t.Errorf("the main name's status moved to INDI:\n%s", text)
+	}
+	if !strings.Contains(text, "1 DEAT\n2 DATE 1900\n2 _STAT probable") {
+		t.Errorf("the unknown status was not kept under DEAT:\n%s", text)
+	}
+	// An "accepted" with a note is not GoTree's: keep it, note and all.
+	if !strings.Contains(text, "1 CHR\n2 _STAT accepted\n3 NOTE checked in 1990") {
+		t.Errorf("the accepted status with a note was not kept under CHR:\n%s", text)
+	}
+}
+
+func TestImportRolePhrase(t *testing.T) {
+	src := strings.Join([]string{
+		"0 HEAD", "1 GEDC", "2 VERS 7.0",
+		"0 @I1@ INDI", "1 NAME Anna /Weber/",
+		"1 BIRT",
+		"2 ASSO @I2@", "3 ROLE OTHER", "4 PHRASE Informant",
+		"2 ASSO @I3@", "3 ROLE OTHER", "4 PHRASE Lodger",
+		"2 ASSO @I4@", "3 ROLE OTHER",
+		"2 ASSO @I5@", "3 ROLE WITN", "4 PHRASE chief witness",
+		"0 @I2@ INDI", "1 NAME Bert /Weber/",
+		"0 @I3@ INDI", "1 NAME Clara /Weber/",
+		"0 @I4@ INDI", "1 NAME Dora /Weber/",
+		"0 @I5@ INDI", "1 NAME Emil /Weber/",
+		"0 TRLR", "",
+	}, "\n")
+	doc, err := gedcom.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := newStore(t)
+	a := setup(t, s)
+	if _, err := s.ImportGEDCOM(ctx, a, doc, ImportIntoEmpty); err != nil {
+		t.Fatal(err)
+	}
+	type rc struct{ role, custom string }
+	got := map[string]rc{}
+	for _, e := range findPerson(t, s, a, "anna").Events {
+		for _, p := range e.Participants {
+			got[p.Person.GivenNames] = rc{p.Role, p.CustomRole}
+		}
+	}
+	want := map[string]rc{
+		"Bert": {"informant", ""}, "Clara": {"other", "Lodger"}, "Dora": {"other", ""}, "Emil": {"witness", ""},
+	}
+	for name, w := range want {
+		if got[name] != w {
+			t.Errorf("%s: %+v, want %+v", name, got[name], w)
+		}
+	}
+}

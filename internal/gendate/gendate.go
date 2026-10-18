@@ -442,7 +442,8 @@ func julianToGregorian(y, m, d int) (int, int, int) {
 // DATE.PHRASE substructure; value may then be empty.
 //
 // A Date has one phrase, so two known limits apply: an INT date with a dual
-// year keeps only the INT explanation, and a range with dual years on both
+// year and an explanation keeps only the explanation (without an
+// explanation it keeps the dual year), and a range with dual years on both
 // ends keeps only the last end's.
 func (d Date) GEDCOM7() (value, phrase string) {
 	simple := func(sd *SimpleDate) string {
@@ -465,7 +466,9 @@ func (d Date) GEDCOM7() (value, phrase string) {
 		value = "TO " + simple(d.End)
 	case QualifierInterpreted:
 		value = simple(d.Start)
-		phrase = d.Phrase
+		if d.Phrase != "" {
+			phrase = d.Phrase
+		}
 	case QualifierNone:
 		value = simple(d.Start)
 	default:

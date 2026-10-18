@@ -90,9 +90,15 @@ func refreshNameKeys(ctx context.Context, conn *sql.DB) error {
 	return tx.Commit()
 }
 
+// newProvider knows the SQL migrations and migration 16, which is Go
+// because it must run with foreign keys off (see migrate16.go).
+func newProvider(conn *sql.DB) (*goose.Provider, error) {
+	return goose.NewProvider(goose.DialectSQLite3, conn, migrations, goose.WithGoMigrations(migration16()))
+}
+
 // Migrate applies all pending migrations.
 func Migrate(ctx context.Context, conn *sql.DB) error {
-	provider, err := goose.NewProvider(goose.DialectSQLite3, conn, migrations)
+	provider, err := newProvider(conn)
 	if err != nil {
 		return fmt.Errorf("migrations: %w", err)
 	}
@@ -104,7 +110,7 @@ func Migrate(ctx context.Context, conn *sql.DB) error {
 
 // SchemaVersion reports the version of the newest applied migration.
 func SchemaVersion(ctx context.Context, conn *sql.DB) (int64, error) {
-	provider, err := goose.NewProvider(goose.DialectSQLite3, conn, migrations)
+	provider, err := newProvider(conn)
 	if err != nil {
 		return 0, err
 	}

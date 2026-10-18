@@ -102,6 +102,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Deleting a person, event, family, name or heirloom also deletes citations that supported only
+  it, instead of leaving them behind on the source; citations already left without any fact are
+  removed on update, and a citation can no longer be created through the API without a fact (#56)
+
 - Share links that show living people by name only no longer find them by nickname or other names,
   such as a maiden name; only their given names and surname are searched, and such links list
   matches in name order, since relevance also weighed the hidden names (#58)

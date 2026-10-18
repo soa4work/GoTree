@@ -74,6 +74,12 @@ func (s *Server) Handler() http.Handler {
 			r.Delete("/auth/sessions/{id}", s.endSession)
 			r.Post("/auth/logout-all", s.logoutAll)
 			r.Post("/auth/password", s.changePassword)
+
+			// Accounts, trees and memberships need a login but not a tree,
+			// so a user who belongs to no tree can still pick or create
+			// one. The store checks the admin and owner rules itself.
+			s.treeRoutes(r)
+			s.accountRoutes(r)
 		})
 
 		r.Group(func(r chi.Router) {

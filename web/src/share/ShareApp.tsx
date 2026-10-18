@@ -13,6 +13,7 @@ import { ThemeSwitch } from '../components/ThemeSwitch'
 import { useDebounced } from '../hooks/useDebounced'
 import { fullName, lifespan } from '../lib/people'
 import { PersonHrefContext, usePersonHref } from '../lib/personHref'
+import { treeDisplayName } from '../lib/treeName'
 import { Timeline } from '../people/Timeline'
 import { timelineItems } from '../people/timelineItems'
 import { layoutTree, type TreeView } from '../tree/layout'
@@ -87,7 +88,7 @@ export function ShareApp() {
           <div className="flex flex-wrap items-center gap-3">
             <img src="/icons/logo-64.png" alt="" width={32} height={32} className="size-8 rounded-md" />
             <span className="min-w-0 truncate text-lg font-semibold text-brand-700 dark:text-brand-100">
-              {info.data ? t('share.sharedBy', { tree: info.data.treeName }) : t('app.name')}
+              {info.data ? t('share.sharedBy', { tree: treeDisplayName(info.data.treeName, t) }) : t('app.name')}
             </span>
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
               {t('share.readOnly')}
@@ -141,7 +142,7 @@ function ShareHome({ info, token }: { info: ShareInfo; token: string }) {
   const startName = info.root ? fullName(info.root) : null
   return (
     <div className="max-w-3xl space-y-6">
-      <PageHeading title={info.treeName}>{info.treeName}</PageHeading>
+      <PageHeading title={treeDisplayName(info.treeName, t)}>{treeDisplayName(info.treeName, t)}</PageHeading>
       <PrivacyNote info={info} />
       {info.startId !== null && (
         <p>
@@ -253,7 +254,7 @@ function SharePerson({ token }: { token: string }) {
       <header className="space-y-2">
         <PageHeading title={name}>{name}</PageHeading>
         <p className="text-slate-700 dark:text-slate-300">
-          {[t(`sex.${p.sex}`), life, p.living ? t('person.living') : t('person.deceased')].filter(Boolean).join(' · ')}
+          {[t(`sex.${p.sex}`), life, t(p.living ? 'person.living' : 'person.deceased', { context: p.sex })].filter(Boolean).join(' · ')}
         </p>
         <Link
           to={`/share/${token}/tree?root=${p.id}`}

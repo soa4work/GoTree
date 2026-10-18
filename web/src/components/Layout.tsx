@@ -14,6 +14,7 @@ import { UpdateNotice } from './UpdateNotice'
 import { DialogShell } from './DialogShell'
 import { MoreIcon } from './icons'
 import { homeItem, navGroups, phoneItems, type NavItem } from './navGroups'
+import { treeDisplayName } from '../lib/treeName'
 
 function sideLinkClass({ isActive }: { isActive: boolean }) {
   return [
@@ -160,7 +161,7 @@ export function Layout() {
         <img src="/icons/logo-64.png" alt="" width={32} height={32} className="size-8 rounded-md" />
         <span className="max-sm:sr-only text-lg font-semibold text-brand-700 dark:text-brand-100">{t('app.name')}</span>
         {auth.data?.tree && (
-          <span className="hidden truncate text-slate-600 sm:inline dark:text-slate-400">· {auth.data.tree.name}</span>
+          <span className="hidden truncate text-slate-600 sm:inline dark:text-slate-400">· {treeDisplayName(auth.data.tree.name, t)}</span>
         )}
         {user && (
           <div className="ml-auto flex items-center gap-2 sm:gap-3">

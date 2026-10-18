@@ -53,7 +53,9 @@ function longDate(year: string, month: number, day: number, dual = '', monthCase
     return [`${y} ж.`, day || '', month ? KK_MONTHS[month - 1] : ''].filter(Boolean).join(' ')
   }
   const date = new Date(0)
-  date.setUTCFullYear(Number(year), (month || 1) - 1, day || 1)
+  // The year part is replaced by the text as written; 2000 is a leap year, so
+  // 29 February of a dual or Julian year does not roll over to 1 March.
+  date.setUTCFullYear(2000, (month || 1) - 1, day || 1)
   const options: Intl.DateTimeFormatOptions = { year: 'numeric', timeZone: 'UTC' }
   if (month) options.month = 'long'
   if (day) options.day = 'numeric'

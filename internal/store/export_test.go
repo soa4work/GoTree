@@ -177,6 +177,7 @@ func TestExportGedcom7DatePhraseRoundTrip(t *testing.T) {
 		{"DEAT", "12 FEB 1750/51", "12 FEB 1750/51"},
 		{"BURI", "BET 1750/51 AND 1760", "BET 1750/51 AND 1760"},
 		{"CHR", "INT 1750/51", "1750/51"},
+		{"RESI", "29 FEB 1751/52", "29 FEB 1751/52"},
 	}
 	for i, d := range dates[:3] {
 		if _, err := s.CreateHeirloom(ctx, a, HeirloomInput{Name: fmt.Sprintf("Heirloom %d", i), MadeDate: d.in}); err != nil {
@@ -258,7 +259,7 @@ func TestExportIntDualYear551(t *testing.T) {
 	}
 
 	text7 := exportText(t, s, a, ExportOptions{Version7: true})
-	if !strings.Contains(text7, "1 DATE 1750\n2 PHRASE 1750/51\n") {
+	if !strings.Contains(text7, "1 DATE 1751\n2 PHRASE 1750/51\n") {
 		t.Errorf("7.0 heirloom made date lacks its dual year:\n%s", text7)
 	}
 	s3, a3 := reimport(t, text7)

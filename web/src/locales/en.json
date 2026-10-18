@@ -1171,7 +1171,7 @@
     "legendTrail": "Moves so far; older ones fade"
   },
   "apiError": {
-    "invalid_json": "The request was not valid JSON: {{detail}}",
+    "invalid_json": "The request was not valid JSON.",
     "trailing_data": "The request contains extra data after the JSON.",
     "invalid_input": "Some fields are not valid.",
     "not_found": "Not found.",
@@ -1206,7 +1206,12 @@
     "thumbnail_failed": "Could not render a thumbnail.",
     "replace_owner_only": "Only the owner of the tree can replace it; editors can import into an empty tree.",
     "gedcom_too_large": "The GEDCOM file is too large (over {{limitMB}} MB).",
-    "gedcom_invalid": "The GEDCOM file could not be read: {{detail}}",
+    "gedcom_invalid": "The GEDCOM file could not be read.",
+    "gedcom_not_gedcom": "This does not look like a GEDCOM file (line {{line}}).",
+    "gedcom_empty": "The file is empty.",
+    "gedcom_zip_unreadable": "The zip file could not be read.",
+    "gedcom_zip_no_ged": "The zip file contains no .ged file.",
+    "gedcom_zip_several_ged": "The zip file contains several .ged files; upload the one you want.",
     "tree_not_empty": "The tree is not empty.",
     "field": {
       "required": "is required",

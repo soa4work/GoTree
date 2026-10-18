@@ -53,7 +53,12 @@ const (
 	CodeThumbFailed       = "thumbnail_failed"
 	CodeReplaceOwnerOnly  = "replace_owner_only"
 	CodeGedcomTooLarge    = "gedcom_too_large"
-	CodeGedcomInvalid     = "gedcom_invalid"
+	CodeGedcomInvalid     = "gedcom_invalid" // fallback for a file error without a code of its own
+	CodeGedcomNotGedcom   = "gedcom_not_gedcom"
+	CodeGedcomEmpty       = "gedcom_empty"
+	CodeGedcomZipBad      = "gedcom_zip_unreadable"
+	CodeGedcomZipNoFile   = "gedcom_zip_no_ged"
+	CodeGedcomZipSeveral  = "gedcom_zip_several_ged"
 	CodeTreeNotEmpty      = "tree_not_empty"
 )
 
@@ -185,6 +190,10 @@ var (
 	reUnknownWord = regexp.MustCompile(`^unknown (?:kind|status|role|action|column|name type|participant role|way of getting it:) (.+)$`)
 )
 
+// reRowField splits the "<column>: <message>" form in which the transcription
+// apply step reports a problem of one row.
+var reRowField = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9_.]*): (.+)$`)
+
 func atoi(s string) int {
 	n, _ := strconv.Atoi(s)
 	return n
@@ -198,6 +207,20 @@ func atoi(s string) int {
 func classifyField(msg string) FieldError {
 	if code, ok := exactFields[msg]; ok {
 		return FieldError{Code: code}
+	}
+	// A row message of a transcription ("<column>: <message>"): classify the
+	// part after the column and keep the column as a param. An unknown inner
+	// message stays FieldInvalid and the client shows the whole English text.
+	if m := reRowField.FindStringSubmatch(msg); m != nil {
+		inner := classifyField(m[2])
+		if inner.Code == FieldInvalid {
+			return inner
+		}
+		params := map[string]any{"field": m[1]}
+		for k, v := range inner.Params {
+			params[k] = v
+		}
+		return FieldError{Code: inner.Code, Params: params}
 	}
 	switch msg {
 	case "must be at least 10 characters":

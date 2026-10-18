@@ -14,6 +14,24 @@ import (
 	"golang.org/x/text/transform"
 )
 
+// Kinds of ParseError: the reasons a file is refused. Callers use them to give
+// stable machine codes; the error text stays English.
+const (
+	ErrNotGedcom = "not_gedcom" // the first lines are not GEDCOM lines; Line is set
+	ErrEmpty     = "empty"      // the file has no lines
+)
+
+// ParseError is a file that is not GEDCOM at all.
+type ParseError struct {
+	Kind string
+	Line int
+	Err  error
+	msg  string
+}
+
+func (e *ParseError) Error() string { return e.msg }
+func (e *ParseError) Unwrap() error { return e.Err }
+
 // Node is one line of a GEDCOM file with the lines nested below it.
 type Node struct {
 	Level int
@@ -184,7 +202,7 @@ func (d *Document) parseLines(text string) error {
 		n, ok := parseLine(line)
 		if !ok {
 			if parsed == 0 && i < 3 {
-				return fmt.Errorf("this does not look like a GEDCOM file (line %d)", lineNo)
+				return &ParseError{Kind: ErrNotGedcom, Line: lineNo, msg: fmt.Sprintf("this does not look like a GEDCOM file (line %d)", lineNo)}
 			}
 			d.warn(lineNo, "unreadable line skipped: %q", truncate(line, 80))
 			continue
@@ -211,7 +229,7 @@ func (d *Document) parseLines(text string) error {
 		stack = append(stack, n)
 	}
 	if parsed == 0 {
-		return fmt.Errorf("the file is empty")
+		return &ParseError{Kind: ErrEmpty, msg: "the file is empty"}
 	}
 
 	for _, r := range roots {

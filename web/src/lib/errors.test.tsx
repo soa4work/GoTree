@@ -69,4 +69,27 @@ describe('translated server errors in the interface', () => {
     expect(field(1)).toBe('должен содержать не менее 1 символа')
     expect(field(10)).toBe('должен содержать не менее 10 символов')
   })
+
+  it('translates a transcription row error and keeps its column', () => {
+    const err = new ApiError(
+      422,
+      'invalid input',
+      { 'rows.2': 'givenNames: is too long' },
+      { code: 'invalid_input', fieldCodes: { 'rows.2': { code: 'too_long', params: { field: 'givenNames' } } } },
+    )
+    expect(fieldErrors(err, t)['rows.2']).toBe('givenNames: слишком длинное значение')
+  })
+
+  it('translates a GEDCOM file error with its line, without the English detail', () => {
+    const err = new ApiError(
+      422,
+      'this does not look like a GEDCOM file (line 1)',
+      {},
+      { code: 'gedcom_not_gedcom', params: { line: 1, detail: 'this does not look like a GEDCOM file (line 1)' } },
+    )
+    expect(errorText(err, t)).toBe('Это не похоже на файл GEDCOM (строка 1).')
+    expect(errorText(new ApiError(400, 'invalid JSON: EOF', {}, { code: 'invalid_json', params: { detail: 'EOF' } }), t)).toBe(
+      'Запрос не является корректным JSON.',
+    )
+  })
 })

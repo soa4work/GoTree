@@ -129,6 +129,23 @@ describe('tree page root', () => {
     expect(screen.getByRole('link', { name: 'Show the tree' })).toHaveAttribute('href', '/tree')
   })
 
+  it('opens the last centered person when the Tree link is followed again', async () => {
+    localStorage.setItem('gotree.treeRoot.1', '1')
+    mockApi({
+      'GET /api/tree/1': [200, graph],
+      'GET /api/tree/2': [200, { ...graph, rootId: 2 }],
+    })
+    renderApp('/tree')
+    const chart = await screen.findByRole('group', { name: 'Family tree chart' })
+    fireEvent.doubleClick(within(chart).getByRole('button', { name: /^Hans Weber/ }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Tree of Hans Weber' })).toBeInTheDocument()
+    await waitFor(() => expect(localStorage.getItem('gotree.treeRoot.1')).toBe('2'))
+
+    fireEvent.click(screen.getAllByRole('link', { name: 'Tree' })[0]!)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Tree of Hans Weber' })).toBeInTheDocument()
+    expect(localStorage.getItem('gotree.treeRoot.1')).toBe('2')
+  })
+
   it('keys the remembered root by tree', async () => {
     localStorage.setItem('gotree.treeRoot.2', '5')
     const fetchMock = mockApi({

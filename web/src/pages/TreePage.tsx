@@ -104,12 +104,10 @@ export function TreePage() {
     staleTime: Infinity,
   })
   const rootKey = `gotree.treeRoot.${auth.data?.tree?.id ?? 0}`
-  const [stored, setStored] = useState(() => remembered(rootKey))
-  const [prevKey, setPrevKey] = useState(rootKey)
-  if (prevKey !== rootKey) {
-    setPrevKey(rootKey)
-    setStored(remembered(rootKey))
-  }
+  // Read on every render, not once: centering on someone remembers them, and
+  // following the Tree link again (same page instance) must start there. A
+  // root that 404s is forgotten in the tree query before its error renders.
+  const stored = remembered(rootKey)
 
   // Without a root in the URL: the last one viewed, else the first person.
   const source = rootParam !== null ? 'url' : stored !== null ? 'stored' : 'first'
@@ -138,8 +136,6 @@ export function TreePage() {
   })
 
   const missing = tree.error instanceof ApiError && tree.error.status === 404
-  // A remembered root that is gone: start from the first person instead.
-  if (missing && source === 'stored') setStored(null)
   const retried = useRef(false)
   useEffect(() => {
     if (!missing || source !== 'first' || retried.current) return

@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PageHeading } from '../components/PageHeading'
 import { ExportSection } from '../transfer/ExportSection'
 import { ImportReportView } from '../transfer/ImportReportView'
+import { errorText } from '../lib/errors'
 
 export function ImportExportPage() {
   const { t } = useTranslation()
@@ -66,7 +67,7 @@ function ImportSection() {
     run.error instanceof ApiError && run.error.status === 409
       ? t('transfer.notEmpty')
       : run.error
-        ? t('transfer.importFailed', { message: run.error.message })
+        ? t('transfer.importFailed', { message: errorText(run.error, t) })
         : null
 
   return (

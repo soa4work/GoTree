@@ -30,7 +30,7 @@ func (s *Server) mapData(w http.ResponseWriter, r *http.Request) {
 		scope = store.MapScopeAll
 	case store.MapScopeAncestors, store.MapScopeDescendants:
 	default:
-		writeError(w, http.StatusBadRequest, "scope must be all, ancestors or descendants")
+		writeError(w, http.StatusBadRequest, CodeInvalidScope, "scope must be all, ancestors or descendants")
 		return
 	}
 	d, err := s.Store.MapData(r.Context(), actorFrom(r), scope, int64(queryInt(r, "root", 0)))

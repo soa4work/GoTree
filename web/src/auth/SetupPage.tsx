@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ApiError, setup } from '../api/client'
+import { setup } from '../api/client'
 import { Button } from '../components/Button'
 import { TextField } from '../components/TextField'
 import { AuthCard } from './AuthCard'
 import { FormError } from './FormError'
+import { errorText, fieldErrors } from '../lib/errors'
 
 export function SetupPage() {
   const { t } = useTranslation()
@@ -20,9 +21,9 @@ export function SetupPage() {
     mutationFn: setup,
     onSuccess: (state) => queryClient.setQueryData(['auth'], state),
   })
-  const fields = mutation.error instanceof ApiError ? mutation.error.fields : {}
+  const fields = fieldErrors(mutation.error, t)
   const formError =
-    mutation.error && Object.keys(fields).length === 0 ? t('auth.setupFailed', { message: mutation.error.message }) : null
+    mutation.error && Object.keys(fields).length === 0 ? t('auth.setupFailed', { message: errorText(mutation.error, t) }) : null
 
   const submit = (e: FormEvent) => {
     e.preventDefault()

@@ -1,11 +1,33 @@
+export type ErrorParams = Record<string, string | number>
+
+/** Machine-readable part of an error: a stable code and its message parameters. */
+export interface ErrorDetail {
+  code?: string
+  params?: ErrorParams
+}
+
+/** The JSON body of an API error response; `error` is the English message. */
+interface ErrorBody extends ErrorDetail {
+  error?: string
+  fields?: Record<string, string>
+  fieldCodes?: Record<string, ErrorDetail>
+}
+
 export class ApiError extends Error {
   readonly status: number
   readonly fields: Record<string, string>
+  /** Stable server error code, e.g. "gedcom_too_large"; undefined for old servers and proxies. */
+  readonly code?: string
+  readonly params: ErrorParams
+  readonly fieldCodes: Record<string, ErrorDetail>
 
-  constructor(status: number, message: string, fields: Record<string, string> = {}) {
+  constructor(status: number, message: string, fields: Record<string, string> = {}, body: ErrorBody = {}) {
     super(message)
     this.status = status
     this.fields = fields
+    this.code = body.code
+    this.params = body.params ?? {}
+    this.fieldCodes = body.fieldCodes ?? {}
   }
 }
 
@@ -21,14 +43,15 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
   if (!res.ok) {
     let message = res.statusText
     let fields: Record<string, string> = {}
+    let body: ErrorBody = {}
     try {
-      const err = (await res.json()) as { error?: string; fields?: Record<string, string> }
-      message = err.error ?? message
-      fields = err.fields ?? {}
+      body = (await res.json()) as ErrorBody
+      message = body.error ?? message
+      fields = body.fields ?? {}
     } catch {
       // Non-JSON error bodies (e.g. a proxy page) keep the status text.
     }
-    throw new ApiError(res.status, message, fields)
+    throw new ApiError(res.status, message, fields, body)
   }
   if (res.status === 204) return undefined as T
   return (await res.json()) as T
@@ -41,12 +64,14 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
   const res = await fetch(`/api${path}`, { method: 'POST', body, headers: { Accept: 'application/json' } })
   if (!res.ok) {
     let message = res.statusText
+    let body: ErrorBody = {}
     try {
-      message = ((await res.json()) as { error?: string }).error ?? message
+      body = (await res.json()) as ErrorBody
+      message = body.error ?? message
     } catch {
       // keep the status text
     }
-    throw new ApiError(res.status, message)
+    throw new ApiError(res.status, message, {}, body)
   }
   return (await res.json()) as T
 }

@@ -22,7 +22,6 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { TextAreaField } from '../components/Field'
 import { PageHeading } from '../components/PageHeading'
 import { TextField } from '../components/TextField'
-import { formErrors } from '../lib/errors'
 import { fullName } from '../lib/people'
 import { FaceTagger, type Box } from '../media/FaceTagger'
 import { AudioPlayer, VideoPlayer } from '../media/Players'
@@ -30,6 +29,7 @@ import { DateField } from '../people/DateField'
 import { EventDialog } from '../people/EventDialog'
 import { PersonPicker } from '../people/PersonPicker'
 import { NotFound } from './NotFound'
+import { errorText, formErrors } from '../lib/errors'
 
 export function MediaPage() {
   const { t } = useTranslation()
@@ -206,7 +206,7 @@ function MediaView({ media: m }: { media: Media }) {
         message={t('media.deleteConfirm', { title })}
         confirmLabel={t('common.delete')}
         busy={remove.isPending}
-        error={remove.error ? t('common.deleteFailed', { message: remove.error.message }) : null}
+        error={remove.error ? t('common.deleteFailed', { message: errorText(remove.error, t) }) : null}
         onConfirm={() => remove.mutate()}
         onClose={() => setDeleting(false)}
       />
@@ -246,7 +246,7 @@ function Details({ media: m, onSaved }: { media: Media; onSaved: (m: Media) => v
     mutationFn: () => updateMedia(m.id, { title, date, description, transcript }),
     onSuccess: onSaved,
   })
-  const errors = formErrors(save.error, (msg) => t('common.saveFailed', { message: msg }))
+  const errors = formErrors(save.error, t, (msg) => t('common.saveFailed', { message: msg }))
   return (
     <form
       className="space-y-3"
@@ -315,7 +315,7 @@ function NewRegion({ media: m, box, onDone }: { media: Media; box: Box; onDone: 
       )}
       {save.error && (
         <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-400">
-          {save.error.message}
+          {errorText(save.error, t)}
         </p>
       )}
       <div className="flex gap-2">

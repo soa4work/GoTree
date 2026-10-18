@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { exportUrl, verifyExport, type ExportVersion, type Privacy } from '../api/endpoints'
 import { Button } from '../components/Button'
 import { Choice } from '../components/Choice'
+import { errorText } from '../lib/errors'
 
 export function ExportSection() {
   const { t } = useTranslation()
@@ -63,7 +64,7 @@ export function ExportSection() {
       </p>
       {verify.error && (
         <p role="alert" className="font-medium text-red-700 dark:text-red-400">
-          {t('transfer.checkFailed', { message: verify.error.message })}
+          {t('transfer.checkFailed', { message: errorText(verify.error, t) })}
         </p>
       )}
       {verify.data && (

@@ -27,7 +27,7 @@ Thumbnails are not included; they are made again when first shown.
 // covers the whole instance, so only administrators may download it.
 func (s *Server) backup(w http.ResponseWriter, r *http.Request) {
 	if sessionFrom(r.Context()).User.Role != store.UserRoleAdmin {
-		writeError(w, http.StatusForbidden, "only administrators can download a backup")
+		writeError(w, http.StatusForbidden, CodeAdminOnlyBackup, "only administrators can download a backup")
 		return
 	}
 	dir, err := os.MkdirTemp("", "gotree-backup-")

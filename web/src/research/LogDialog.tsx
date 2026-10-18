@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ApiError } from '../api/client'
 import { createLogEntry, deleteLogEntry, listTasks, updateLogEntry } from '../api/endpoints'
 import type { LogEntry, ResearchLink, SearchResult } from '../api/types'
 import { Button } from '../components/Button'
@@ -12,6 +11,7 @@ import { SelectField, TextAreaField } from '../components/Field'
 import { Form } from '../components/Form'
 import { TextField } from '../components/TextField'
 import { LinkEditor } from './LinkEditor'
+import { errorText, fieldErrors } from '../lib/errors'
 
 interface Props {
   entry?: LogEntry
@@ -60,7 +60,7 @@ export function LogDialog({ entry, initialLinks = [], initialTaskId = null, onCl
     onSuccess: done,
   })
   const remove = useMutation({ mutationFn: () => deleteLogEntry(entry!.id), onSuccess: done })
-  const fields = save.error instanceof ApiError ? save.error.fields : {}
+  const fields = fieldErrors(save.error, t)
   // The entry's own task may be done by now and missing from the active list.
   const taskOptions = [...(tasks.data ?? [])]
   if (entry?.taskId && !taskOptions.some((x) => x.id === entry.taskId)) {
@@ -84,7 +84,7 @@ export function LogDialog({ entry, initialLinks = [], initialTaskId = null, onCl
           busy={save.isPending}
           error={
             save.error && Object.keys(fields).length === 0
-              ? t('common.saveFailed', { message: save.error.message })
+              ? t('common.saveFailed', { message: errorText(save.error, t) })
               : null
           }
           secondary={
@@ -156,7 +156,7 @@ export function LogDialog({ entry, initialLinks = [], initialTaskId = null, onCl
         message={t('research.deleteEntryConfirm')}
         confirmLabel={t('common.delete')}
         busy={remove.isPending}
-        error={remove.error ? t('common.deleteFailed', { message: remove.error.message }) : null}
+        error={remove.error ? t('common.deleteFailed', { message: errorText(remove.error, t) }) : null}
         onConfirm={() => remove.mutate()}
         onClose={() => setConfirmDelete(false)}
       />

@@ -5,10 +5,10 @@ import { createPerson, updatePerson } from '../api/endpoints'
 import type { Person, PersonInput } from '../api/types'
 import { Dialog } from '../components/Dialog'
 import { Form } from '../components/Form'
-import { formErrors } from '../lib/errors'
 import { emptyLife, emptyPerson, lifeInput } from '../lib/people'
 import { CitationEditor, type PendingCitation } from '../sources/CitationEditor'
 import { PersonFields } from './PersonFields'
+import { formErrors } from '../lib/errors'
 
 interface Props {
   open: boolean
@@ -74,7 +74,7 @@ function PersonDialogForm({ person, onClose, onSaved }: Omit<Props, 'open'>) {
       onSaved(p)
     },
   })
-  const errors = formErrors(save.error, (m) => t('common.saveFailed', { message: m }))
+  const errors = formErrors(save.error, t, (m) => t('common.saveFailed', { message: m }))
 
   return (
     <Form onSubmit={() => save.mutate()} onCancel={onClose} submitLabel={t('common.save')} busy={save.isPending} error={errors.form}>

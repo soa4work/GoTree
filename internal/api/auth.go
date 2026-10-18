@@ -68,7 +68,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := s.Store.Setup(r.Context(), in)
 	if errors.Is(err, store.ErrSetupDone) {
-		writeError(w, http.StatusConflict, err.Error())
+		writeError(w, http.StatusConflict, CodeSetupDone, err.Error())
 		return
 	}
 	if err != nil {
@@ -91,7 +91,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	ip := clientIP(r)
 	if !s.throttle.allow(ip) {
 		w.Header().Set("Retry-After", "900")
-		writeError(w, http.StatusTooManyRequests, "too many failed logins, try again later")
+		writeError(w, http.StatusTooManyRequests, CodeTooManyLogins, "too many failed logins, try again later")
 		return
 	}
 	var in loginInput
@@ -102,7 +102,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if errors.Is(err, store.ErrBadCredentials) {
 		s.throttle.fail(ip)
 		s.Log.Warn("failed login", "user", in.Username, "ip", ip)
-		writeError(w, http.StatusUnauthorized, err.Error())
+		writeError(w, http.StatusUnauthorized, CodeBadCredentials, err.Error())
 		return
 	}
 	if err != nil {
@@ -161,12 +161,12 @@ func (s *Server) requireSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(sessionCookie)
 		if err != nil {
-			writeError(w, http.StatusUnauthorized, "not logged in")
+			writeError(w, http.StatusUnauthorized, CodeNotLoggedIn, "not logged in")
 			return
 		}
 		sess, err := s.Store.SessionByToken(r.Context(), c.Value)
 		if errors.Is(err, store.ErrNotFound) {
-			writeError(w, http.StatusUnauthorized, "not logged in")
+			writeError(w, http.StatusUnauthorized, CodeNotLoggedIn, "not logged in")
 			return
 		}
 		if err != nil {
@@ -174,7 +174,7 @@ func (s *Server) requireSession(next http.Handler) http.Handler {
 			return
 		}
 		if sess.TreeID == 0 {
-			writeError(w, http.StatusForbidden, "you are not a member of any tree")
+			writeError(w, http.StatusForbidden, CodeNotMember, "you are not a member of any tree")
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), sessionKey, sess)))
@@ -188,7 +188,7 @@ func requireEditor(next http.Handler) http.Handler {
 		case http.MethodGet, http.MethodHead, http.MethodOptions:
 		default:
 			if !actorFrom(r).CanEdit() {
-				writeError(w, http.StatusForbidden, "you can only view this tree")
+				writeError(w, http.StatusForbidden, CodeViewOnly, "you can only view this tree")
 				return
 			}
 		}

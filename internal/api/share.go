@@ -40,12 +40,12 @@ func (s *Server) shareLinkRoutes(r chi.Router) {
 func (s *Server) requireShare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			writeError(w, http.StatusMethodNotAllowed, "share links are read-only")
+			writeError(w, http.StatusMethodNotAllowed, CodeShareReadOnly, "share links are read-only")
 			return
 		}
 		sh, err := s.Store.ShareByToken(r.Context(), chi.URLParam(r, "token"))
 		if errors.Is(err, store.ErrNotFound) {
-			writeError(w, http.StatusNotFound, "this link does not exist, has expired or was withdrawn")
+			writeError(w, http.StatusNotFound, CodeShareGone, "this link does not exist, has expired or was withdrawn")
 			return
 		}
 		if err != nil {

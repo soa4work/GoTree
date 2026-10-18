@@ -8,6 +8,7 @@ import { Button } from '../components/Button'
 import { TextField } from '../components/TextField'
 import { lookupPlace, parseCoordinate, type GeoCandidate } from './nominatim'
 import { unmappedPlacesKey, useUnmappedPlaces } from './useUnmappedPlaces'
+import { errorText } from '../lib/errors'
 
 /** Nominatim allows one request per second; clicks closer together are ignored. */
 const LOOKUP_GAP_MS = 1100
@@ -151,7 +152,7 @@ function PlaceCoordinates({ place, readOnly, onSaved }: { place: UnmappedPlace; 
       )}
       {save.isError && (
         <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-400">
-          {t('map.saveFailed', { message: save.error.message })}
+          {t('map.saveFailed', { message: errorText(save.error, t) })}
         </p>
       )}
       {lookupError && (

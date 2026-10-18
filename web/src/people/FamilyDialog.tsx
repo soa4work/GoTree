@@ -8,7 +8,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Dialog } from '../components/Dialog'
 import { SelectField, TextAreaField } from '../components/Field'
 import { Form } from '../components/Form'
-import { formErrors } from '../lib/errors'
+import { errorText, formErrors } from '../lib/errors'
 
 interface Props {
   open: boolean
@@ -48,7 +48,7 @@ function FamilyForm({ family, onClose }: Omit<Props, 'open'>) {
     onSuccess: done,
   })
   const remove = useMutation({ mutationFn: () => deleteFamily(family.id), onSuccess: done })
-  const errors = formErrors(save.error, (m) => t('common.saveFailed', { message: m }))
+  const errors = formErrors(save.error, t, (m) => t('common.saveFailed', { message: m }))
 
   return (
     <>
@@ -79,7 +79,7 @@ function FamilyForm({ family, onClose }: Omit<Props, 'open'>) {
         message={t('family.deleteConfirm')}
         confirmLabel={t('common.delete')}
         busy={remove.isPending}
-        error={remove.error ? t('common.deleteFailed', { message: remove.error.message }) : null}
+        error={remove.error ? t('common.deleteFailed', { message: errorText(remove.error, t) }) : null}
         onConfirm={() => remove.mutate()}
         onClose={() => setConfirmDelete(false)}
       />

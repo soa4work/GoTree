@@ -6,13 +6,13 @@ import type { ChildRelation, PersonDetail, PersonInput, PersonRef, Relation, Rel
 import { Dialog } from '../components/Dialog'
 import { SelectField } from '../components/Field'
 import { Form } from '../components/Form'
-import { formErrors } from '../lib/errors'
 import { SourcePicker } from '../sources/SourcePicker'
 import { TextField } from '../components/TextField'
 import { emptyLife, emptyPerson, fullName, lifeInput } from '../lib/people'
 import { parentsLabel, partnerLabel } from './familyLabel'
 import { PersonFields } from './PersonFields'
 import { PersonPicker } from './PersonPicker'
+import { formErrors } from '../lib/errors'
 
 interface Props {
   open: boolean
@@ -71,7 +71,7 @@ function RelativeForm({ anchor, relation, onClose, onSaved }: Omit<Props, 'open'
       onSaved(r)
     },
   })
-  const errors = formErrors(save.error, (m) => t('common.saveFailed', { message: m }))
+  const errors = formErrors(save.error, t, (m) => t('common.saveFailed', { message: m }))
   const personError = errors.fields.person ?? errors.fields.personId
 
   return (

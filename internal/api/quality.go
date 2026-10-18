@@ -40,7 +40,7 @@ func (s *Server) relationship(w http.ResponseWriter, r *http.Request) {
 	a, errA := strconv.ParseInt(r.URL.Query().Get("a"), 10, 64)
 	b, errB := strconv.ParseInt(r.URL.Query().Get("b"), 10, 64)
 	if errA != nil || errB != nil {
-		writeError(w, http.StatusBadRequest, "a and b must be person ids")
+		writeError(w, http.StatusBadRequest, CodeIDsRequired, "a and b must be person ids")
 		return
 	}
 	rep, err := s.Store.Relationship(r.Context(), actorFrom(r), a, b)

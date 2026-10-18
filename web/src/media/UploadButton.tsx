@@ -3,6 +3,7 @@ import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { uploadMedia, type MediaOwner } from '../api/endpoints'
 import type { Media } from '../api/types'
+import { errorText } from '../lib/errors'
 
 export const acceptedTypes =
   'image/jpeg,image/png,image/gif,image/webp,application/pdf,audio/mpeg,audio/mp4,audio/x-m4a,audio/ogg,audio/wav,audio/webm,video/mp4,video/webm,.m4a,.mp3,.ogg,.wav,.weba'
@@ -32,7 +33,7 @@ export function UploadButton({ owner, onUploaded }: Props) {
           const media = await uploadMedia(file, owner)
           onUploaded?.(media)
         } catch (e) {
-          failed.push(t('media.uploadFailed', { name: file.name, message: (e as Error).message }))
+          failed.push(t('media.uploadFailed', { name: file.name, message: errorText(e, t) }))
         }
       }
       setProgress(null)

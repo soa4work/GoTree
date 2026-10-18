@@ -24,13 +24,13 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 	// Replace wipes the tree, so it is the owner's call, as with share links.
 	// Checked before the upload is read.
 	if mode == store.ImportReplace && actorFrom(r).Role != store.RoleOwner {
-		writeError(w, http.StatusForbidden, "only the owner of the tree can replace it; editors can import into an empty tree")
+		writeError(w, http.StatusForbidden, CodeReplaceOwnerOnly, "only the owner of the tree can replace it; editors can import into an empty tree")
 		return
 	}
 	s.limitUpload(w, r)
 	mr, err := r.MultipartReader()
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "expected a multipart upload")
+		writeError(w, http.StatusBadRequest, CodeExpectedMultipart, "expected a multipart upload")
 		return
 	}
 	var data []byte
@@ -42,7 +42,7 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 		}
 		if err != nil {
 			if !writeSlowUpload(w, err) {
-				writeError(w, http.StatusBadRequest, "invalid upload")
+				writeError(w, http.StatusBadRequest, CodeInvalidUpload, "invalid upload")
 			}
 			return
 		}
@@ -54,7 +54,7 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 				if writeSlowUpload(w, err) {
 					return
 				}
-				writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("the file is larger than %d MB", s.MaxUpload>>20))
+				writeErrorP(w, http.StatusRequestEntityTooLarge, CodeFileTooLarge, fmt.Sprintf("the file is larger than %d MB", s.MaxUpload>>20), map[string]any{"limitMB": s.MaxUpload >> 20})
 				return
 			}
 			break
@@ -62,7 +62,7 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 		part.Close()
 	}
 	if data == nil {
-		writeError(w, http.StatusBadRequest, "no file in the upload")
+		writeError(w, http.StatusBadRequest, CodeNoFile, "no file in the upload")
 		return
 	}
 
@@ -70,28 +70,28 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 	if bytes.HasPrefix(data, []byte("PK\x03\x04")) {
 		inner, err := gedcomFromZip(data, limit)
 		if errors.Is(err, errGedcomTooLarge) {
-			writeError(w, http.StatusRequestEntityTooLarge, err.Error())
+			writeErrorP(w, http.StatusRequestEntityTooLarge, CodeGedcomTooLarge, err.Error(), map[string]any{"limitMB": limit >> 20})
 			return
 		}
 		if err != nil {
-			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			writeErrorP(w, http.StatusUnprocessableEntity, CodeGedcomInvalid, err.Error(), map[string]any{"detail": err.Error()})
 			return
 		}
 		data = inner
 	} else if int64(len(data)) > limit {
 		// Plain uploads are already capped by limitUpload, so this is a
 		// backstop; the limit mostly applies to zips.
-		writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("%v (over %d MB)", errGedcomTooLarge, limit>>20))
+		writeErrorP(w, http.StatusRequestEntityTooLarge, CodeGedcomTooLarge, fmt.Sprintf("%v (over %d MB)", errGedcomTooLarge, limit>>20), map[string]any{"limitMB": limit >> 20})
 		return
 	}
 	doc, err := gedcom.Parse(data)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		writeErrorP(w, http.StatusUnprocessableEntity, CodeGedcomInvalid, err.Error(), map[string]any{"detail": err.Error()})
 		return
 	}
 	report, err := s.Store.ImportGEDCOM(r.Context(), actorFrom(r), doc, mode)
 	if errors.Is(err, store.ErrTreeNotEmpty) {
-		writeError(w, http.StatusConflict, err.Error())
+		writeError(w, http.StatusConflict, CodeTreeNotEmpty, err.Error())
 		return
 	}
 	if err != nil {

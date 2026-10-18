@@ -535,3 +535,65 @@ func TestThrottleKnownAddressOutlastsSession(t *testing.T) {
 		t.Error("the owner's address must still be known when their session reaches its absolute limit")
 	}
 }
+
+func TestThrottleFailsClosedWhenFullOfLockedKeys(t *testing.T) {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	th := newLoginThrottle()
+	th.now = func() time.Time { return now }
+	th.maxKeys = 20
+	warned := 0
+	th.onFull = func() { warned++ }
+	th.allow("203.0.113.9", "owner")
+	th.succeed("203.0.113.9", "owner")
+	// Fill the map with locked username keys.
+	for i := 0; len(th.failures) < th.maxKeys; i++ {
+		k := userKey(fmt.Sprintf("locked%d", i))
+		for range th.maxUser {
+			th.failures[k] = append(th.failures[k], now)
+		}
+	}
+	if th.allow("198.51.100.1", "newuser") {
+		t.Error("a guess for an untracked username must be refused when the throttle is full")
+	}
+	if th.allow("198.51.100.2", "owner") {
+		t.Error("an unknown address must be refused when the throttle is full")
+	}
+	if warned != 1 {
+		t.Errorf("warned %d times within a minute, want 1", warned)
+	}
+	if !th.allow("203.0.113.9", "owner") {
+		t.Error("the owner's known address must still be allowed")
+	}
+	now = now.Add(2 * time.Minute)
+	th.allow("198.51.100.3", "newuser")
+	if warned != 2 {
+		t.Errorf("warned %d times after a minute, want 2", warned)
+	}
+}
+
+func TestLoginOwnerCanLogInWhenThrottleIsFull(t *testing.T) {
+	ts := newServerWith(t, builtFrontend, behindProxy)
+	loggedIn(t, ts)
+	c := newClient(t, ts)
+	login := func(user, pw, ip string, want int) {
+		t.Helper()
+		status, raw := c.do("POST", "/api/auth/login", map[string]string{"username": user, "password": pw}, "X-Forwarded-For", ip)
+		if status != want {
+			t.Fatalf("login %s from %s: status %d, want %d: %s", user, ip, status, want, raw)
+		}
+	}
+	login("admin", testPassword, "203.0.113.9", http.StatusNoContent)
+	th := testServers[ts].throttle
+	th.mu.Lock()
+	th.maxKeys = 10
+	for i := 0; len(th.failures) < th.maxKeys; i++ {
+		k := userKey(fmt.Sprintf("locked%d", i))
+		for range th.maxUser {
+			th.failures[k] = append(th.failures[k], th.now())
+		}
+	}
+	th.mu.Unlock()
+	login("newuser", "nope nope nope", "198.51.100.5", http.StatusTooManyRequests)
+	login("admin", testPassword, "198.51.100.5", http.StatusTooManyRequests)
+	login("admin", testPassword, "203.0.113.9", http.StatusNoContent)
+}

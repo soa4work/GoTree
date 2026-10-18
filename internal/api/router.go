@@ -37,6 +37,9 @@ type Server struct {
 func (s *Server) Handler() http.Handler {
 	if s.throttle == nil {
 		s.throttle = newLoginThrottle()
+		s.throttle.onFull = func() {
+			s.Log.Warn("login throttle is full of locked keys; refusing logins from unknown addresses")
+		}
 	}
 
 	r := chi.NewRouter()

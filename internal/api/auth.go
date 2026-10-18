@@ -403,6 +403,11 @@ type loginThrottle struct {
 	trustTTL  time.Duration
 	lastSweep time.Time
 	now       func() time.Time
+
+	// onFull is called, at most once a minute, when attempts are refused
+	// because the throttle is full of locked keys.
+	onFull       func()
+	lastFullWarn time.Time
 }
 
 const (
@@ -475,15 +480,37 @@ func (t *loginThrottle) allow(ip, user string) bool {
 	defer t.mu.Unlock()
 	t.sweep()
 	ik, uk := ipKey(ip), userKey(user)
+	known := t.isKnown(uk, ik)
 	if len(t.recent(ik)) >= t.maxIP {
 		return false
 	}
-	if len(t.recent(uk)) >= t.maxUser && !t.isKnown(uk, ik) {
+	if len(t.recent(uk)) >= t.maxUser && !known {
 		return false
 	}
-	t.add(ik)
-	t.add(uk)
+	// Fail closed: when the map is full of locked keys a new key cannot be
+	// tracked, and letting the attempt through unrecorded would make the
+	// limits meaningless. An address known for this user may still try.
+	if !t.add(ik) && !known {
+		t.warnFull()
+		return false
+	}
+	if !t.add(uk) && !known {
+		t.drop(ik)
+		t.warnFull()
+		return false
+	}
 	return true
+}
+
+// warnFull reports, at most once a minute, that the throttle is refusing
+// attempts because it has no room left.
+func (t *loginThrottle) warnFull() {
+	now := t.now()
+	if t.onFull == nil || now.Sub(t.lastFullWarn) < time.Minute {
+		return
+	}
+	t.lastFullWarn = now
+	t.onFull()
 }
 
 func (t *loginThrottle) isKnown(uk, ik string) bool {
@@ -492,12 +519,13 @@ func (t *loginThrottle) isKnown(uk, ik string) bool {
 }
 
 // add records a failure under key, keeping only the newest `limit` of them.
-// When the map is full of keys that cannot be evicted, the new key is dropped.
-func (t *loginThrottle) add(key string) {
+// It reports false when the map is full of keys that cannot be evicted and
+// the new key was therefore not recorded.
+func (t *loginThrottle) add(key string) bool {
 	if _, ok := t.failures[key]; !ok && len(t.failures) >= t.maxKeys {
 		t.evict()
 		if len(t.failures) >= t.maxKeys {
-			return
+			return false
 		}
 	}
 	list := append(t.recent(key), t.now())
@@ -505,6 +533,7 @@ func (t *loginThrottle) add(key string) {
 		list = list[len(list)-max:]
 	}
 	t.failures[key] = list
+	return true
 }
 
 // drop removes the newest failure under key.

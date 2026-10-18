@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router'
+import { ApiError, getAuthState } from '../api/client'
 import { getTree, listPersons } from '../api/endpoints'
 import type { PersonRef } from '../api/types'
 import { SelectField } from '../components/Field'
@@ -18,7 +19,7 @@ import { TreeList } from '../tree/TreeList'
 import type { TreeLook } from '../tree/nodeTypes'
 
 const views: TreeView[] = ['pedigree', 'descendants', 'hourglass', 'family']
-const rootKey = 'gotree.treeRoot'
+const legacyRootKey = 'gotree.treeRoot'
 const lookKey = 'gotree.treeLook'
 
 function storedLook(): TreeLook {
@@ -37,12 +38,30 @@ function saveLook(look: TreeLook) {
   }
 }
 
-function remembered(): number | null {
+function remembered(key: string): number | null {
   try {
-    const v = Number(localStorage.getItem(rootKey))
+    const v = Number(localStorage.getItem(key))
     return v > 0 ? v : null
   } catch {
     return null
+  }
+}
+
+function remember(key: string, id: number) {
+  try {
+    localStorage.setItem(key, String(id))
+  } catch {
+    // Storage can be unavailable (private mode); the URL still works.
+  }
+}
+
+function forget(key: string) {
+  try {
+    localStorage.removeItem(key)
+    // The key used before the root was remembered per tree.
+    localStorage.removeItem(legacyRootKey)
+  } catch {
+    // Nothing was stored.
   }
 }
 
@@ -63,42 +82,76 @@ export function TreePage() {
   const rootParam = Number(params.get('root')) || null
   const selectedId = Number(params.get('sel')) || null
 
-  const set = (patch: Record<string, string | null>, replace = true) =>
-    setParams(
-      (p) => {
-        for (const [k, v] of Object.entries(patch)) {
-          if (v === null) p.delete(k)
-          else p.set(k, v)
-        }
-        return p
-      },
-      { replace },
-    )
+  const set = useCallback(
+    (patch: Record<string, string | null>, replace = true) =>
+      setParams(
+        (p) => {
+          for (const [k, v] of Object.entries(patch)) {
+            if (v === null) p.delete(k)
+            else p.set(k, v)
+          }
+          return p
+        },
+        { replace },
+      ),
+    [setParams],
+  )
+
+  // The remembered root belongs to one tree: a replaced tree has other people.
+  const auth = useQuery({
+    queryKey: ['auth'],
+    queryFn: ({ signal }) => getAuthState(signal),
+    staleTime: Infinity,
+  })
+  const rootKey = `gotree.treeRoot.${auth.data?.tree?.id ?? 0}`
+  const [stored, setStored] = useState(() => remembered(rootKey))
+  const [prevKey, setPrevKey] = useState(rootKey)
+  if (prevKey !== rootKey) {
+    setPrevKey(rootKey)
+    setStored(remembered(rootKey))
+  }
 
   // Without a root in the URL: the last one viewed, else the first person.
+  const source = rootParam !== null ? 'url' : stored !== null ? 'stored' : 'first'
   const fallback = useQuery({
     queryKey: ['persons', 'first'],
     queryFn: ({ signal }) => listPersons('', 1, 0, signal),
-    enabled: rootParam === null && remembered() === null,
+    enabled: rootParam === null && stored === null,
+    staleTime: 0,
   })
-  const rootId = rootParam ?? remembered() ?? fallback.data?.items[0]?.id ?? null
-
-  useEffect(() => {
-    if (rootId === null) return
-    try {
-      localStorage.setItem(rootKey, String(rootId))
-    } catch {
-      // Storage can be unavailable (private mode); the URL still works.
-    }
-  }, [rootId])
+  const rootId = rootParam ?? stored ?? fallback.data?.items[0]?.id ?? null
 
   const up = view === 'descendants' ? 0 : view === 'family' ? 1 : generations
   const down = view === 'pedigree' ? 0 : view === 'family' ? 1 : generations
   const tree = useQuery({
     queryKey: ['tree', rootId, up, down, view === 'family'],
-    queryFn: ({ signal }) => getTree(rootId!, { up, down, siblings: view === 'family' }, signal),
+    queryFn: async ({ signal }) => {
+      try {
+        return await getTree(rootId!, { up, down, siblings: view === 'family' }, signal)
+      } catch (e) {
+        // A person that is gone must not be remembered as the root.
+        if (e instanceof ApiError && e.status === 404 && remembered(rootKey) === rootId) forget(rootKey)
+        throw e
+      }
+    },
     enabled: rootId !== null,
   })
+
+  const missing = tree.error instanceof ApiError && tree.error.status === 404
+  // A remembered root that is gone: start from the first person instead.
+  if (missing && source === 'stored') setStored(null)
+  const retried = useRef(false)
+  useEffect(() => {
+    if (!missing || source !== 'first' || retried.current) return
+    retried.current = true
+    void fallback.refetch()
+  }, [missing, source, fallback])
+
+  // Only a root that loaded is worth remembering.
+  const loadedRoot = tree.isSuccess ? tree.data.rootId : null
+  useEffect(() => {
+    if (loadedRoot !== null) remember(rootKey, loadedRoot)
+  }, [loadedRoot, rootKey])
 
   const index = useMemo(() => (tree.data ? indexGraph(tree.data) : null), [tree.data])
   const layout = useMemo(
@@ -108,7 +161,8 @@ export function TreePage() {
   const root = index?.persons.get(index.rootId) ?? null
   const selected = selectedId !== null ? (index?.persons.get(selectedId) ?? null) : null
 
-  const centerOn = (id: number) => set({ root: String(id), sel: null }, false)
+  const centerOn = useCallback((id: number) => set({ root: String(id), sel: null }, false), [set])
+  const onSelect = useCallback((id: number) => set({ sel: String(id) }), [set])
   const title = root ? t('tree.titleFor', { name: fullName(root) ?? t('person.unknown') }) : t('nav.tree')
 
   const modeSwitch = (
@@ -119,7 +173,13 @@ export function TreePage() {
           key={m}
           className="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-md font-medium has-[:checked]:bg-brand-700 has-[:checked]:text-white has-[:focus-visible]:outline has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-brand-500"
         >
-          <input type="radio" name={modeName} className="sr-only" checked={mode === m} onChange={() => set({ mode: m === 'list' ? 'list' : null })} />
+          <input
+            type="radio"
+            name={modeName}
+            className="sr-only"
+            checked={mode === m}
+            onChange={() => set({ mode: m === 'list' ? 'list' : null })}
+          />
           {t(`tree.mode.${m}`)}
         </label>
       ))}
@@ -131,6 +191,23 @@ export function TreePage() {
       <div className="max-w-3xl space-y-4">
         <PageHeading title={t('nav.tree')}>{t('nav.tree')}</PageHeading>
         <OnboardingCard />
+      </div>
+    )
+  }
+
+  if (missing && source === 'url') {
+    return (
+      <div className="max-w-3xl space-y-4">
+        <PageHeading title={t('nav.tree')}>{t('nav.tree')}</PageHeading>
+        <p role="alert" className="font-medium">
+          {t('tree.rootMissing')}
+        </p>
+        <Link
+          to="/tree"
+          className="inline-flex min-h-11 items-center font-medium text-brand-700 underline dark:text-brand-100"
+        >
+          {t('tree.showFirst')}
+        </Link>
       </div>
     )
   }
@@ -195,7 +272,11 @@ export function TreePage() {
           </div>
         </div>
         <div className="col-span-2 md:col-span-1">
-          <PersonPicker label={t('tree.centerOn')} value={null} onChange={(p: PersonRef | null) => p && centerOn(p.id)} />
+          <PersonPicker
+            label={t('tree.centerOn')}
+            value={null}
+            onChange={(p: PersonRef | null) => p && centerOn(p.id)}
+          />
         </div>
         <div className="col-span-2 flex flex-col gap-2 md:col-span-1">
           <label className="flex min-h-11 items-center gap-2">
@@ -244,7 +325,7 @@ export function TreePage() {
                 layout={layout}
                 index={index}
                 selectedId={selectedId}
-                onSelect={(id) => set({ sel: String(id) })}
+                onSelect={onSelect}
                 onCenter={centerOn}
                 look={look}
                 sheetOpen={selected !== null && !wide}
@@ -263,7 +344,12 @@ export function TreePage() {
             <TreeList index={index} view={view} generations={generations} bloodOnly={bloodOnly} />
           )}
           {selected && (wide || mode === 'list') && (
-            <PersonPanel person={selected} isRoot={selected.id === index.rootId} onCenter={centerOn} onClose={() => set({ sel: null })} />
+            <PersonPanel
+              person={selected}
+              isRoot={selected.id === index.rootId}
+              onCenter={centerOn}
+              onClose={() => set({ sel: null })}
+            />
           )}
         </div>
       )}

@@ -157,6 +157,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The tree chart redraws only the cards whose selection or focus changed, the wall chart's SVG
+  download fetches at most four photos at a time, and the tree no longer gets stuck on "Could not
+  load" when the last viewed person was deleted or the tree replaced: it forgets that person per
+  tree and starts from the first one, or shows the getting-started card (#60)
+
 - Dates read as plain English ("26 February 1820", "about 1850", "between 1850 and 1860") on the
   timeline, heirlooms and in the date field preview, and can be typed that way in events,
   heirlooms, media and transcriptions (saved as GEDCOM when needed, so the preview matches what is

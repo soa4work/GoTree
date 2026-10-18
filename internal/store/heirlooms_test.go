@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -127,6 +128,93 @@ func TestHeirloomGEDCOMRoundTrip(t *testing.T) {
 		if !r.OK {
 			t.Errorf("v7=%v: verify: %+v %+v", v7, r.Rows, r.Dropped)
 		}
+	}
+}
+
+func TestHeirloomCustodyDatesRoundTrip(t *testing.T) {
+	type pair struct{ from, to string }
+	for _, v7 := range []bool{false, true} {
+		t.Run(fmt.Sprintf("v7=%v", v7), func(t *testing.T) {
+			s := newStore(t)
+			a := setup(t, s)
+			anna := mustPerson(t, s, a, "Anna", "Weber")
+			typed := []pair{
+				{"12.3.1850", "about 1870"},
+				{"Frühjahr 1850", ""},
+				{"@#DJULIAN@ 4 OCT 1582", "44 B.C."},
+				{"1750/51", "INT 1850 (as written)"},
+			}
+			custody := []CustodyInput{{PersonID: &anna.ID, FromDate: typed[0].from, ToDate: typed[0].to, How: "inherited"}}
+			for i, p := range typed[1:] {
+				custody = append(custody, CustodyInput{FromDate: p.from, ToDate: p.to, How: "inherited", Notes: fmt.Sprintf("holder %d", i)})
+			}
+			if _, err := s.CreateHeirloom(ctx, a, HeirloomInput{Name: "Watch", Custody: custody}); err != nil {
+				t.Fatal(err)
+			}
+
+			text := exportText(t, s, a, ExportOptions{Version7: v7})
+			want := []string{
+				"2 _FROM 12 MAR 1850\n", "2 _TO ABT 1870\n", "2 _FROM (Frühjahr 1850)\n",
+				"2 _FROM 1750/51\n", "2 _TO INT 1850 (as written)\n",
+			}
+			if v7 {
+				want = append(want, "2 _FROM JULIAN 4 OCT 1582\n", "2 _TO 44 BCE\n")
+			} else {
+				want = append(want, "2 _FROM @#DJULIAN@ 4 OCT 1582\n", "2 _TO 44 B.C.\n")
+			}
+			for _, w := range want {
+				if !strings.Contains(text, w) {
+					t.Errorf("export lacks %q:\n%s", w, text)
+				}
+			}
+			for _, bad := range []string{"_FROM 12.3.1850", "about 1870"} {
+				if strings.Contains(text, bad) {
+					t.Errorf("export still has %q:\n%s", bad, text)
+				}
+			}
+
+			s2, a2 := reimport(t, text)
+			list, err := s2.ListHeirlooms(ctx, a2, "", 0)
+			if err != nil || len(list) != 1 {
+				t.Fatalf("reimported: %+v %v", list, err)
+			}
+			h, err := s2.GetHeirloom(ctx, a2, list[0].ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantDates := []pair{
+				{"12 MAR 1850", "ABT 1870"},
+				{"(Frühjahr 1850)", ""},
+				{"@#DJULIAN@ 4 OCT 1582", "44 B.C."},
+				{"1750/51", "INT 1850 (as written)"},
+			}
+			if len(h.Custody) != len(wantDates) {
+				t.Fatalf("custody: %+v", h.Custody)
+			}
+			for i, w := range wantDates {
+				if h.Custody[i].FromDate != w.from || h.Custody[i].ToDate != w.to {
+					t.Errorf("custody %d came back as %q / %q, want %q / %q", i, h.Custody[i].FromDate, h.Custody[i].ToDate, w.from, w.to)
+				}
+			}
+
+			// Storage keeps what was typed; only the export converts.
+			orig, _ := s.ListHeirlooms(ctx, a, "", 0)
+			h0, err := s.GetHeirloom(ctx, a, orig[0].ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if h0.Custody[0].FromDate != "12.3.1850" || h0.Custody[0].ToDate != "about 1870" {
+				t.Errorf("stored custody dates changed: %+v", h0.Custody[0])
+			}
+
+			r, err := s.VerifyExport(ctx, a, v7, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !r.OK {
+				t.Errorf("verify: %+v %+v", r.Rows, r.Dropped)
+			}
+		})
 	}
 }
 

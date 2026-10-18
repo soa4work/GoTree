@@ -86,7 +86,7 @@ export function PersonPage() {
             <div>
             <PageHeading title={name}>{name}</PageHeading>
             <p className="mt-1 text-slate-700 dark:text-slate-300">
-              {[t(`sex.${p.sex}`), lifespan(summary(p)), p.living ? t('person.living') : t('person.deceased')]
+              {[t(`sex.${p.sex}`), lifespan(summary(p)), t(p.living ? 'person.living' : 'person.deceased', { context: p.sex })]
                 .filter(Boolean)
                 .join(' · ')}
             </p>

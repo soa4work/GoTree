@@ -176,6 +176,7 @@ func TestExportGedcom7DatePhraseRoundTrip(t *testing.T) {
 		{"BAPM", "INT 1850 (nach dem Kirchenbuch)", "INT 1850 (nach dem Kirchenbuch)"},
 		{"DEAT", "12 FEB 1750/51", "12 FEB 1750/51"},
 		{"BURI", "BET 1750/51 AND 1760", "BET 1750/51 AND 1760"},
+		{"CHR", "INT 1750/51", "1750/51"},
 	}
 	for i, d := range dates[:3] {
 		if _, err := s.CreateHeirloom(ctx, a, HeirloomInput{Name: fmt.Sprintf("Heirloom %d", i), MadeDate: d.in}); err != nil {
@@ -216,8 +217,54 @@ func TestExportGedcom7DatePhraseRoundTrip(t *testing.T) {
 			t.Errorf("heirloom %q came back as %q, want %q", d.in, got, d.want)
 		}
 	}
-	if !byType["DEAT"].Valid || byType["BAPM"].Qualifier != "INT" {
+	if !byType["DEAT"].Valid || byType["BAPM"].Qualifier != "INT" || !byType["CHR"].Valid {
 		t.Errorf("dates lost their meaning: %+v", byType)
+	}
+}
+
+// TestExportIntDualYear551 pins that an interpreted date with a dual year
+// keeps both in 5.5.1, and that 7.0 keeps the dual year in a PHRASE.
+func TestExportIntDualYear551(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	p := mustPerson(t, s, a, "Anna", "Weber")
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &p.ID, Type: "CHR", Date: "INT 1750/51"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateHeirloom(ctx, a, HeirloomInput{Name: "Clock", MadeDate: "INT 1750/51"}); err != nil {
+		t.Fatal(err)
+	}
+
+	text := exportText(t, s, a, ExportOptions{})
+	for _, want := range []string{"2 DATE INT 1750/51\n", "1 DATE INT 1750/51\n"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("5.5.1 export lacks %q:\n%s", want, text)
+		}
+	}
+	s2, a2 := reimport(t, text)
+	got := findPerson(t, s2, a2, "anna")
+	var chr *Event
+	for i := range got.Events {
+		if got.Events[i].Type == "CHR" {
+			chr = &got.Events[i]
+		}
+	}
+	if chr == nil || chr.Date.Raw != "INT 1750/51" || chr.Date.Qualifier != "INT" {
+		t.Errorf("5.5.1 CHR came back as %+v", chr)
+	}
+	list, err := s2.ListHeirlooms(ctx, a2, "", 0)
+	if err != nil || len(list) != 1 || list[0].MadeDate != "INT 1750/51" {
+		t.Errorf("5.5.1 heirloom: %+v %v", list, err)
+	}
+
+	text7 := exportText(t, s, a, ExportOptions{Version7: true})
+	if !strings.Contains(text7, "1 DATE 1750\n2 PHRASE 1750/51\n") {
+		t.Errorf("7.0 heirloom made date lacks its dual year:\n%s", text7)
+	}
+	s3, a3 := reimport(t, text7)
+	list, err = s3.ListHeirlooms(ctx, a3, "", 0)
+	if err != nil || len(list) != 1 || list[0].MadeDate != "1750/51" {
+		t.Errorf("7.0 heirloom: %+v %v", list, err)
 	}
 }
 

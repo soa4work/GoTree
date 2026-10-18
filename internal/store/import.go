@@ -295,8 +295,8 @@ func (im *importer) prepare(ctx context.Context) error {
 	var err error
 	if im.insertPerson, err = im.tx.PrepareContext(ctx, `
 		INSERT INTO persons (tree_id, given_names, surname, name_prefix, name_suffix, nickname, sex, notes, gedcom_xref,
-			extra_json, created_at, updated_at, created_by, updated_by, surname_key, given_key)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
+			extra_json, created_at, updated_at, created_by, updated_by, surname_key, given_key, name_notes)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
 		return err
 	}
 	if im.insertEvent, err = im.tx.PrepareContext(ctx, `
@@ -307,8 +307,8 @@ func (im *importer) prepare(ctx context.Context) error {
 		return err
 	}
 	if im.insertName, err = im.tx.PrepareContext(ctx, `
-		INSERT INTO person_names (person_id, type, given_names, surname, name_prefix, name_suffix, nickname, status, status_reason, sort_order)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
+		INSERT INTO person_names (person_id, type, given_names, surname, name_prefix, name_suffix, nickname, status, status_reason, sort_order, notes)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
 		return err
 	}
 	im.insertFTS, err = im.tx.PrepareContext(ctx, `INSERT INTO persons_fts (rowid, names) VALUES (?, ?)`)
@@ -616,6 +616,12 @@ func (im *importer) createSource(ctx context.Context, title, author, publ, call,
 
 // citation imports a SOUR line under a person, name, event or family.
 func (im *importer) citation(ctx context.Context, ctxPath string, c *gedcom.Node, entityType string, entityID int64) error {
+	return im.citationField(ctx, ctxPath, c, entityType, entityID, "")
+}
+
+// citationField is citation for a source of one field of the entity, such
+// as the main name of a person (field "name").
+func (im *importer) citationField(ctx context.Context, ctxPath string, c *gedcom.Node, entityType string, entityID int64, field string) error {
 	sourceID, ok := im.sources[c.Pointer]
 	var kept []keptNode
 	if c.Pointer == "" {
@@ -678,7 +684,7 @@ func (im *importer) citation(ctx context.Context, ctxPath string, c *gedcom.Node
 	}
 	cid, _ := res.LastInsertId()
 	if _, err := im.tx.ExecContext(ctx, `
-		INSERT OR IGNORE INTO citation_links (citation_id, entity_type, entity_id) VALUES (?, ?, ?)`, cid, entityType, entityID); err != nil {
+		INSERT OR IGNORE INTO citation_links (citation_id, entity_type, entity_id, field) VALUES (?, ?, ?, ?)`, cid, entityType, entityID, field); err != nil {
 		return err
 	}
 	im.report.Counts["citations"]++
@@ -691,6 +697,8 @@ func (im *importer) citation(ctx context.Context, ctxPath string, c *gedcom.Node
 type parsedName struct {
 	given, surname, prefix, suffix, nickname, nameType string
 	status, statusReason                               string
+	notes                                              []string
+	sources                                            []*gedcom.Node
 }
 
 func (im *importer) name(n *gedcom.Node, kept *[]keptNode, ctx string, primary bool) parsedName {
@@ -750,8 +758,11 @@ func (im *importer) name(n *gedcom.Node, kept *[]keptNode, ctx string, primary b
 				im.other(ctx+".NAME", c, kept)
 			}
 			continue
-		case "SOUR", "NOTE", "SNOTE":
-			continue // handled by the caller
+		case "NOTE", "SNOTE":
+			p.notes = append(p.notes, im.noteText(c))
+		case "SOUR":
+			p.sources = append(p.sources, c) // cited by person()
+			continue
 		default:
 			im.other(ctx+".NAME", c, kept)
 			continue
@@ -790,7 +801,6 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 	var notes []string
 	var primary *parsedName
 	var others []parsedName
-	var primaryNode *gedcom.Node
 	sex := "U"
 	var events, citations, assos, famcs []*gedcom.Node
 
@@ -799,7 +809,7 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 		case c.Tag == "NAME":
 			p := im.name(c, &kept, "INDI", primary == nil)
 			if primary == nil {
-				primary, primaryNode = &p, c
+				primary = &p
 			} else {
 				p.nameType = nameType(p.nameType, c.Tag)
 				others = append(others, p)
@@ -808,6 +818,17 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 		case c.Tag == "_MARNM":
 			// Ancestry's married name: "1 _MARNM Schmidt" or "/Schmidt/".
 			p := parsedName{surname: strings.Trim(strings.TrimSpace(c.Value), "/"), nameType: "married"}
+			for _, sub := range c.Children {
+				switch sub.Tag {
+				case "SOUR":
+					p.sources = append(p.sources, sub)
+				case "NOTE", "SNOTE":
+					p.notes = append(p.notes, im.noteText(sub))
+					im.mapped("INDI._MARNM." + sub.Tag)
+				default:
+					im.tag("INDI._MARNM."+sub.Tag, TagDropped, "not kept for a married name")
+				}
+			}
 			others = append(others, p)
 			im.mapped("INDI._MARNM")
 		case c.Tag == "SEX":
@@ -842,7 +863,7 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 	}
 	res, err := im.insertPerson.ExecContext(ctx, im.a.TreeID, primary.given, primary.surname, primary.prefix, primary.suffix,
 		primary.nickname, sex, joinNotes(notes), r.Xref, extraJSON(kept), im.now, im.now, nullID(im.a.UserID), nullID(im.a.UserID),
-		db.NamesKey(primary.surname), db.NamesKey(primary.given))
+		db.NamesKey(primary.surname), db.NamesKey(primary.given), joinNotes(primary.notes))
 	if err != nil {
 		return err
 	}
@@ -857,22 +878,33 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 	allNames := []string{primary.given, primary.surname, primary.nickname}
 	for i, n := range others {
 		if n.given == "" && n.surname == "" && n.nickname == "" {
+			for range n.sources {
+				im.tag("INDI.NAME.SOUR", TagDropped, "the name is empty")
+			}
+			for range n.notes {
+				im.tag("INDI.NAME.NOTE", TagDropped, "the name is empty")
+			}
 			continue
 		}
-		if _, err := im.insertName.ExecContext(ctx, pid, n.nameType, n.given, n.surname, n.prefix, n.suffix, n.nickname,
-			defaultStatus(n.status), n.statusReason, i); err != nil {
+		res, err := im.insertName.ExecContext(ctx, pid, n.nameType, n.given, n.surname, n.prefix, n.suffix, n.nickname,
+			defaultStatus(n.status), n.statusReason, i, joinNotes(n.notes))
+		if err != nil {
 			return err
+		}
+		nameID, _ := res.LastInsertId()
+		for _, c := range n.sources {
+			if err := im.citation(ctx, "INDI.NAME", c, "name", nameID); err != nil {
+				return err
+			}
 		}
 		allNames = append(allNames, n.given, n.surname, n.nickname)
 	}
 	if _, err := im.insertFTS.ExecContext(ctx, pid, searchFold.Replace(strings.Join(allNames, " "))); err != nil {
 		return err
 	}
-	if primaryNode != nil {
-		for _, c := range primaryNode.All("SOUR") {
-			if err := im.citation(ctx, "INDI.NAME", c, "person", pid); err != nil {
-				return err
-			}
+	for _, c := range primary.sources {
+		if err := im.citationField(ctx, "INDI.NAME", c, "person", pid, "name"); err != nil {
+			return err
 		}
 	}
 	for _, c := range citations {

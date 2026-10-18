@@ -459,3 +459,76 @@ func TestImportRolePhrase(t *testing.T) {
 		}
 	}
 }
+
+func TestImportNameNotesAndSources(t *testing.T) {
+	src := strings.Join([]string{
+		"0 HEAD", "1 GEDC", "2 VERS 5.5.1", "1 CHAR UTF-8",
+		"0 @S1@ SOUR", "1 TITLE Parish book",
+		"0 @I1@ INDI",
+		"1 NAME Anna /Meyer/", "2 NOTE spelled Maier in the parish book", "2 SOUR @S1@", "3 PAGE 12",
+		"1 NAME Anna /Schmidt/", "2 TYPE married", "2 NOTE after 1890", "2 SOUR @S1@",
+		"1 _MARNM /Weber/", "2 SOUR @S1@", "2 NOTE second marriage", "2 FOO bar",
+		"1 NAME", "2 SOUR @S1@", "2 NOTE nothing to attach to",
+		"0 TRLR", "",
+	}, "\n")
+	doc, err := gedcom.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := newStore(t)
+	a := setup(t, s)
+	report, err := s.ImportGEDCOM(ctx, a, doc, ImportIntoEmpty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pid int64
+	var notes string
+	if err := s.DB.QueryRow(`SELECT id, name_notes FROM persons`).Scan(&pid, &notes); err != nil || notes != "spelled Maier in the parish book" {
+		t.Fatalf("name_notes: %q %v", notes, err)
+	}
+	names := map[string]string{}
+	rows, err := s.DB.Query(`SELECT surname, notes FROM person_names`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var sn, n string
+		_ = rows.Scan(&sn, &n)
+		names[sn] = n
+	}
+	rows.Close()
+	if len(names) != 2 || names["Schmidt"] != "after 1890" || names["Weber"] != "second marriage" {
+		t.Errorf("names: %v", names)
+	}
+	var page string
+	if err := s.DB.QueryRow(`SELECT c.page FROM citation_links l JOIN citations c ON c.id = l.citation_id
+		WHERE l.entity_type = 'person' AND l.entity_id = ? AND l.field = 'name'`, pid).Scan(&page); err != nil || page != "12" {
+		t.Errorf("citation of the main name: %q %v", page, err)
+	}
+	var n int
+	if err := s.DB.QueryRow(`SELECT count(*) FROM citation_links l JOIN person_names p ON p.id = l.entity_id
+		WHERE l.entity_type = 'name' AND l.field = ''`).Scan(&n); err != nil || n != 2 {
+		t.Errorf("name citations: %d %v", n, err)
+	}
+	if err := s.DB.QueryRow(`SELECT count(*) FROM citations`).Scan(&n); err != nil || n != 3 {
+		t.Errorf("citations: %d %v (the empty name's is not created)", n, err)
+	}
+	if tagOutcome(report, "INDI.NAME.NOTE") != TagMapped {
+		t.Errorf("INDI.NAME.NOTE: %q", tagOutcome(report, "INDI.NAME.NOTE"))
+	}
+	dropped := map[string]TagStat{}
+	for _, tg := range report.Tags {
+		if tg.Outcome == TagDropped {
+			dropped[tg.Path] = tg
+		}
+	}
+	if d := dropped["INDI.NAME.SOUR"]; d.Count != 1 || d.Reason != "the name is empty" {
+		t.Errorf("INDI.NAME.SOUR: %+v", d)
+	}
+	if d := dropped["INDI.NAME.NOTE"]; d.Count != 1 {
+		t.Errorf("empty name's note: %+v", d)
+	}
+	if _, ok := dropped["INDI._MARNM.FOO"]; !ok {
+		t.Errorf("_MARNM.FOO not reported: %+v", dropped)
+	}
+}

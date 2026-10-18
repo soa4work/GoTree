@@ -51,7 +51,7 @@ export function TranscriptionPage() {
   if (existing.error instanceof ApiError && existing.error.status === 404) return <NotFound />
   if (templates.isPending || (id !== null && existing.isPending)) return <p role="status">{t('app.loading')}</p>
   if (templates.isError || existing.isError) return <p role="alert">{t('common.loadFailed')}</p>
-  return <Editor key={existing.data?.updatedAt ?? 'new'} templates={templates.data} initial={existing.data ?? null} />
+  return <Editor key={existing.data?.id ?? 'new'} templates={templates.data} initial={existing.data ?? null} />
 }
 
 function Editor({ templates, initial }: { templates: RecordTemplate[]; initial: Transcription | null }) {
@@ -97,7 +97,10 @@ function Editor({ templates, initial }: { templates: RecordTemplate[]; initial: 
   const save = useMutation({
     mutationFn: persist,
     onSuccess: (saved) => {
-      if (!initial) navigate(`/transcribe/${saved.id}`, { replace: true })
+      if (!initial) {
+        queryClient.setQueryData(['transcriptions', saved.id], saved)
+        navigate(`/transcribe/${saved.id}`, { replace: true })
+      }
     },
   })
   const apply = useMutation({

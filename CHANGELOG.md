@@ -102,6 +102,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Switching between media no longer carries the form over (saving could overwrite the other
+  medium), saving a transcription keeps unsaved rows, failed task, repository and logout actions
+  say so, an expired session during a save brings up the login screen, and a new version is
+  offered even if it arrived on the login page (#60)
+
 - Searching places, sources, repositories and heirlooms ignores the case of Russian and Kazakh
   letters and treats ё as е, so «москва» finds «Москва» (#52)
 

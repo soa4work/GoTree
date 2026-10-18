@@ -5,6 +5,7 @@
     "mainNavigation": "Основная навигация",
     "loading": "Загрузка…",
     "logOut": "Выйти",
+    "logOutFailed": "Не удалось выйти. Попробуйте ещё раз.",
     "signedInAs": "Вы вошли как {{name}}",
     "updateReady": "Доступна новая версия GoTree.",
     "reload": "Обновить сейчас",

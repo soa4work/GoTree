@@ -78,3 +78,27 @@ describe('navigation', () => {
     expect(screen.queryByRole('dialog', { name: 'More' })).not.toBeInTheDocument()
   })
 })
+
+describe('logging out', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  async function renderWith(logoutStatus: number) {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} }))
+    const fetchMock = mockApi({ ...home, 'POST /api/auth/logout': [logoutStatus, { error: 'nope' }] })
+    renderApp('/')
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Log out' }))
+    return fetchMock
+  }
+
+  it('says so when logging out fails', async () => {
+    await renderWith(500)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not log out. Try again.')
+  })
+
+  it('treats a 401 as logged out and re-checks the session', async () => {
+    const fetchMock = await renderWith(401)
+    await vi.waitFor(() => expect(fetchMock.mock.calls.filter(([u]) => String(u).endsWith('/api/auth/state')).length).toBeGreaterThan(1))
+    expect(screen.queryByText('Could not log out. Try again.')).not.toBeInTheDocument()
+  })
+})

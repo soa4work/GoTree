@@ -83,3 +83,20 @@ describe('sources', () => {
     expect(sent!.addCitations).toEqual([{ sourceId: 7, page: 'S. 12', quality: 3, text: '' }])
   })
 })
+
+describe('repository field', () => {
+  it('says so when creating a repository fails', async () => {
+    mockApi({
+      'GET /api/sources': [200, []],
+      'GET /api/repositories': [200, []],
+      'POST /api/repositories': [500, { error: 'disk full' }],
+    })
+    const user = userEvent.setup()
+    renderApp('/sources')
+    await user.click(await screen.findByRole('button', { name: '+ New source' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByRole('searchbox', { name: 'Kept at' }), 'Stadtarchiv')
+    await user.click(await within(dialog).findByRole('button', { name: 'Create “Stadtarchiv”' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Could not save')
+  })
+})

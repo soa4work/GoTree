@@ -44,7 +44,7 @@ export function MediaPage() {
     return <p role="alert">{t('common.loadFailed')}</p>
   }
   if (media.isPending) return <p role="status">{t('app.loading')}</p>
-  return <MediaView media={media.data} />
+  return <MediaView key={media.data.id} media={media.data} />
 }
 
 function MediaView({ media: m }: { media: Media }) {

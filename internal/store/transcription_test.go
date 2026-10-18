@@ -263,3 +263,46 @@ func TestFieldCitationsExportOnce(t *testing.T) {
 		t.Errorf("the birth cites line 1 %d times:\n%s", n, out)
 	}
 }
+
+func TestTranscriptionReusesPlaceIgnoringCyrillicCase(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	moscow, err := s.CreatePlace(ctx, a, PlaceInput{Name: "Москва"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	muller, err := s.CreatePlace(ctx, a, PlaceInput{Name: "Müller"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := mustSource(t, s, a, "Перепись")
+	tr, err := s.CreateTranscription(ctx, a, TranscriptionInput{TemplateKey: "census", SourceID: &src.ID, Rows: []TranscriptionRow{
+		row("1", "head", map[string]string{"given": "Иван", "surname": "Петров", "birthplace": "москва"}),
+		row("2", "spouse", map[string]string{"given": "Anna", "surname": "Petrov", "birthplace": "Muller"}),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ApplyTranscription(ctx, a, tr.ID); err != nil {
+		t.Fatal(err)
+	}
+	places, err := s.ListPlaces(ctx, a, "", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, p := range places {
+		names = append(names, p.Name)
+	}
+	if len(places) != 3 {
+		t.Fatalf("places %v, want Москва and Müller reused and Muller added", names)
+	}
+	for _, p := range places {
+		if p.ID != moscow.ID && p.ID != muller.ID && p.Name != "Muller" {
+			t.Errorf("unexpected place %q", p.Name)
+		}
+		if p.Name == "москва" {
+			t.Errorf("created a second Москва")
+		}
+	}
+}

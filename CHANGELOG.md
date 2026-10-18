@@ -100,6 +100,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- «й» and the Kazakh letters sort in alphabet order, and transcriptions reuse a place whatever the
+  case of its Cyrillic name (#43)
+
 - Russian and Kazakh names sort in alphabetical order and match their Latin spellings when looking
   for duplicates, and searching «петр» finds «Пётр» (#24)
 

@@ -134,7 +134,7 @@ export type ExportVersion = '5.5.1' | '7.0'
 export type Privacy = 'all' | 'exclude-living' | 'name-only'
 export const exportUrl = (version: ExportVersion, privacy: Privacy, format: 'ged' | 'gedzip') =>
   `/api/export/gedcom?${qs({ version, privacy, format })}`
-export const verifyExport = (version: ExportVersion) => getJSON<VerifyReport>(`/export/verify?${qs({ version })}`)
+export const verifyExport = (version: ExportVersion) => postJSON<VerifyReport>(`/export/verify?${qs({ version })}`)
 
 export const getChecks = (personId: number | null, signal?: AbortSignal) =>
   getJSON<CheckReport>(`/checks${personId ? `?${qs({ person: personId })}` : ''}`, signal)

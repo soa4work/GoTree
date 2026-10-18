@@ -67,4 +67,36 @@ describe('import page', () => {
     expect(await screen.findByRole('button', { name: 'Import' })).toBeInTheDocument()
     expect(screen.queryByText(/Only the owner of the tree/)).not.toBeInTheDocument()
   })
+
+  describe('export check', () => {
+    const checkReport = { ok: true, version: '5.5.1', rows: [{ kind: 'Persons', tree: 4, roundTrip: 4 }], warnings: [], dropped: [] }
+
+    it('runs the check as a POST', async () => {
+      mockApi({ ...people(0), 'POST /api/export/verify': [200, checkReport] as [number, unknown] })
+      renderApp('/import-export')
+      await userEvent.click(await screen.findByRole('button', { name: 'Check the export' }))
+      expect(await screen.findByText('Persons')).toBeInTheDocument()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+
+    it('hides the check from viewers', async () => {
+      mockApi({
+        ...people(0),
+        'GET /api/auth/state': [200, { ...loggedInState, tree: { id: 1, name: 'Weber family', role: 'viewer' } }] as [number, unknown],
+      })
+      renderApp('/import-export')
+      await screen.findByLabelText('GEDCOM file')
+      expect(screen.queryByRole('button', { name: 'Check the export' })).not.toBeInTheDocument()
+    })
+
+    it('shows the translated message when another check is running', async () => {
+      mockApi({
+        ...people(0),
+        'POST /api/export/verify': [429, { code: 'export_check_busy', error: 'busy' }] as [number, unknown],
+      })
+      renderApp('/import-export')
+      await userEvent.click(await screen.findByRole('button', { name: 'Check the export' }))
+      expect(await screen.findByText(/An export check is already running/)).toBeInTheDocument()
+    })
+  })
 })

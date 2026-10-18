@@ -176,8 +176,8 @@ func (s *Store) Authenticate(ctx context.Context, username, password string) (Us
 	return u, nil
 }
 
-// CreateSession starts a session for the user in their first tree and
-// returns the token for the cookie.
+// CreateSession starts a session for the user in the tree they last switched
+// to (or their first tree) and returns the token for the cookie.
 func (s *Store) CreateSession(ctx context.Context, userID int64, userAgent string) (string, error) {
 	token, err := newToken()
 	if err != nil {
@@ -188,7 +188,13 @@ func (s *Store) CreateSession(ctx context.Context, userID int64, userAgent strin
 	}
 
 	var treeID sql.NullInt64
-	err = s.DB.QueryRowContext(ctx, `SELECT tree_id FROM tree_members WHERE user_id = ? ORDER BY tree_id LIMIT 1`, userID).Scan(&treeID)
+	// The tree the user last switched to, while they are still a member;
+	// otherwise their oldest tree.
+	err = s.DB.QueryRowContext(ctx, `
+		SELECT m.tree_id FROM tree_members m JOIN users u ON u.id = m.user_id
+		WHERE m.user_id = ?
+		ORDER BY coalesce(m.tree_id = u.last_tree_id, 0) DESC, m.tree_id
+		LIMIT 1`, userID).Scan(&treeID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", err
 	}

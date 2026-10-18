@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
@@ -145,5 +146,39 @@ func TestHeirloomMigrationKeepsLinks(t *testing.T) {
 	_ = conn.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM citation_links) + (SELECT count(*) FROM media_links)`).Scan(&n)
 	if n != 0 {
 		t.Errorf("%d links left after deleting the person", n)
+	}
+}
+
+func TestUserLastTreeMigration(t *testing.T) {
+	ctx := context.Background()
+	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	provider, err := newProvider(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.DownTo(ctx, 16); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.ExecContext(ctx, `INSERT INTO users (id, username, password_hash, created_at, updated_at) VALUES (1, 'u', 'x', '', '')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(ctx, conn); err != nil {
+		t.Fatal(err)
+	}
+	var last sql.NullInt64
+	if err := conn.QueryRowContext(ctx, `SELECT last_tree_id FROM users WHERE id = 1`).Scan(&last); err != nil || last.Valid {
+		t.Errorf("last_tree_id = %v, %v; want NULL", last, err)
+	}
+	// Going down again keeps the user.
+	if _, err := provider.DownTo(ctx, 16); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := conn.QueryRowContext(ctx, `SELECT count(*) FROM users`).Scan(&n); err != nil || n != 1 {
+		t.Errorf("users after down: %d, %v", n, err)
 	}
 }

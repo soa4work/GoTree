@@ -9,6 +9,12 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Accounts, trees and members over the API (#59): administrators create and delete accounts,
+  change their role and reset passwords (which signs the account out everywhere); owners add
+  existing accounts to a tree as owner, editor or viewer, change roles and remove members, and a
+  tree always keeps one owner; any account can create a tree and switch between its trees, and
+  logging in opens the tree chosen last
+
 - Health check: `gotree -healthcheck` asks the running server whether it is healthy, and the
   Docker image uses it as its HEALTHCHECK (#62)
 
@@ -231,6 +237,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
   scripts from its own files (#2)
 
 ### Changed
+
+- Viewers can export GEDCOM only without living people (#59)
 
 - Docker images: `latest` and `X.Y` move only to the newest release, so re-running an older
   release or publishing a prerelease no longer moves them back, and the image is built from base

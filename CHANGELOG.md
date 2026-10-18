@@ -105,6 +105,15 @@ and the versioning [Semantic Versioning](https://semver.org/).
 - Dates in Kazakh no longer repeat «ж.» and no longer fall back to English in browsers without Kazakh
   locale data, and Russian months after prepositions are declined («до февраля 1820 г.») (#50)
 
+- GEDCOM import no longer loses family links: a pointer followed by spaces (`1 FAMC @F1@ `) and a
+  record line with several spaces after its identifier are read, and a child that names its family
+  only in its own record (INDI.FAMC, no FAM.CHIL) is added to the family and listed in the import
+  report (#53)
+
+- The people list and a share link's people list no longer sort the whole tree for every page,
+  so a share link on a large tree answers quickly, and paging through search results no longer
+  repeats or skips people whose names differ only in case or accents (#49)
+
 - Kazakh and Russian wording proofread (#46)
 
 - Errors in transcription rows and in GEDCOM files are shown in the interface language (#43)

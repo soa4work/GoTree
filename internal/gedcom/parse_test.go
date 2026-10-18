@@ -157,6 +157,63 @@ func TestMalformedInput(t *testing.T) {
 	}
 }
 
+func TestParseTolerantSpacing(t *testing.T) {
+	// Built from interpreted strings: the trailing spaces and tabs matter.
+	src := strings.Join([]string{
+		"0 HEAD",
+		"1 GEDC",
+		"2 VERS 5.5.1",
+		"0 @I1@  INDI",
+		"1 NAME Anna /Weber/  ",
+		"1 FAMC @F1@ ",
+		"1 FAMS @F2@\t",
+		"1  FAMC  @F3@",
+		"1 NOTE abc ",
+		"2 CONC def ",
+		"1 BIRT ",
+		"0 @I2@INDI",
+		"0 @F1@   FAM ",
+		"1 CHIL @I1@",
+		"0 TRLR",
+	}, "\n")
+	doc, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Records) != 2 {
+		t.Fatalf("want records I1 and F1, got %d", len(doc.Records))
+	}
+	if len(doc.Warnings) != 1 || !strings.Contains(doc.Warnings[0].Message, "unreadable line") {
+		t.Errorf("want one unreadable-line warning: %+v", doc.Warnings)
+	}
+	indi, fam := doc.Records[0], doc.Records[1]
+	if indi.Xref != "I1" || indi.Tag != "INDI" {
+		t.Errorf("record 0: %q %q", indi.Xref, indi.Tag)
+	}
+	if fam.Xref != "F1" || fam.Tag != "FAM" {
+		t.Errorf("record 1: %q %q", fam.Xref, fam.Tag)
+	}
+	if c := fam.First("CHIL"); c == nil || c.Pointer != "I1" {
+		t.Errorf("CHIL: %+v", c)
+	}
+	famc := indi.All("FAMC")
+	if len(famc) != 2 || famc[0].Pointer != "F1" || famc[1].Pointer != "F3" || famc[0].Value != "" || famc[1].Value != "" {
+		t.Errorf("FAMC: %+v", famc)
+	}
+	if f := indi.First("FAMS"); f == nil || f.Pointer != "F2" {
+		t.Errorf("FAMS: %+v", f)
+	}
+	if got := indi.Text("NAME"); got != "Anna /Weber/" {
+		t.Errorf("NAME %q", got)
+	}
+	if got := indi.Text("NOTE"); got != "abc def" {
+		t.Errorf("NOTE %q", got)
+	}
+	if b := indi.First("BIRT"); b == nil || b.Value != "" {
+		t.Errorf("BIRT: %+v", b)
+	}
+}
+
 func TestParseNeverPanics(t *testing.T) {
 	data := []byte(sample551)
 	for i := range len(data) {

@@ -168,12 +168,15 @@ func (s *Store) ShareInfo(ctx context.Context, sh Share) (ShareInfo, error) {
 		info.StartID = &sh.Link.Root.ID
 		return info, nil
 	}
-	list, err := s.SharePersons(ctx, sh, "")
+	ids, err := personIDs(ctx, s.DB, sh.Actor, "", -1, 0)
 	if err != nil {
 		return ShareInfo{}, err
 	}
-	if len(list.Items) > 0 {
-		info.StartID = &list.Items[0].ID
+	for _, id := range ids {
+		if sc.sees(id) {
+			info.StartID = &id
+			break
+		}
 	}
 	return info, nil
 }
@@ -181,31 +184,36 @@ func (s *Store) ShareInfo(ctx context.Context, sh Share) (ShareInfo, error) {
 // maxShareResults bounds a share link's person list.
 const maxShareResults = 100
 
-// SharePersons searches the people a link shows.
+// SharePersons searches the people a link shows: the first maxShareResults in
+// list order, and how many there are. Only those are loaded.
 func (s *Store) SharePersons(ctx context.Context, sh Share, query string) (PersonList, error) {
 	sc, err := s.scopeOf(ctx, sh)
 	if err != nil {
 		return PersonList{}, err
 	}
+	ids, err := personIDs(ctx, s.DB, sh.Actor, ftsQuery(query), -1, 0)
+	if err != nil {
+		return PersonList{}, err
+	}
 	out := PersonList{Items: []PersonRef{}}
-	for offset := 0; ; offset += 500 {
-		page, err := s.ListPersons(ctx, sh.Actor, query, 500, offset)
-		if err != nil {
-			return PersonList{}, err
+	var shown []int64
+	for _, id := range ids {
+		if !sc.sees(id) {
+			continue
 		}
-		for _, p := range page.Items {
-			if !sc.sees(p.ID) {
-				continue
-			}
-			out.Total++
-			if len(out.Items) < maxShareResults {
-				out.Items = append(out.Items, sc.ref(p))
-			}
-		}
-		if offset+len(page.Items) >= page.Total || len(page.Items) == 0 {
-			return out, nil
+		out.Total++
+		if len(shown) < maxShareResults {
+			shown = append(shown, id)
 		}
 	}
+	refs, err := s.personRefs(ctx, s.DB, sh.Actor, shown)
+	if err != nil {
+		return PersonList{}, err
+	}
+	for _, id := range shown {
+		out.Items = append(out.Items, sc.ref(refs[id]))
+	}
+	return out, nil
 }
 
 // SharePerson returns a person as the link may show them.

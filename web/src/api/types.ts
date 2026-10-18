@@ -394,6 +394,8 @@ export interface ImportReport {
   invalidDates: number
   invalidDateExamples: string[]
   brokenReferences: string[]
+  childrenFromFamc: number
+  childrenFromFamcExamples: string[]
   durationMs: number
 }
 

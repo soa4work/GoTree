@@ -97,3 +97,23 @@ func TestPlacesAndSourcesSortCyrillic(t *testing.T) {
 		t.Errorf("sources: %v, want %v", gotSources, want)
 	}
 }
+
+func TestPersonsSortByCyrillicGivenNames(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	for _, given := range []string{"Яков", "иван", "Әлия", "Иван", "Алия", "Нұрлан"} {
+		mustPerson(t, s, a, given, "Ахметов")
+	}
+	list, err := s.ListPersons(ctx, a, "", 100, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, p := range list.Items {
+		got = append(got, p.GivenNames)
+	}
+	want := []string{"Алия", "Әлия", "иван", "Иван", "Нұрлан", "Яков"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}

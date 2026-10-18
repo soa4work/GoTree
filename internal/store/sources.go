@@ -148,7 +148,7 @@ func (s *Store) ListRepositories(ctx context.Context, a Actor, q string) ([]Repo
 	}
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id, name, address, url, notes, created_at, updated_at FROM repositories
-		WHERE tree_id = ?`+filter+` ORDER BY name COLLATE NAMES LIMIT 200`, args...)
+		WHERE tree_id = ?`+filter+` ORDER BY name COLLATE NAMES, id LIMIT 200`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +297,7 @@ func (s *Store) ListSources(ctx context.Context, a Actor, q string, limit int) (
 	args = append(args, limit)
 	rows, err := s.DB.QueryContext(ctx, `SELECT `+sourceColumns+`
 		FROM sources s LEFT JOIN repositories r ON r.id = s.repository_id
-		WHERE s.tree_id = ?`+filter+` ORDER BY s.title COLLATE NAMES LIMIT ?`, args...)
+		WHERE s.tree_id = ?`+filter+` ORDER BY s.title COLLATE NAMES, s.id LIMIT ?`, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -20,6 +20,11 @@ import (
 // the plain Latin letter, ignores case and, as NOCASE users expected for
 // Latin names, accents ("Muller" sorts with "Müller"). Lists are paged
 // (at most a few hundred rows) or sorted once, so the callback cost is fine.
+//
+// Known limitations of the root collation: й is a diacritic form of и and
+// ignored with the accents (иван and йван tie, then fall back to id), ё and
+// е tie likewise, and ү sorts before ұ (the Kazakh alphabet has ұ first) and
+// і right after и instead of after һ.
 const NamesCollation = "NAMES"
 
 func init() {

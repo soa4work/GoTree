@@ -91,7 +91,7 @@ and the versioning [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - Russian and Kazakh names sort in alphabetical order and match their Latin spellings when looking
-  for duplicates (#24)
+  for duplicates, and searching «петр» finds «Пётр» (#24)
 
 - A GEDCOM file inside a zip that unpacks to more than four times the upload limit is refused
   (413) instead of being silently cut off and, with "Replace the tree", imported truncated after

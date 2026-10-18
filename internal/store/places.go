@@ -122,7 +122,7 @@ func (s *Store) ListPlaces(ctx context.Context, a Actor, q string, limit int) ([
 		SELECT p.id, p.parent_id, p.name, p.place_type, p.lat, p.lng, p.notes, f.full_name, p.created_at, p.updated_at
 		FROM places p JOIN full_names f ON f.id = p.id
 		WHERE p.tree_id = ?`+filter+`
-		ORDER BY f.full_name COLLATE NAMES
+		ORDER BY f.full_name COLLATE NAMES, f.id
 		LIMIT ?`, args...)
 	if err != nil {
 		return nil, err

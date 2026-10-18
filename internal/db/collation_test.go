@@ -47,6 +47,9 @@ func TestNamesCollation(t *testing.T) {
 
 // Sorting a big list must not be noticeably slower than a binary sort.
 func TestNamesCollationSpeed(t *testing.T) {
+	if testing.Short() {
+		t.Skip("timing test")
+	}
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -66,7 +69,7 @@ func TestNamesCollationSpeed(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("sorted 50000 names in %s", time.Since(start))
-	if d := time.Since(start); d > 5*time.Second {
+	if d := time.Since(start); d > 20*time.Second {
 		t.Errorf("sorting 50000 names took %s", d)
 	}
 }

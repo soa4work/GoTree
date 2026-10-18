@@ -521,7 +521,7 @@ func (s *Store) ListPersons(ctx context.Context, a Actor, query string, limit, o
 		}
 		ids, err = queryIDs(ctx, s.DB, `
 			SELECT id FROM persons WHERE tree_id = ?
-			ORDER BY surname = '', surname COLLATE NAMES, given_names COLLATE NOCASE, id
+			ORDER BY surname = '', surname COLLATE NAMES, given_names COLLATE NAMES, id
 			LIMIT ? OFFSET ?`, a.TreeID, limit, offset)
 	} else {
 		if err = s.DB.QueryRowContext(ctx, `
@@ -532,7 +532,7 @@ func (s *Store) ListPersons(ctx context.Context, a Actor, query string, limit, o
 		ids, err = queryIDs(ctx, s.DB, `
 			SELECT p.id FROM persons_fts f JOIN persons p ON p.id = f.rowid
 			WHERE persons_fts MATCH ? AND p.tree_id = ?
-			ORDER BY f.rank, p.surname COLLATE NAMES, p.given_names COLLATE NOCASE
+			ORDER BY f.rank, p.surname COLLATE NAMES, p.given_names COLLATE NAMES
 			LIMIT ? OFFSET ?`, match, a.TreeID, limit, offset)
 	}
 	if err != nil {

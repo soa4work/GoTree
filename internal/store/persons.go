@@ -511,6 +511,12 @@ func (s *Store) GetPersonDetail(ctx context.Context, a Actor, id int64) (PersonD
 // searching. The search matches the start of any name word, ignores case
 // and diacritics ("muller" finds "Müller") and covers alternate names.
 func (s *Store) ListPersons(ctx context.Context, a Actor, query string, limit, offset int) (PersonList, error) {
+	return s.ListPersonsFiltered(ctx, a, query, PersonFilter{}, limit, offset)
+}
+
+// ListPersonsFiltered is ListPersons narrowed and ordered by f. The zero
+// filter takes the plain list path, which the persons_tree_sort index serves.
+func (s *Store) ListPersonsFiltered(ctx context.Context, a Actor, query string, f PersonFilter, limit, offset int) (PersonList, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 50
 	}
@@ -520,20 +526,33 @@ func (s *Store) ListPersons(ctx context.Context, a Actor, query string, limit, o
 	list := PersonList{Items: []PersonRef{}}
 
 	match := ftsQuery(query)
-	var err error
-	if match == "" {
-		err = s.DB.QueryRowContext(ctx, `SELECT count(*) FROM persons WHERE tree_id = ?`, a.TreeID).Scan(&list.Total)
+	var ids []int64
+	if f.zero(match) {
+		var err error
+		if match == "" {
+			err = s.DB.QueryRowContext(ctx, `SELECT count(*) FROM persons WHERE tree_id = ?`, a.TreeID).Scan(&list.Total)
+		} else {
+			err = s.DB.QueryRowContext(ctx, `
+				SELECT count(*) FROM persons_fts f JOIN persons p ON p.id = f.rowid
+				WHERE persons_fts MATCH ? AND p.tree_id = ?`, match, a.TreeID).Scan(&list.Total)
+		}
+		if err != nil {
+			return list, err
+		}
+		if ids, err = personIDs(ctx, s.DB, a, match, limit, offset); err != nil {
+			return list, err
+		}
 	} else {
-		err = s.DB.QueryRowContext(ctx, `
-			SELECT count(*) FROM persons_fts f JOIN persons p ON p.id = f.rowid
-			WHERE persons_fts MATCH ? AND p.tree_id = ?`, match, a.TreeID).Scan(&list.Total)
-	}
-	if err != nil {
-		return list, err
-	}
-	ids, err := personIDs(ctx, s.DB, a, match, limit, offset)
-	if err != nil {
-		return list, err
+		from, where, args := s.filteredPersonsQuery(a, match, f)
+		if err := s.DB.QueryRowContext(ctx, `SELECT count(*) `+from+where, args...).Scan(&list.Total); err != nil {
+			return list, err
+		}
+		var err error
+		ids, err = queryIDs(ctx, s.DB, `SELECT p.id `+from+where+` ORDER BY `+personOrderSQL(match, f.Sort)+` LIMIT ? OFFSET ?`,
+			append(args, limit, offset)...)
+		if err != nil {
+			return list, err
+		}
 	}
 	refs, err := s.personRefs(ctx, s.DB, a, ids)
 	if err != nil {
@@ -567,6 +586,79 @@ func personIDs(ctx context.Context, q queryer, a Actor, match string, limit, off
 		return queryIDs(ctx, q, listPersonsSQL, a.TreeID, limit, offset)
 	}
 	return queryIDs(ctx, q, searchPersonsSQL, match, a.TreeID, limit, offset)
+}
+
+// PersonFilter narrows and orders the people list; the zero value is the
+// plain list of ListPersons.
+type PersonFilter struct {
+	Sort   string // "", "name", "birth", "-birth", "updated"
+	Sex    string // "", "M", "F", "X", "U"
+	Living *bool
+}
+
+// zero reports whether the filter leaves the plain list: alphabetical, or
+// by relevance when searching.
+func (f PersonFilter) zero(match string) bool {
+	return (f.Sort == "" || (f.Sort == "name" && match == "")) && f.Sex == "" && f.Living == nil
+}
+
+// birthSortSQL is the birth date_sort of person p, by the same rule as
+// personRefs (keep in sync).
+const birthSortSQL = `(SELECT e.date_sort FROM events e WHERE e.person_id = p.id AND e.type IN ('BIRT','CHR','BAPM')
+	AND e.status <> 'disproven' AND e.date_sort IS NOT NULL ORDER BY e.type <> 'BIRT', e.date_sort LIMIT 1)`
+
+// livingSQL mirrors the Go rule in personRefs; its one placeholder is the
+// earliest birth year still presumed living (now minus livingCutoffYears).
+// If date_sort changes, both must change together.
+const livingSQL = `CASE WHEN p.is_living IS NOT NULL THEN p.is_living
+	WHEN EXISTS (SELECT 1 FROM events e WHERE e.person_id = p.id AND e.type IN ('DEAT','BURI','CREM') AND e.status <> 'disproven') THEN 0
+	WHEN ` + birthSortSQL + ` IS NOT NULL THEN (` + birthSortSQL + ` / 10000) > ?
+	ELSE 1 END`
+
+// filteredPersonsQuery builds the FROM and WHERE clauses of a filtered list.
+func (s *Store) filteredPersonsQuery(a Actor, match string, f PersonFilter) (from, where string, args []any) {
+	from = `FROM persons p `
+	where = `WHERE p.tree_id = ?`
+	if match != "" {
+		from = `FROM persons_fts f JOIN persons p ON p.id = f.rowid `
+		where = `WHERE persons_fts MATCH ? AND p.tree_id = ?`
+		args = append(args, match)
+	}
+	args = append(args, a.TreeID)
+	if f.Sex != "" {
+		where += ` AND p.sex = ?`
+		args = append(args, f.Sex)
+	}
+	if f.Living != nil {
+		where += ` AND (` + livingSQL + `) = ?`
+		living := 0
+		if *f.Living {
+			living = 1
+		}
+		args = append(args, s.Now().Year()-livingCutoffYears, living)
+	}
+	return from, where, args
+}
+
+// personOrderSQL is the ORDER BY of a filtered list. Every order ends in
+// the stored name keys and the id, so pages are stable; unknown birth dates
+// come last in both birth orders.
+func personOrderSQL(match, sort string) string {
+	const names = `p.surname_key, p.given_key, p.id`
+	switch sort {
+	case "birth":
+		return birthSortSQL + ` IS NULL, ` + birthSortSQL + `, ` + names
+	case "-birth":
+		return birthSortSQL + ` IS NULL, ` + birthSortSQL + ` DESC, ` + names
+	case "updated":
+		return `p.updated_at DESC, p.id DESC`
+	case "name":
+		return `p.surname = '', ` + names
+	}
+	if match != "" {
+		return `f.rank, ` + names
+	}
+	return `p.surname = '', ` + names
 }
 
 // searchFold is applied to indexed names and to the query, because the FTS

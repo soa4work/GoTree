@@ -104,16 +104,34 @@ func TestEncodings(t *testing.T) {
 	// "UTF-8" in the header but saved as Windows-1252, a common mistake.
 	mislabeled, _, _ := transform.Bytes(charmap.Windows1252.NewEncoder(), []byte(head("UTF-8")+body))
 
+	enc := func(cm *charmap.Charmap, text string) []byte {
+		out, _, err := transform.Bytes(cm.NewEncoder(), []byte(text))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	muller := "0 @I1@ INDI\n1 NAME Jürgen /Müller/\n0 TRLR\n"
+
 	tests := []struct {
 		name, encoding string
 		data           []byte
 		warn           bool
+		want           string // expected name; Jürgen /Ørsted/ when empty
 	}{
-		{"utf-8 with BOM", "UTF-8", append([]byte{0xEF, 0xBB, 0xBF}, head("UTF-8")+body...), false},
-		{"utf-16", "UTF-16", utf16, false},
-		{"ansi", "ANSI", ansi, false},
-		{"ansel", "ANSEL", ansel, false},
-		{"mislabeled", "ANSI", mislabeled, true},
+		{"utf-8 with BOM", "UTF-8", append([]byte{0xEF, 0xBB, 0xBF}, head("UTF-8")+body...), false, ""},
+		{"utf-16", "UTF-16", utf16, false, ""},
+		{"ansi", "ANSI", ansi, false, ""},
+		{"ansel", "ANSEL", ansel, false, ""},
+		{"mislabeled", "ANSI", mislabeled, true, ""},
+		{"ibmpc cp850", "CP850", enc(charmap.CodePage850, head("IBMPC")+body), false, ""},
+		{"ibmpc lower case crlf", "CP850", enc(charmap.CodePage850, strings.ReplaceAll(head("ibmpc")+body, "\n", "\r\n")), false, ""},
+		{"ibmpc vers 437", "CP437", enc(charmap.CodePage437, "0 HEAD\n1 GEDC\n2 VERS 5.5.1\n1 CHAR IBMPC\n2 VERS 437\n"+muller), false, "Jürgen /Müller/"},
+		{"cp437", "CP437", enc(charmap.CodePage437, head("CP437")+muller), false, "Jürgen /Müller/"},
+		{"macintosh", "MACINTOSH", enc(charmap.Macintosh, head("MACINTOSH")+body), false, ""},
+		{"macintosh cr", "MACINTOSH", enc(charmap.Macintosh, strings.ReplaceAll(head("MACINTOSH")+body, "\n", "\r")), false, ""},
+		{"latin1", "ISO-8859-1", enc(charmap.ISO8859_1, head("ISO-8859-1")+body), false, ""},
+		{"ibm windows", "ANSI", enc(charmap.Windows1252, head("IBM WINDOWS")+body), false, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -124,8 +142,12 @@ func TestEncodings(t *testing.T) {
 			if doc.Encoding != tt.encoding {
 				t.Errorf("encoding %q, want %q", doc.Encoding, tt.encoding)
 			}
-			if got := doc.Records[0].Text("NAME"); got != "Jürgen /Ørsted/" {
-				t.Errorf("name %q", got)
+			want := tt.want
+			if want == "" {
+				want = "Jürgen /Ørsted/"
+			}
+			if got := doc.Records[0].Text("NAME"); got != want {
+				t.Errorf("name %q, want %q", got, want)
 			}
 			if (len(doc.Warnings) > 0) != tt.warn {
 				t.Errorf("warnings %+v", doc.Warnings)
@@ -223,4 +245,21 @@ func TestParseNeverPanics(t *testing.T) {
 		_, _ = Parse(bad)
 	}
 	_, _ = Parse([]byte(strings.Repeat("9", 100) + " X"))
+}
+
+func TestParseContinuationAt(t *testing.T) {
+	v7, err := Parse([]byte("0 HEAD\n1 GEDC\n2 VERS 7.0\n0 @N1@ NOTE\n1 NOTE first\n2 CONT @I1@\n2 CONT @@mail\n2 CONT\n2 CONT @\n0 TRLR\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := v7.Records[0].Text("NOTE"); got != "first\n@I1@\n@mail\n\n@" {
+		t.Errorf("7.0: %q", got)
+	}
+	v5, err := Parse([]byte("0 HEAD\n1 GEDC\n2 VERS 5.5.1\n0 @N1@ NOTE\n1 NOTE first\n2 CONT @@I1@@\n0 TRLR\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := v5.Records[0].Text("NOTE"); got != "first\n@I1@" {
+		t.Errorf("5.5.1: %q", got)
+	}
 }

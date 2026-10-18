@@ -36,3 +36,20 @@ test('cite a source on a birth and find it from the source', async ({ page }) =>
   await expect(page.getByRole('link', { name: new RegExp(title) })).toContainText('1 citation')
   await expectAccessible(page)
 })
+
+test('the sources list loads more than one page', async ({ page }) => {
+  await login(page)
+  const prefix = unique('Paged', page)
+  for (let i = 1; i <= 101; i++) {
+    const res = await page.request.post('/api/sources', { data: { title: `${prefix} ${String(i).padStart(3, '0')}` } })
+    expect(res.ok()).toBe(true)
+  }
+
+  await page.goto('/sources')
+  await page.getByRole('searchbox', { name: 'Search sources' }).fill(prefix)
+  const rows = page.getByRole('main').getByRole('link', { name: new RegExp(prefix) })
+  await expect(rows).toHaveCount(100)
+  await page.getByRole('button', { name: 'Show more sources' }).click()
+  await expect(rows).toHaveCount(101)
+  await expect(page.getByRole('button', { name: 'Show more sources' })).toBeHidden()
+})

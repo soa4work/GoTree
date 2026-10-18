@@ -17,7 +17,7 @@ export function renderApp(path = '/') {
 }
 
 type Reply = [status: number, body?: unknown]
-type Handler = Reply | ((body: unknown) => Reply)
+type Handler = Reply | ((body: unknown, url: URL) => Reply)
 
 export const loggedInState: AuthState = {
   setupRequired: false,
@@ -42,7 +42,7 @@ export function mockApi(routes: Record<string, Handler>) {
     const key = `${init?.method ?? 'GET'} ${url.pathname}`
     const handler = all[key]
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined
-    const [status, payload] = handler === undefined ? [404, { error: 'not found' }] : typeof handler === 'function' ? handler(body) : handler
+    const [status, payload] = handler === undefined ? [404, { error: 'not found' }] : typeof handler === 'function' ? handler(body, url) : handler
     return Promise.resolve(
       status === 204
         ? new Response(null, { status })

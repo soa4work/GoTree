@@ -9,6 +9,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- People list: sort by surname, birth (oldest or youngest first) or recent changes, and filter by
+  sex and living or deceased, kept in the address; the sources list and the media gallery load more
+  with a "Show more" button instead of stopping at 100 sources and 200 media (#60)
+
 - The relationship calculator also names in-laws through two marriages and step-siblings (#43)
 
 - Error messages from the server are shown in the interface language (#24)

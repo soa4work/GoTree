@@ -188,3 +188,21 @@ describe('import page', () => {
     })
   })
 })
+
+describe('backup section', () => {
+  it('tells administrators that the backup holds every tree and account', async () => {
+    mockApi(people(0))
+    renderApp('/import-export')
+    expect(await screen.findByText(/The backup holds every tree and every account on this server/)).toBeInTheDocument()
+  })
+
+  it('leaves the backup section out for users who are not administrators', async () => {
+    mockApi({
+      ...people(0),
+      'GET /api/auth/state': [200, { ...loggedInState, user: { id: 2, username: 'bob', displayName: '', role: 'user' } }] as [number, unknown],
+    })
+    renderApp('/import-export')
+    await screen.findByLabelText('GEDCOM file')
+    expect(screen.queryByText(/The backup holds every tree/)).not.toBeInTheDocument()
+  })
+})

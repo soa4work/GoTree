@@ -33,6 +33,7 @@ function BackupSection() {
         {t('backup.title')}
       </h2>
       <p className="text-slate-700 dark:text-slate-300">{t('backup.intro')}</p>
+      <p className="text-slate-700 dark:text-slate-300">{t('transfer.backupAllTrees')}</p>
       <a
         href="/api/backup"
         download

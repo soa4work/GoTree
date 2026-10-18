@@ -227,3 +227,31 @@ export const addMember = (treeId: number, username: string, role: TreeRole) =>
 export const setMemberRole = (treeId: number, userId: number, role: TreeRole) =>
   putJSON<Member>(`/trees/${treeId}/members/${userId}`, { role })
 export const removeMember = (treeId: number, userId: number) => del(`/trees/${treeId}/members/${userId}`)
+
+export type AccountRole = 'admin' | 'user'
+
+/** An account as administrators see it, with its trees. */
+export interface Account {
+  id: number
+  username: string
+  displayName: string
+  role: AccountRole
+  createdAt: string
+  /** Empty when the account has never signed in. */
+  lastSeenAt: string
+  trees: { id: number; name: string; role: TreeRole }[]
+}
+
+export interface AccountInput {
+  username: string
+  displayName: string
+  password: string
+  role: AccountRole
+}
+
+export const listAccounts = (signal?: AbortSignal) => getJSON<Account[]>('/admin/users', signal)
+export const createAccount = (input: AccountInput) => postJSON<Account>('/admin/users', input)
+export const updateAccount = (id: number, input: { displayName: string; role: AccountRole }) =>
+  putJSON<Account>(`/admin/users/${id}`, input)
+export const resetPassword = (id: number, password: string) => postJSON<void>(`/admin/users/${id}/password`, { password })
+export const deleteAccount = (id: number) => del(`/admin/users/${id}`)

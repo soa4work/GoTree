@@ -33,7 +33,8 @@ SQLite file — no database server, no cloud account.
   birthdays and anniversaries
 - GEDCOM 5.5, 5.5.1 and 7.0 import and export, also zipped with media; backup as one zip
 - Light, dark or system theme and a first-run onboarding
-- Single user today, data model ready for multiple users and trees (there is no multi-user UI yet)
+- Several users and trees: administrators create accounts, owners add members as owner, editor or
+  viewer, and everyone can switch between their trees
 
 ## Stack
 
@@ -69,6 +70,20 @@ Backups always hold the originals.
 On first start GoTree asks you in the browser to create the admin account and name your tree.
 For unattended installs, set `GOTREE_ADMIN_PASSWORD` instead.
 
+### Accounts and members
+
+Only administrators manage accounts, under **Accounts** in the menu: they create an account, change
+its name and role, reset its password (which signs it out on every device) and delete it. They
+cannot delete or reset themselves, and the last administrator can be neither deleted nor made a
+regular user. Being an administrator gives no access to the contents of a tree.
+
+Tree members are managed by the owners of that tree, under **Members**: they add an existing
+account by its username as owner, editor or viewer, change roles and remove members. A tree always
+keeps at least one owner, so the last owner can neither be demoted nor removed, and an account that
+is the last owner of a tree cannot be deleted. Any member can leave a tree. Editors change the
+tree, viewers only read it, and viewers can export it only without living people. A person who is
+not a member of a tree cannot see that it exists.
+
 Behind a reverse proxy, terminate TLS there and forward `X-Forwarded-Proto: https` so the session
 cookie is marked secure. Failed logins are limited per username and per client address. Behind a
 reverse proxy, set `GOTREE_TRUSTED_PROXIES` to the proxy's address or range (e.g. `127.0.0.1` or
@@ -90,7 +105,8 @@ own server.
 
 Everything lives in the data directory: the database `gotree.db` and `media/` with the uploaded
 files. Administrators can download both as one zip under **Import & export → Backup**; the
-database in it is a consistent snapshot taken while GoTree keeps running. Copying the data
+database in it is a consistent snapshot taken while GoTree keeps running. The backup holds every
+tree and every account; to share one tree, export it as GEDCOM. Copying the data
 directory works too, but only while GoTree is stopped, since the database may have changes in
 its `-wal` file that a copy taken mid-write would miss.
 

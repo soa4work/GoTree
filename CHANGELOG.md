@@ -14,6 +14,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
   members, and where every member can leave the tree; viewers can export only without living
   people (#59)
 
+- Accounts page for administrators: create accounts, change their name and role, reset a
+  password and delete an account; the backup section says that it covers every tree and
+  account (#59)
+
 - GEDCOM import reads photos and documents: the files in a GEDZIP or zip become media with their
   title and description, attached to the people, events, families, sources and heirlooms that point
   to them, and a primary photo becomes the portrait; an export without media no longer points to

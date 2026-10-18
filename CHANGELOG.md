@@ -123,6 +123,14 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The interface no longer falls back to English in Russian and Kazakh: tree and map zoom buttons,
+  network and proxy errors, GEDCOM import warnings, dropped-tag reasons and broken references,
+  transcription row errors, the calendar's "Unknown", the default tree name, the page language
+  and description, Kazakh sorting, decimal commas and the chart file name; the person line says
+  «умер»/«умерла» by sex; OpenStreetMap lookups keep one request per second across all places
+  and return names in the interface language; the pages are checked in Russian and Kazakh at
+  phone width (#61)
+
 - Switching between media no longer carries the form over (saving could overwrite the other
   medium), saving a transcription keeps unsaved rows, failed task, repository, photo link, face,
   match search and logout actions say so, an expired session during a save brings up the login screen, and a new version is

@@ -54,6 +54,22 @@ describe('import page', () => {
     expect(screen.queryByText(/Only the owner of the tree/)).not.toBeInTheDocument()
   })
 
+  it('offers an owner the export with everyone', async () => {
+    mockApi(people(3))
+    renderApp('/import-export')
+    expect(await screen.findByRole('radio', { name: 'Include everyone' })).toBeChecked()
+    expect(screen.queryByText(/export the tree without living people/)).not.toBeInTheDocument()
+  })
+
+  it('offers a viewer no export with living people', async () => {
+    mockApi({ ...people(3), 'GET /api/auth/state': [200, { ...loggedInState, tree: { id: 1, name: 'Weber family', role: 'viewer' } }] })
+    renderApp('/import-export')
+    expect(await screen.findByText(/export the tree without living people/)).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: 'Include everyone' })).not.toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Leave living people out' })).toBeChecked()
+    expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute('href', expect.stringContaining('privacy=exclude-living'))
+  })
+
   it('disables replacing for an editor and says why', async () => {
     mockApi({ ...people(3), ...asEditor })
     renderApp('/import-export')

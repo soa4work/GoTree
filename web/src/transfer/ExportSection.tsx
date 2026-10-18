@@ -10,11 +10,14 @@ import { errorText } from '../lib/errors'
 export function ExportSection() {
   const { t } = useTranslation()
   const [version, setVersion] = useState<ExportVersion>('5.5.1')
-  const [privacy, setPrivacy] = useState<Privacy>('all')
+  const [chosenPrivacy, setPrivacy] = useState<Privacy>('all')
   const [format, setFormat] = useState<'ged' | 'gedzip'>('ged')
   const auth = useQuery({ queryKey: ['auth'], queryFn: ({ signal }) => getAuthState(signal), staleTime: Infinity })
   // The check builds a whole database, so the server only lets editors start it.
   const canVerify = auth.data?.tree?.role !== 'viewer'
+  // Viewers may not take a full copy of living people; the server refuses it.
+  const viewer = !canVerify
+  const privacy: Privacy = viewer && chosenPrivacy === 'all' ? 'exclude-living' : chosenPrivacy
   const verify = useMutation({ mutationFn: () => verifyExport(version) })
 
   return (
@@ -37,11 +40,12 @@ export function ExportSection() {
         value={privacy}
         onChange={setPrivacy}
         options={[
-          { value: 'all', label: t('transfer.privacyAll'), hint: t('transfer.privacyAllHint') },
+          ...(viewer ? [] : [{ value: 'all' as const, label: t('transfer.privacyAll'), hint: t('transfer.privacyAllHint') }]),
           { value: 'name-only', label: t('transfer.privacyNameOnly'), hint: t('transfer.privacyNameOnlyHint') },
           { value: 'exclude-living', label: t('transfer.privacyExclude'), hint: t('transfer.privacyExcludeHint') },
         ]}
       />
+      {viewer && <p className="text-sm text-slate-600 dark:text-slate-400">{t('transfer.viewerPrivacy')}</p>}
       <Choice
         legend={t('transfer.format')}
         value={format}

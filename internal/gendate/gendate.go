@@ -310,7 +310,7 @@ func (sd SimpleDate) validate() error {
 		if sd.Month == 0 {
 			return errors.New("day without month")
 		}
-		if sd.Day < 1 || sd.Day > daysIn(sd.Calendar, sd.year(), sd.Month) {
+		if sd.Day < 1 || sd.Day > daysIn(sd.Calendar, sd.leapYear(), sd.Month) {
 			return fmt.Errorf("day %d does not exist in %s %d", sd.Day, months[sd.Month-1], sd.year())
 		}
 	}
@@ -417,6 +417,15 @@ func (sd SimpleDate) year() int {
 	return sd.Year
 }
 
+// leapYear is the astronomical year that decides whether February has a
+// 29th: 1 B.C. is year 0, so 1, 5, 9 B.C. are leap years, not 4 B.C.
+func (sd SimpleDate) leapYear() int {
+	if sd.BC {
+		return 1 - sd.year()
+	}
+	return sd.year()
+}
+
 func (sd SimpleDate) compareKey() int {
 	y, m, d := sd.year(), sd.Month, sd.Day
 	if sd.Calendar != Julian {
@@ -458,7 +467,7 @@ func (sd SimpleDate) Bounds() (first, last int) {
 		lm = 12
 	}
 	if ld == 0 {
-		ld = daysIn(sd.Calendar, y, lm)
+		ld = daysIn(sd.Calendar, sd.leapYear(), lm)
 	}
 	if sd.Calendar != Julian {
 		return key(y, fm, fd, sd.BC), key(y, lm, ld, sd.BC)

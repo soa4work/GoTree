@@ -45,6 +45,9 @@ func TestParseCanonical(t *testing.T) {
 		{"15 MAR 50 B.C.", "15 MAR 50 B.C.", -499685, -499685, QualifierNone},
 		{"@#DJULIAN@ 1 JAN 44 B.C.", "@#DJULIAN@ 1 JAN 44 B.C.", -448770, -448770, QualifierNone},
 		{"@#DJULIAN@ 15 MAR 44 B.C.", "@#DJULIAN@ 15 MAR 44 B.C.", -439687, -439687, QualifierNone},
+		// 1 B.C. is the astronomical year 0, a leap year.
+		{"29 FEB 1 B.C.", "29 FEB 1 B.C.", -9771, -9771, QualifierNone},
+		{"@#DJULIAN@ 29 FEB 5 B.C.", "@#DJULIAN@ 29 FEB 5 B.C.", -49773, -49773, QualifierNone},
 		// GEDCOM 7 spelling of the calendar escape.
 		{"JULIAN 4 OCT 1582", "@#DJULIAN@ 4 OCT 1582", 15821014, 15821014, QualifierNone},
 		{"@#DJULIAN@ 1 JAN 1700", "@#DJULIAN@ 1 JAN 1700", 17000111, 17000111, QualifierNone},
@@ -121,6 +124,7 @@ func TestParseErrors(t *testing.T) {
 		"@#DHEBREW@ 5600",
 		"1850/52",
 		"29 FEB 1750/51",
+		"@#DJULIAN@ 29 FEB 4 B.C.",
 		"BET 10 FEB 1750/51 AND 1 DEC 1750",
 		"0",
 		"12345",
@@ -244,6 +248,7 @@ func TestBounds(t *testing.T) {
 		{"29 FEB 1751/52", 17520229, 17520229},
 		{"@#DJULIAN@ 1700", 17000111, 17010111},
 		{"50 B.C.", -499899, -498769},
+		{"FEB 1 B.C.", -9799, -9771},
 	}
 	for _, tt := range tests {
 		d, err := Parse(tt.in)

@@ -43,3 +43,36 @@ test('record an heirloom from a person and pass it on', async ({ page }) => {
   expect(ged).toContain(`1 NAME Watch ${surname}`)
   expect(ged).toContain('2 TYPE gift')
 })
+
+test('custody dates read naturally in Russian and Kazakh', async ({ page }) => {
+  await login(page)
+  const surname = unique('Heir', page)
+  const anna = await (await page.request.post('/api/persons', { data: { givenNames: 'Anna', surname, sex: 'F' } })).json()
+  const h = await (
+    await page.request.post('/api/heirlooms', {
+      data: {
+        name: `Ring ${surname}`,
+        kind: 'jewellery',
+        description: '',
+        madeDate: 'FEB 1880',
+        originPlaceId: null,
+        currentLocation: '',
+        notes: '',
+        custody: [{ personId: anna.id, fromDate: 'FEB 1920', toDate: '', how: 'gift', notes: '' }],
+      },
+    })
+  ).json()
+
+  await page.evaluate(() => localStorage.setItem('gotree-lang', 'kk'))
+  await page.goto(`/heirlooms/${h.id}`)
+  const main = page.getByRole('main')
+  await expect(main).toContainText('1880 ж. ақпан')
+  await expect(main).toContainText('1920 ж. ақпан бастап')
+  await expect(main).not.toContainText('ж. ж.')
+  await expect(main).not.toContainText('February')
+
+  await page.evaluate(() => localStorage.setItem('gotree-lang', 'ru'))
+  await page.goto(`/heirlooms/${h.id}`)
+  await expect(main).toContainText('февраль 1880 г.')
+  await expect(main).toContainText('с февраля 1920 г.')
+})

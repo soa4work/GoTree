@@ -102,6 +102,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Dates in Kazakh no longer repeat «ж.» and no longer fall back to English in browsers without Kazakh
+  locale data, and Russian months after prepositions are declined («до февраля 1820 г.») (#50)
+
 - Kazakh and Russian wording proofread (#46)
 
 - Errors in transcription rows and in GEDCOM files are shown in the interface language (#43)

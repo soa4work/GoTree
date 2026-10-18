@@ -211,7 +211,7 @@ func TestImportAncestry551(t *testing.T) {
 	for path, outcome := range map[string]string{
 		"INDI.BIRT.DATE":       TagMapped,
 		"INDI._UID":            TagKept,
-		"INDI.OBJE":            TagKept,
+		"INDI.OBJE":            TagDropped, // no files in a plain .ged
 		"INDI.CHAN":            TagDropped,
 		"INDI.BIRT.SOUR._APID": TagKept,
 		"SOUR._APID":           TagKept,
@@ -229,7 +229,7 @@ func TestImportAncestry551(t *testing.T) {
 	if err := s.DB.QueryRow(`SELECT extra_json FROM persons WHERE gedcom_xref = 'I1'`).Scan(&extra); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(extra, `"t":"_UID"`) || !strings.Contains(extra, "6B5C0D1E2F3A4B5C") || !strings.Contains(extra, "abc.jpg") {
+	if !strings.Contains(extra, `"t":"_UID"`) || !strings.Contains(extra, "6B5C0D1E2F3A4B5C") {
 		t.Errorf("extra_json: %s", extra)
 	}
 }

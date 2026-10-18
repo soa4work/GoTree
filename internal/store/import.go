@@ -144,6 +144,15 @@ type importer struct {
 	// familyPartners are the partners of each family by its xref.
 	familyPartners map[string][2]sql.NullInt64
 
+	// Media of the upload (import_media.go): the files found for the FILE
+	// values, the media of each OBJE record by its xref, and the events and
+	// heirlooms by node and xref for the link pass.
+	files       ImportFiles
+	mediaByXref map[string][]int64
+	mediaInfo   map[int64]importedMedia
+	eventNodes  map[*gedcom.Node]int64
+	heirlooms   map[string]int64
+
 	insertPerson, insertEvent, insertName, insertFTS *sql.Stmt
 }
 
@@ -166,7 +175,9 @@ type famcLink struct {
 }
 
 func (im *importer) tag(path, outcome, reason string) {
-	key := path + "|" + outcome
+	// Reasons are part of the key: dropped lines of one kind may have
+	// different causes, and the report should name each.
+	key := path + "|" + outcome + "|" + reason
 	t := im.tags[key]
 	if t == nil {
 		t = &TagStat{Path: path, Outcome: outcome, Reason: reason}
@@ -190,8 +201,15 @@ func (im *importer) broken(n *gedcom.Node, what string) {
 }
 
 // ImportGEDCOM loads a parsed GEDCOM file into the actor's tree, in one
-// transaction: either everything is imported or nothing.
+// transaction: either everything is imported or nothing. Media objects are
+// reported as dropped, because the file has no files to go with them.
 func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document, mode string) (ImportReport, error) {
+	return s.ImportGEDCOMFiles(ctx, a, doc, mode, ImportFiles{})
+}
+
+// ImportGEDCOMFiles is ImportGEDCOM for an upload that carries files (a
+// GEDZIP), which the media objects of the file may refer to.
+func (s *Store) ImportGEDCOMFiles(ctx context.Context, a Actor, doc *gedcom.Document, mode string, files ImportFiles) (ImportReport, error) {
 	started := s.Now()
 	report := ImportReport{
 		Version: doc.Version, Encoding: doc.Encoding, Source: doc.Source,
@@ -202,15 +220,8 @@ func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document,
 	if report.Warnings == nil {
 		report.Warnings = []gedcom.Warning{}
 	}
-	if mode != ImportIntoEmpty && mode != ImportReplace {
-		return report, &ValidationError{Fields: map[string]string{"mode": "must be empty or replace"}}
-	}
-	// The API checks this too; the store enforces it for every caller.
-	if !a.CanEdit() {
-		return report, ErrViewOnly
-	}
-	if mode == ImportReplace && a.Role != RoleOwner {
-		return report, ErrOwnerOnly
+	if err := checkImportMode(a, mode); err != nil {
+		return report, err
 	}
 
 	err := s.tx(ctx, func(tx *sql.Tx) error {
@@ -226,16 +237,8 @@ func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document,
 			if err := clearTranscriptionPeople(ctx, tx, a.TreeID); err != nil {
 				return err
 			}
-		} else {
-			var n int
-			if err := tx.QueryRowContext(ctx, `
-				SELECT (SELECT count(*) FROM persons WHERE tree_id = ?) + (SELECT count(*) FROM families WHERE tree_id = ?)
-					+ (SELECT count(*) FROM sources WHERE tree_id = ?)`, a.TreeID, a.TreeID, a.TreeID).Scan(&n); err != nil {
-				return err
-			}
-			if n > 0 {
-				return ErrTreeNotEmpty
-			}
+		} else if err := checkTreeEmpty(ctx, tx, a.TreeID); err != nil {
+			return err
 		}
 
 		im := &importer{
@@ -244,6 +247,8 @@ func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document,
 			repos: map[string]int64{}, notes: map[string]string{}, places: map[string]int64{},
 			pedigree: map[string]map[string]string{},
 			chilSeen: map[string]bool{}, familyPartners: map[string][2]sql.NullInt64{},
+			files: files, mediaByXref: map[string][]int64{}, mediaInfo: map[int64]importedMedia{},
+			eventNodes: map[*gedcom.Node]int64{}, heirlooms: map[string]int64{},
 		}
 		if err := im.prepare(ctx); err != nil {
 			return err
@@ -335,6 +340,9 @@ func (im *importer) run(ctx context.Context) error {
 			im.mapped(r.Tag)
 		}
 	}
+	if err := im.mediaRecords(ctx, byTag["OBJE"]); err != nil {
+		return err
+	}
 	for _, r := range byTag["REPO"] {
 		if err := im.repository(ctx, r); err != nil {
 			return err
@@ -375,6 +383,9 @@ func (im *importer) run(ctx context.Context) error {
 			return err
 		}
 	}
+	if err := im.linkMedia(ctx); err != nil {
+		return err
+	}
 	for _, p := range im.deferred {
 		pid, ok := im.persons[p.xref]
 		if !ok {
@@ -388,14 +399,10 @@ func (im *importer) run(ctx context.Context) error {
 	}
 	for tag, recs := range byTag {
 		switch tag {
-		case "INDI", "FAM", "SOUR", "REPO", "NOTE", "SNOTE", "_HEIRLOOM":
+		case "INDI", "FAM", "SOUR", "REPO", "NOTE", "SNOTE", "_HEIRLOOM", "OBJE":
 		case "SUBM", "SUBN":
 			for range recs {
 				im.tag(tag, TagDropped, "GoTree writes its own submitter")
-			}
-		case "OBJE":
-			for range recs {
-				im.tag(tag, TagDropped, "media files are not part of a GEDCOM file; upload them in GoTree")
 			}
 		default:
 			for range recs {
@@ -510,6 +517,9 @@ func containsLine(lines []string, s string) bool {
 // other files an unmapped line: known noise is dropped, everything else
 // kept verbatim.
 func (im *importer) other(ctx string, c *gedcom.Node, kept *[]keptNode) {
+	if c.Tag == "OBJE" && objeHandled(ctx) {
+		return // the link pass (linkMedia) reads it
+	}
 	if reason, ok := droppedTags[c.Tag]; ok {
 		im.tag(ctx+"."+c.Tag, TagDropped, reason)
 		return
@@ -1006,6 +1016,7 @@ func (im *importer) event(ctx context.Context, owner string, e *gedcom.Node, per
 		return 0, err
 	}
 	eid, _ := res.LastInsertId()
+	im.eventNodes[e] = eid
 	im.report.Counts["events"]++
 	im.mapped(path)
 	for _, c := range citations {
@@ -1392,6 +1403,8 @@ func (im *importer) heirloom(ctx context.Context, r *gedcom.Node) error {
 		case "SOUR":
 			citations = append(citations, c)
 			continue
+		case "OBJE":
+			continue // linked by linkMedia
 		default:
 			im.tag(path+"."+c.Tag, TagDropped, "not part of an heirloom in GoTree")
 			continue
@@ -1417,6 +1430,7 @@ func (im *importer) heirloom(ctx context.Context, r *gedcom.Node) error {
 		return err
 	}
 	id, _ := res.LastInsertId()
+	im.heirlooms[r.Xref] = id
 	if err := writeCustody(ctx, im.tx, id, in.Custody); err != nil {
 		return err
 	}

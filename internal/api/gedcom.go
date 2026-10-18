@@ -62,8 +62,11 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limit := s.maxGedcom()
+	var zr *zip.Reader
+	var gedName string
 	if bytes.HasPrefix(data, []byte("PK\x03\x04")) {
-		inner, err := gedcomFromZip(data, limit)
+		var inner []byte
+		zr, gedName, inner, err = openGedzip(data, limit)
 		if errors.Is(err, errGedcomTooLarge) {
 			writeErrorP(w, http.StatusRequestEntityTooLarge, CodeGedcomTooLarge, err.Error(), map[string]any{"limitMB": limit >> 20})
 			return
@@ -84,17 +87,54 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 		writeGedcomInvalid(w, err)
 		return
 	}
+	var files store.ImportFiles
+	if zr != nil {
+		// Refuse before any file is stored, so that a refused import leaves
+		// none behind. The import checks again inside its transaction.
+		if err := s.Store.CheckImportTarget(r.Context(), actorFrom(r), mode); err != nil {
+			s.writeImportError(w, err)
+			return
+		}
+		var finish func(failed bool)
+		files, finish, err = s.stageGedzipMedia(r.Context(), zr, gedName, len(data), store.MediaPaths(doc))
+		if err != nil {
+			s.Log.Error("store gedzip media", "err", err)
+			writeError(w, http.StatusInternalServerError, CodeStoreFileFailed, "could not store the file")
+			return
+		}
+		// finish releases the file locks, and removes the files that the
+		// failed import left without a medium.
+		failed := true
+		defer func() { finish(failed) }()
+		report, err := s.Store.ImportGEDCOMFiles(r.Context(), actorFrom(r), doc, mode, files)
+		if err != nil {
+			s.writeImportError(w, err)
+			return
+		}
+		failed = false
+		s.logImported(name, report)
+		writeJSON(w, http.StatusOK, report)
+		return
+	}
 	report, err := s.Store.ImportGEDCOM(r.Context(), actorFrom(r), doc, mode)
+	if err != nil {
+		s.writeImportError(w, err)
+		return
+	}
+	s.logImported(name, report)
+	writeJSON(w, http.StatusOK, report)
+}
+
+func (s *Server) logImported(name string, report store.ImportReport) {
+	s.Log.Info("gedcom imported", "file", name, "persons", report.Counts["persons"], "media", report.Counts["media"], "ms", report.DurationMS)
+}
+
+func (s *Server) writeImportError(w http.ResponseWriter, err error) {
 	if errors.Is(err, store.ErrTreeNotEmpty) {
 		writeError(w, http.StatusConflict, CodeTreeNotEmpty, err.Error())
 		return
 	}
-	if err != nil {
-		writeStoreError(w, s.Log, err)
-		return
-	}
-	s.Log.Info("gedcom imported", "file", name, "persons", report.Counts["persons"], "ms", report.DurationMS)
-	writeJSON(w, http.StatusOK, report)
+	writeStoreError(w, s.Log, err)
 }
 
 var (
@@ -136,13 +176,14 @@ func (s *Server) maxGedcom() int64 {
 	return 4 * s.MaxUpload
 }
 
-// gedcomFromZip returns the GEDCOM file inside a zip: gedcom.ged as
-// GEDZIP names it, else the only .ged file. A file larger than limit bytes
-// unzipped is refused with errGedcomTooLarge.
-func gedcomFromZip(data []byte, limit int64) ([]byte, error) {
-	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+// openGedzip opens a zip and returns it with the name and the content of the
+// GEDCOM file inside: gedcom.ged as GEDZIP names it, else the only .ged
+// file. A file larger than limit bytes unzipped is refused with
+// errGedcomTooLarge.
+func openGedzip(data []byte, limit int64) (zr *zip.Reader, gedName string, ged []byte, err error) {
+	zr, err = zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errZipUnreadable, err)
+		return nil, "", nil, fmt.Errorf("%w: %v", errZipUnreadable, err)
 	}
 	var found []*zip.File
 	for _, f := range zr.File {
@@ -156,29 +197,29 @@ func gedcomFromZip(data []byte, limit int64) ([]byte, error) {
 	}
 	switch len(found) {
 	case 0:
-		return nil, errZipNoGed
+		return nil, "", nil, errZipNoGed
 	case 1:
 	default:
-		return nil, errZipSeveralGed
+		return nil, "", nil, errZipSeveralGed
 	}
 	// The declared size can lie, so the bounded read below is the real check;
 	// this refuses an honest oversized entry without reading it.
 	if found[0].UncompressedSize64 > uint64(limit) {
-		return nil, fmt.Errorf("%w (over %d MB unzipped)", errGedcomTooLarge, limit>>20)
+		return nil, "", nil, fmt.Errorf("%w (over %d MB unzipped)", errGedcomTooLarge, limit>>20)
 	}
 	rc, err := found[0].Open()
 	if err != nil {
-		return nil, err
+		return nil, "", nil, err
 	}
 	defer rc.Close()
 	// Guard against zip bombs. Read one byte past the limit so an oversized
 	// file is refused instead of silently truncated.
 	out, err := io.ReadAll(io.LimitReader(rc, limit+1))
 	if err != nil {
-		return nil, err
+		return nil, "", nil, err
 	}
 	if int64(len(out)) > limit {
-		return nil, fmt.Errorf("%w (over %d MB unzipped)", errGedcomTooLarge, limit>>20)
+		return nil, "", nil, fmt.Errorf("%w (over %d MB unzipped)", errGedcomTooLarge, limit>>20)
 	}
-	return out, nil
+	return zr, found[0].Name, out, nil
 }

@@ -9,6 +9,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- GEDCOM import reads photos and documents: the files in a GEDZIP or zip become media with their
+  title and description, attached to the people, events, families, sources and heirlooms that point
+  to them, and a primary photo becomes the portrait; an export without media no longer points to
+  media records it does not contain (#54)
+
 - People list: sort by surname, birth (oldest or youngest first) or recent changes, and filter by
   sex and living or deceased, kept in the address; the sources list and the media gallery load more
   with a "Show more" button instead of stopping at 100 sources and 200 media (#60)

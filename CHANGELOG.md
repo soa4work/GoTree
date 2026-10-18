@@ -102,6 +102,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- GEDCOM files saved as IBM PC (code pages 437 and 850), Macintosh or Latin-1 text are read with
+  their own character set, so umlauts and accents come through, and a GEDCOM 7 note line that
+  starts with "@" is no longer lost on export and import (#54)
+
 - Share links that show living people by name only no longer find them by nickname or other names,
   such as a maiden name; only their given names and surname are searched, and such links list
   matches in name order, since relevance also weighed the hidden names (#58)

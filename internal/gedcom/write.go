@@ -40,14 +40,16 @@ func writeNode(w *bufio.Writer, n *Node, level int, opt WriteOptions) error {
 	}
 	prefix += n.Tag
 
-	var value string
+	value := n.Value
 	if n.Pointer != "" {
 		value = "@" + n.Pointer + "@"
-	} else {
-		value = escape(n.Value, opt.Version7)
 	}
 
 	for i, line := range strings.Split(value, "\n") {
+		if n.Pointer == "" {
+			// Every line is a line of its own, so every line is escaped.
+			line = escape(line, opt.Version7)
+		}
 		head := prefix
 		if i > 0 {
 			head = fmt.Sprintf("%d CONT", level+1)
@@ -120,6 +122,17 @@ func splitForCONC(s string, max int) []string {
 		if cut <= 1 {
 			cut = max
 			for cut > 0 && !utf8.RuneStart(s[cut]) {
+				cut--
+			}
+		}
+		// Never cut an escaped "@@" in two: a piece starting with a lone @
+		// could read as a pointer.
+		if s[cut] == '@' {
+			run := 0
+			for run < cut && s[cut-1-run] == '@' {
+				run++
+			}
+			if run%2 == 1 && cut > 1 {
 				cut--
 			}
 		}

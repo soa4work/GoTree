@@ -102,6 +102,13 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Dates: dual years count by their second year, so "29 FEB 1751/52" is accepted, "FEB 1750/51"
+  sorts in 1751 and "BET 1 DEC 1750 AND 10 FEB 1750/51" is a valid range; Julian dates without
+  a day are converted to the Gregorian calendar too, so the plausibility checks no longer
+  flag a Julian month against a Gregorian day; dates B.C. are no longer misread by the checks
+  and record matching; GEDCOM 7.0 export writes the later year of a dual date beside the
+  5.5.1 form as a phrase, and dates already stored are re-sorted on the next start (#55)
+
 - Share links that show living people by name only no longer find them by nickname or other names,
   such as a maiden name; only their given names and surname are searched, and such links list
   matches in name order, since relevance also weighed the hidden names (#58)

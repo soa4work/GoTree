@@ -2,9 +2,22 @@
 # PreToolUse on Edit|Write|NotebookEdit|Bash: all work happens on an issue
 # branch named <type>/<issue>-<slug>, never on main, and nothing is pushed
 # unless ./run-tests.sh passes.
+#
+# Bash commands are split the way a shell would split them: quoted strings are
+# kept as one word, and code that runs elsewhere (bash -c, eval, $(...),
+# backticks, a heredoc fed to a shell, env -S, xargs) is inspected as well.
+# cd, pushd and subshells move the checkout a command is judged against, and
+# output redirections and tee into a checkout count as edits of it.
+#
+# This is a guard rail against mistakes, not a sandbox: programs that write
+# files by themselves (sed -i, cp, mv, an interpreter) and commands assembled
+# from variables are not followed.
 set -uo pipefail
 
 BRANCH_RE='^(feat|fix|chore|docs|refactor|test|perf|ci|build|revert)/[0-9]+-[a-z0-9][a-z0-9._-]*$'
+PROTECTED_RE='(^|/)(main|master)$'
+SHELL_RE='^(sh|bash|dash|zsh|ksh|ash)$'
+MAX_DEPTH=5
 HINT="Work only on issue branches named <type>/<issue>-<slug> (e.g. fix/42-audio-regression). Find or create the GitHub issue first (see the gh skill), then: gh issue develop <N> --name <type>/<N>-<slug> --base main --checkout"
 
 input="$(cat)"
@@ -28,6 +41,14 @@ checkout_for() {
   common="$(git_common_dir "$dir")"
   [[ "$common" == "$project_git_dir" ]] || return 1
   printf '%s' "$top"
+}
+
+# The deepest directory of path that exists: a file written into a directory
+# that does not exist yet still belongs to the checkout around it.
+existing_dir() {
+  local d="$1"
+  while [[ ! -d "$d" && "$d" != / ]]; do d="$(dirname "$d")"; done
+  printf '%s' "$d"
 }
 
 decide() {
@@ -57,6 +78,14 @@ current_branch() {
   printf %s "(detached HEAD)"
 }
 
+# The branch each checkout is on, as far as the command seen so far goes:
+# "git switch -c fix/1-x && git commit" commits on fix/1-x.
+declare -A BRANCH_OF=()
+branch_of() {
+  [[ -n "${BRANCH_OF[$1]:-}" ]] || BRANCH_OF[$1]="$(current_branch "$1")"
+  printf %s "${BRANCH_OF[$1]}"
+}
+
 # True for `git merge --ff-only <upstream>` / `git reset --hard <upstream>` where
 # <upstream> is exactly the tracking branch of the checked-out branch.
 syncs_with_upstream() {
@@ -73,10 +102,9 @@ syncs_with_upstream() {
   done
   (( mode )) && [[ "$target" == "$upstream" ]]
 }
-is_branch() { git -C "$repo" show-ref --verify --quiet "refs/heads/$1"; }
 
 run_tests() {
-  local log
+  local repo="$1" log
   log="$(mktemp)"
   # run-tests.sh gives each checkout its own stack, so gates running in
   # parallel worktrees do not collide (#95).
@@ -90,13 +118,356 @@ $tail_out"
   rm -f "$log"
 }
 
+# Splits a command line into simple commands, one per output line, with the
+# words of each separated by \x1f. Quotes are removed but keep their content
+# in one word; redirection operators come out as words of their own prefixed
+# with \x02, so a quoted ">" is never mistaken for one. A subshell opens with
+# the word \x03( and closes with \x03). Heredoc bodies are data and dropped,
+# unless the heredoc is fed to a shell; $(...) and backticks are emitted as
+# commands of their own.
+read -r -d '' TOKENIZER <<'PERL'
+use strict; use warnings;
+my @out;
+sub emit { my ($seg) = @_; push @out, join("\x1f", @$seg) if @$seg; @$seg = (); }
+sub heredocs {
+  my ($s) = @_;
+  my @lines = split /\n/, $s, -1; my @keep; my @pending;
+  for my $line (@lines) {
+    if (@pending) {
+      my ($term, $code) = @{$pending[0]};
+      if ($line =~ /^\s*\Q$term\E[ \t]*$/) { shift @pending; next; }
+      push @keep, $line if $code; next;
+    }
+    push @keep, $line;
+    while ($line =~ /<<-?\s*(['"]?)(\w+)\1/g) {
+      my $term = $2; my $before = substr($line, 0, $-[0]);
+      my $code = $before =~ m{(?:^|[;&|(\s])(?:\S*/)?(?:ba|da|z|k|a)?sh(?:\s+-[A-Za-z]+)*\s*$} ? 1 : 0;
+      push @pending, [$term, $code];
+    }
+  }
+  return join("\n", @keep);
+}
+sub balanced { # text after "$(" -> (inner, rest)
+  my ($s) = @_; my $d = 1; my $i = 0; my $q = '';
+  for (; $i < length $s; $i++) {
+    my $c = substr($s, $i, 1);
+    if ($q) { $q = '' if $c eq $q; next; }
+    if ($c eq "'" || $c eq '"') { $q = $c; next; }
+    $d++ if $c eq '('; $d-- if $c eq ')';
+    return (substr($s, 0, $i), substr($s, $i + 1)) if $d == 0;
+  }
+  return ($s, '');
+}
+sub lex {
+  my ($s, $depth) = @_;
+  return if $depth > 5;
+  my @seg; my $tok = ''; my $has = 0;
+  my $end = sub { if ($has) { push @seg, $tok; } $tok = ''; $has = 0; };
+  while (length $s) {
+    my $c = substr($s, 0, 1);
+    if ($c eq '\\') {
+      my $n = substr($s, 1, 1); $s = substr($s, 2);
+      if ($n ne "\n") { $tok .= $n; $has = 1; } next;
+    }
+    if ($c eq "'") {
+      $s =~ s/^'([^']*)'?//s; (my $t = $1) =~ s/\n/ /g; $tok .= $t; $has = 1; next;
+    }
+    if ($c eq '"') {
+      $s = substr($s, 1); $has = 1;
+      while (length $s) {
+        my $d = substr($s, 0, 1);
+        if ($d eq '"') { $s = substr($s, 1); last; }
+        if ($d eq '\\') { $tok .= substr($s, 1, 1); $s = substr($s, 2); next; }
+        if ($s =~ s/^\$\(//) { my ($in, $rest) = balanced($s); $s = $rest; lex($in, $depth + 1); next; }
+        if ($s =~ s/^`([^`]*)`?//s) { lex($1, $depth + 1); next; }
+        $tok .= $d eq "\n" ? ' ' : $d; $s = substr($s, 1);
+      }
+      next;
+    }
+    if ($s =~ s/^\$\(//) { my ($in, $rest) = balanced($s); $s = $rest; lex($in, $depth + 1); $tok .= 'S'; $has = 1; next; }
+    if ($s =~ s/^`([^`]*)`?//s) { lex($1, $depth + 1); $tok .= 'S'; $has = 1; next; }
+    if ($c eq '#' && !$has) { $s =~ s/^[^\n]*//; next; }
+    if ($s =~ s/^(&>>|&>|>>|>\||>&|>|<<<|<<-|<<|<&|<>|<)//) {
+      my $op = $1;
+      if ($has && $tok =~ /^\d+$/) { $op = $tok . $op; $tok = ''; $has = 0; } else { $end->(); }
+      push @seg, "\x02$op"; next;
+    }
+    if ($s =~ s/^(&&|\|\||;;|[;&|\n])//) { $end->(); emit(\@seg); next; }
+    if ($c eq '(' || $c eq ')') { $s = substr($s, 1); $end->(); emit(\@seg); push @out, "\x03$c"; next; }
+    if ($c eq ' ' || $c eq "\t") { $s = substr($s, 1); $end->(); next; }
+    $tok .= $c; $has = 1; $s = substr($s, 1);
+  }
+  $end->(); emit(\@seg);
+}
+local $/; my $src = <STDIN>;
+lex(heredocs($src), 0);
+print "$_\n" for @out;
+PERL
+
+tokenize() { perl -e "$TOKENIZER" <<< "$1"; }
+
+resolve() { # dir path -> absolute path
+  if [[ "$2" == /* ]]; then realpath -m "$2"; else realpath -m "$1/$2"; fi
+}
+
+# A redirection or tee into a checkout on main is an edit of that checkout.
+check_write() {
+  local path="$1" r b
+  [[ "$path" == /dev/* ]] && return
+  r="$(checkout_for "$(existing_dir "$(dirname "$path")")")" || return
+  b="$(branch_of "$r")"
+  valid "$b" || deny "Refusing to write $path on branch '$b'. $HINT"
+}
+
+pushing_repos=()
+
+inspect() { # command-string cwd depth
+  local cmd="$1" here="$2" depth="$3"
+  (( depth > MAX_DEPTH )) && deny "Command nested too deeply to check."
+  local -a segs stack=() dirs=()
+  local oldpwd="$here" seg
+  mapfile -t segs < <(tokenize "$cmd")
+  for seg in "${segs[@]}"; do
+    case "$seg" in
+      $'\x03(') stack+=("$here"); continue ;;
+      $'\x03)') (( ${#stack[@]} )) && { here="${stack[-1]}"; unset 'stack[-1]'; }; continue ;;
+    esac
+    local -a t=()
+    IFS=$'\x1f' read -r -a t <<< "$seg"
+    segment "$depth" "${t[@]}"
+  done
+}
+
+# Judges one simple command. It may change "here" (cd), which inspect owns.
+segment() {
+  local depth="$1"; shift
+  local -a t=() words=()
+  local a k j from_xargs=0 seg_here="$here" git_env=0
+  # Redirections first: they apply whatever the command is.
+  local -a raw=("$@")
+  for ((j = 0; j < ${#raw[@]}; j++)); do
+    a="${raw[j]}"
+    if [[ "$a" == $'\x02'* ]]; then
+      local op="${a#$'\x02'}" target="${raw[j+1]:-}"
+      ((j++))
+      [[ "$op" == *'>'* && "$op" != *'>&' && "$target" != '&'* ]] && check_write "$(resolve "$here" "$target")"
+      continue
+    fi
+    words+=("$a")
+  done
+  t=("${words[@]}")
+  (( ${#t[@]} )) || return 0
+
+  # Strip keywords, env assignments and wrappers (time git push, env -i git
+  # commit, sudo -u x git ..., timeout 5 git push, xargs git ...).
+  k=0
+  while (( k < ${#t[@]} )); do
+    a="${t[k]}"
+    if [[ "$a" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+      [[ "$a" =~ ^GIT_(DIR|WORK_TREE)= ]] && git_env=1
+      ((k++)); continue
+    fi
+    case "${a##*/}" in
+      if|then|else|elif|do|while|until|'!'|'{'|'}'|time|nohup|exec|builtin) ((k++)) ;;
+      command)
+        ((k++))
+        while [[ "${t[k]:-}" == -* ]]; do [[ "${t[k]}" == -v || "${t[k]}" == -V ]] && return 0; ((k++)); done ;;
+      nice|stdbuf)
+        ((k++))
+        while [[ "${t[k]:-}" == -* ]]; do
+          [[ "${t[k]}" =~ ^-(n|i|o|e)$ ]] && ((k++))
+          ((k++))
+        done ;;
+      timeout)
+        ((k++))
+        while [[ "${t[k]:-}" == -* ]]; do [[ "${t[k]}" =~ ^-(s|k)$ ]] && ((k++)); ((k++)); done
+        ((k++)) ;;
+      sudo|doas)
+        ((k++))
+        while [[ "${t[k]:-}" == -* ]]; do [[ "${t[k]}" =~ ^-[ugCDhprtU]$ ]] && ((k++)); ((k++)); done ;;
+      env)
+        ((k++))
+        while [[ "${t[k]:-}" == -* ]]; do
+          case "${t[k]}" in
+            -u|--unset) ((k++)) ;;
+            -C|--chdir) seg_here="$(resolve "$here" "${t[k+1]:-.}")"; ((k++)) ;;
+            --chdir=*) seg_here="$(resolve "$here" "${t[k]#--chdir=}")" ;;
+            -S|--split-string)
+              inspect "${t[k+1]:-} ${t[*]:k+2}" "$seg_here" $((depth + 1)); return 0 ;;
+            --split-string=*)
+              inspect "${t[k]#--split-string=} ${t[*]:k+1}" "$seg_here" $((depth + 1)); return 0 ;;
+          esac
+          ((k++))
+        done ;;
+      xargs)
+        ((k++)); from_xargs=1
+        while [[ "${t[k]:-}" == -* ]]; do
+          [[ "${t[k]}" =~ ^-[IinLPdEsa]$ ]] && ((k++))
+          ((k++))
+        done ;;
+      *) break ;;
+    esac
+  done
+  t=("${t[@]:k}")
+  (( ${#t[@]} )) || return 0
+  local name="${t[0]##*/}"
+
+  if [[ "$name" =~ $SHELL_RE ]]; then
+    for ((j = 1; j < ${#t[@]}; j++)); do
+      [[ "${t[j]}" == -* ]] || break
+      if [[ "${t[j]}" =~ ^-[A-Za-z]*c[A-Za-z]*$ ]]; then
+        inspect "${t[j+1]:-}" "$seg_here" $((depth + 1))
+        return 0
+      fi
+    done
+    return 0
+  fi
+
+  case "$name" in
+    eval) inspect "${t[*]:1}" "$seg_here" $((depth + 1)); return 0 ;;
+    cd|pushd|popd)
+      local dest=""
+      for a in "${t[@]:1}"; do [[ "$a" == -[LPe@]* ]] && continue; dest="$a"; break; done
+      if [[ "$name" == popd ]]; then
+        (( ${#dirs[@]} )) && { dest="${dirs[-1]}"; unset 'dirs[-1]'; } || dest="$here"
+      elif [[ -z "$dest" ]]; then dest="${HOME:-/}"
+      elif [[ "$dest" == - ]]; then dest="$oldpwd"
+      fi
+      [[ "$name" == pushd ]] && dirs+=("$here")
+      oldpwd="$here"
+      here="$(resolve "$here" "$dest")"
+      return 0 ;;
+    tee)
+      for a in "${t[@]:1}"; do [[ "$a" == -* ]] && continue; check_write "$(resolve "$here" "$a")"; done
+      return 0 ;;
+    gh)
+      [[ "${t[1]:-} ${t[2]:-}" == "pr merge" ]] && ask "Merging a PR is the user's decision."
+      return 0 ;;
+    git) ;;
+    *) return 0 ;;
+  esac
+
+  local target="$seg_here" i=1
+  while [[ "${t[i]:-}" == -* ]]; do
+    case "${t[i]}" in
+      -C) target="$(resolve "$target" "${t[i+1]:-.}")"; ((i++)) ;;
+      -c)
+        [[ "${t[i+1]:-}" == alias.* ]] && deny "Defining git aliases on the command line is not allowed."
+        ((i++)) ;;
+      --git-dir|--work-tree|--git-dir=*|--work-tree=*) git_env=1 ;;
+    esac
+    ((i++))
+  done
+  # -C into another checkout is judged by that checkout's branch. Worktrees
+  # live under .claude/worktrees inside the repo directory, so the path
+  # alone does not say which checkout it belongs to — ask git.
+  local repo branch
+  repo="$(checkout_for "$(existing_dir "$target")")" || {
+    (( git_env )) && ask "git with --git-dir/--work-tree/GIT_DIR cannot be checked; use git -C instead."
+    return 0
+  }
+  (( git_env )) && ask "git with --git-dir/--work-tree/GIT_DIR cannot be checked; use git -C instead."
+  branch="$(branch_of "$repo")"
+  local sub="${t[i]:-}"
+  local -a args=("${t[@]:i+1}")
+
+  case "$sub" in
+    checkout|switch)
+      local created=0
+      for ((j = 0; j < ${#args[@]}; j++)); do
+        # A short-flag cluster counts too: -qc, -qb, --quiet -c, ...
+        if [[ "${args[j]}" =~ ^-[a-zA-Z]*[bBcC]$ ]]; then
+          local new="${args[j+1]:-}"
+          valid "$new" || deny "Branch name '$new' is not allowed. $HINT"
+          BRANCH_OF[$repo]="$new"
+          created=1
+        fi
+      done
+      if (( !created )); then
+        # The branch is the first argument that names one: with "git checkout
+        # -q main" only args[0] was looked at, so the flag hid the branch and
+        # everything after it in the same command was judged against the
+        # branch we were on before (#76).
+        for a in "${args[@]}"; do
+          [[ "$a" == -* ]] && continue
+          git -C "$repo" show-ref --verify --quiet "refs/heads/$a" && BRANCH_OF[$repo]="$a"
+          break
+        done
+      fi
+      ;;
+    branch)
+      local force=0
+      for a in "${args[@]}"; do [[ "$a" =~ ^-[a-zA-Z]*[fmMcCdD]$ || "$a" =~ ^--(force|move|copy|delete)$ ]] && force=1; done
+      if (( force )); then
+        for a in "${args[@]}"; do
+          [[ "$a" != -* && "$a" =~ $PROTECTED_RE ]] && deny "Moving, renaming or deleting '$a' is not allowed. $HINT"
+        done
+      fi
+      if [[ "${#args[@]}" -ge 1 && "${args[0]}" != -* ]]; then
+        valid "${args[0]}" || deny "Branch name '${args[0]}' is not allowed. $HINT"
+      fi
+      ;;
+    update-ref)
+      for a in "${args[@]}"; do
+        [[ "$a" != -* && "$a" =~ $PROTECTED_RE ]] && deny "Moving '$a' is not allowed. $HINT"
+      done
+      valid "$branch" || deny "Refusing 'git $sub' on branch '$branch'. $HINT"
+      ;;
+    stash)
+      [[ "${args[0]:-}" == list || "${args[0]:-}" == show ]] && return 0
+      valid "$branch" || deny "Refusing 'git $sub' on branch '$branch'. $HINT"
+      ;;
+    pull)
+      # Only a fast-forward onto the branch's own upstream catches up.
+      if [[ "${args[*]}" == --ff-only ]] && git -C "$repo" rev-parse --verify --quiet "$branch@{upstream}" >/dev/null; then
+        return 0
+      fi
+      valid "$branch" || deny "Refusing 'git $sub' on branch '$branch'. $HINT"
+      ;;
+    add|mv|rm|restore|apply|commit|merge|rebase|cherry-pick|revert|reset|am)
+      # Catching up with the remote is not working on main: refusing it is
+      # what left main behind after every merged PR, until a release was cut
+      # from stale code (#64). Only a move onto the branch's own upstream is
+      # allowed, and only as a fast-forward or a reset to exactly that ref.
+      if [[ "$sub" == merge || "$sub" == reset ]] && syncs_with_upstream "$repo" "$branch" "${args[@]}"; then
+        return 0
+      fi
+      valid "$branch" || deny "Refusing 'git $sub' on branch '$branch'. $HINT"
+      ;;
+    push)
+      (( from_xargs )) && deny "git push through xargs cannot be checked; push the issue branch directly."
+      local positional=0 dst
+      for a in "${args[@]}"; do
+        [[ "$a" == --all || "$a" == --mirror ]] \
+          && deny "Pushing to main is not allowed; push the issue branch and open a PR instead."
+        [[ "$a" == -* ]] && continue
+        ((positional++))
+        # +main, :main, HEAD:refs/heads/main all land on main.
+        dst="${a#+}"; dst="${dst##*:}"
+        [[ "$dst" =~ $PROTECTED_RE ]] \
+          && deny "Pushing to main is not allowed; push the issue branch and open a PR instead."
+      done
+      if (( positional < 2 )); then
+        # No refspec: push.default decides, and a branch that tracks main
+        # would push there.
+        dst="$(git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name "$branch@{push}" 2>/dev/null)"
+        [[ "$dst" =~ $PROTECTED_RE ]] \
+          && deny "Pushing to main is not allowed: '$branch' pushes to '$dst'. Push it to its own name: git push -u origin HEAD"
+      fi
+      valid "$branch" || deny "Refusing to push from branch '$branch'. $HINT"
+      pushing_repos+=("$repo")
+      ;;
+  esac
+  return 0
+}
+
 case "$tool" in
   Edit|Write|NotebookEdit)
     path="$(jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' <<< "$input")"
     [[ -n "$path" ]] || exit 0
     path="$(realpath -m "$path")"
     # Files outside this repo (scratchpad, memory) are not project work.
-    repo="$(checkout_for "$(dirname "$path")")" || exit 0
+    repo="$(checkout_for "$(existing_dir "$(dirname "$path")")")" || exit 0
     branch="$(current_branch "$repo")"
     valid "$branch" || deny "Refusing to edit $path on branch '$branch'. $HINT"
     ;;
@@ -104,122 +475,11 @@ case "$tool" in
   Bash)
     cmd="$(jq -r '.tool_input.command // empty' <<< "$input")"
     [[ -n "$cmd" ]] || exit 0
-    repo="$(checkout_for "$cwd")" || exit 0
-    branch="$(current_branch "$repo")"
-
-    # Heredoc bodies and quoted strings are data (commit messages, issue
-    # bodies), not commands; blank them before splitting into segments.
-    segments="$(perl -0pe '
-      s/(<<-?\s*([\x27"]?)(\w+)\2[^\n]*\n).*?^\s*\3[ \t]*$/$1/gms;
-      s/"(?:[^"\\]|\\.)*"/Q/gs;
-      s/\x27[^\x27]*\x27/Q/gs;
-      s/\s*(?:&&|\|\||;|\||\n)\s*/\n/g;
-    ' <<< "$cmd")"
-
-    pushing=0
-    # Walk the segments in order so "git switch -c fix/1-x && git commit"
-    # is judged against the branch the commit will actually land on.
-    while IFS= read -r seg; do
-      read -ra t <<< "$seg"
-      # Strip env assignments and wrappers (time git push, env -i git commit, ...).
-      k=0
-      while [[ "${t[k]:-}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] \
-        || [[ "${t[k]:-}" =~ ^(time|command|exec|nohup|nice|stdbuf|env|sudo|doas)$ ]]; do
-        [[ "${t[k]:-}" == env ]] && while [[ "${t[k+1]:-}" == -* ]]; do ((k++)); done
-        ((k++))
-      done
-      t=("${t[@]:k}")
-      (( ${#t[@]} )) || continue
-
-      if [[ "${t[0]}" == "gh" ]]; then
-        [[ "${t[1]:-} ${t[2]:-}" == "pr merge" ]] && ask "Merging a PR is the user's decision."
-        continue
-      fi
-      [[ "${t[0]}" == "git" ]] || continue
-
-      target="$cwd"
-      i=1
-      while [[ "${t[i]:-}" == -* ]]; do
-        [[ "${t[i]}" == -C ]] && target="$(cd "$cwd" 2>/dev/null && realpath -m "${t[i+1]:-.}")"
-        [[ "${t[i]}" == -C || "${t[i]}" == -c ]] && ((i++))
-        ((i++))
-      done
-      # -C into another checkout is judged by that checkout's branch. Worktrees
-      # live under .claude/worktrees inside the repo directory, so the path
-      # alone does not say which checkout it belongs to — ask git.
-      target_repo="$(checkout_for "$target")" || continue
-      if [[ "$target_repo" != "$repo" ]]; then
-        repo="$target_repo"
-        branch="$(current_branch "$repo")"
-      fi
-      sub="${t[i]:-}"
-      # Redirections are not arguments of the command: "git merge --ff-only
-      # origin/main 2>&1" used to look like a merge with two targets, and every
-      # rule that inspects the argument list was reading them (#76).
-      args=()
-      skip_operand=0
-      for a in "${t[@]:i+1}"; do
-        if (( skip_operand )); then skip_operand=0; continue; fi
-        case "$a" in
-          [0-9]*'>'*|'>'*|'<'*)
-            [[ "$a" =~ (\>|\<)$ ]] && skip_operand=1
-            continue
-            ;;
-        esac
-        args+=("$a")
-      done
-
-      case "$sub" in
-        checkout|switch)
-          created=0
-          for ((j = 0; j < ${#args[@]}; j++)); do
-            # A short-flag cluster counts too: -qc, -qb, --quiet -c, ...
-            if [[ "${args[j]}" =~ ^-[a-zA-Z]*[bBcC]$ ]]; then
-              new="${args[j+1]:-}"
-              valid "$new" || deny "Branch name '$new' is not allowed. $HINT"
-              branch="$new"
-              created=1
-            fi
-          done
-          if (( !created )); then
-            # The branch is the first argument that names one: with "git checkout
-            # -q main" only args[0] was looked at, so the flag hid the branch and
-            # everything after it in the same command was judged against the
-            # branch we were on before (#76).
-            for a in "${args[@]}"; do
-              [[ "$a" == -* ]] && continue
-              if is_branch "$a"; then branch="$a"; fi
-              break
-            done
-          fi
-          ;;
-        branch)
-          if [[ "${#args[@]}" -ge 1 && "${args[0]}" != -* ]]; then
-            valid "${args[0]}" || deny "Branch name '${args[0]}' is not allowed. $HINT"
-          fi
-          ;;
-        add|mv|rm|restore|apply|commit|merge|rebase|cherry-pick|revert|reset|am)
-          # Catching up with the remote is not working on main: refusing it is
-          # what left main behind after every merged PR, until a release was cut
-          # from stale code (#64). Only a move onto the branch's own upstream is
-          # allowed, and only as a fast-forward or a reset to exactly that ref.
-          if [[ "$sub" == merge || "$sub" == reset ]] && syncs_with_upstream "$repo" "$branch" "${args[@]}"; then
-            continue
-          fi
-          valid "$branch" || deny "Refusing 'git $sub' on branch '$branch'. $HINT"
-          ;;
-        push)
-          for a in "${args[@]}"; do
-            [[ "$a" =~ (^|:|/)(main|master)$ || "$a" == --all || "$a" == --mirror ]] \
-              && deny "Pushing to main is not allowed; push the issue branch and open a PR instead."
-          done
-          valid "$branch" || deny "Refusing to push from branch '$branch'. $HINT"
-          pushing=1
-          ;;
-      esac
-    done <<< "$segments"
-
-    (( pushing )) && run_tests
+    here="$cwd"
+    inspect "$cmd" "$cwd" 0
+    if (( ${#pushing_repos[@]} )); then
+      while IFS= read -r r; do run_tests "$r"; done < <(printf '%s\n' "${pushing_repos[@]}" | sort -u)
+    fi
     ;;
 esac
 exit 0

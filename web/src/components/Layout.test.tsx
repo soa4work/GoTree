@@ -32,7 +32,7 @@ describe('navigation', () => {
       Records: ['Sources', 'Photos & media', 'Transcribe', 'Heirlooms'],
       Explore: ['Migration map', 'Statistics'],
       Work: ['Research', 'Data quality'],
-      Settings: ['Sharing', 'Import & export'],
+      Settings: ['Sharing', 'Import & export', 'Account'],
     }
     for (const [group, links] of Object.entries(expected)) {
       expect(names(within(sidebar).getByRole('list', { name: group }))).toEqual(links)

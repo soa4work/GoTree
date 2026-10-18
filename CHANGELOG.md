@@ -12,6 +12,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
 - Russian translation of the interface (#24): all screens, messages and plurals are in Russian;
   phrases that would need declined names ("X's birth") are worded with a colon or brackets instead
 
+- Kazakh translation of the interface (to be proofread by a native speaker) (#24)
+
 - Language switcher (Russian and Kazakh) next to the theme switch: the choice is saved in the
   browser, the first visit follows the browser language and falls back to Russian, the page
   language and dates follow it; the translations themselves come in later changes (#24)

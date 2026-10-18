@@ -113,3 +113,18 @@ export interface SetupInput {
 export const setup = (input: SetupInput) => postJSON<AuthState>('/auth/setup', input)
 export const login = (username: string, password: string) => postJSON<void>('/auth/login', { username, password })
 export const logout = () => postJSON<void>('/auth/logout')
+
+export interface SessionInfo {
+  id: number
+  createdAt: string
+  lastSeenAt: string
+  expiresAt: string
+  userAgent: string
+  current: boolean
+}
+
+export const listSessions = (signal?: AbortSignal) => getJSON<SessionInfo[]>('/auth/sessions', signal)
+export const endSession = (id: number) => del(`/auth/sessions/${id}`)
+export const logoutEverywhere = () => postJSON<void>('/auth/logout-all')
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  postJSON<void>('/auth/password', { currentPassword, newPassword })

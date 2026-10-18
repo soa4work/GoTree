@@ -17,6 +17,7 @@ import { TranscribePage } from './pages/TranscribePage'
 import { TranscriptionPage } from './pages/TranscriptionPage'
 import { SharingPage } from './pages/SharingPage'
 import { ShareApp } from './share/ShareApp'
+import { AccountPage } from './pages/AccountPage'
 import { ImportExportPage } from './pages/ImportExportPage'
 import { MediaListPage } from './pages/MediaListPage'
 import { MediaPage } from './pages/MediaPage'
@@ -60,6 +61,7 @@ function AuthedApp() {
           <Route path="transcribe/:id" element={<TranscriptionPage />} />
           <Route path="sharing" element={<SharingPage />} />
           <Route path="import-export" element={<ImportExportPage />} />
+          <Route path="account" element={<AccountPage />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

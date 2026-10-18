@@ -9,6 +9,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Account page: change your password (your other devices are then signed out), see the devices you are signed in on and sign any of them out, or sign out everywhere (#57)
+
+- `GOTREE_TRUSTED_PROXIES` names the reverse proxies whose X-Forwarded-For is trusted, so behind a proxy failed logins are counted per real client (#57)
+
 - The relationship calculator also names in-laws through two marriages and step-siblings (#43)
 
 - Error messages from the server are shown in the interface language (#24)
@@ -106,6 +110,14 @@ and the versioning [Semantic Versioning](https://semver.org/).
   their own character set, so umlauts and accents come through, and a GEDCOM 7 note line that
   starts with "@" is no longer lost on export and import (#54)
 
+- A session ends at the latest 90 days after logging in, however often it is used, and expired sessions are removed every hour instead of only at startup; sessions older than 90 days end with this update (#57)
+
+- A JSON request whose body arrives too slowly is cut off after 15 seconds (408), a body over 1 MB gets 413 instead of "invalid JSON", invalid JSON errors no longer name the server's internal types, and a GEDCOM upload that cannot be read is no longer reported as too large (#57)
+
+- Replacing a tree by GEDCOM import is refused for anyone but the owner in the storage layer too, and viewers cannot import (#57)
+
+- Failed logins are limited per username as well as per address, so a botnet cannot keep guessing one account's password and one client behind a trusted proxy can no longer lock everyone out; guessing the owner's name does not lock the owner out of an address they recently logged in from; the list of failures no longer grows without bound (#57)
+
 - Share links that show living people by name only no longer find them by nickname or other names,
   such as a maiden name; only their given names and surname are searched, and such links list
   matches in name order, since relevance also weighed the hidden names (#58)
@@ -170,6 +182,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
   scripts from its own files (#2)
 
 ### Changed
+
+- The tree chart redraws only the cards whose selection or focus changed, the wall chart's SVG
+  download fetches at most four photos at a time, and the tree no longer gets stuck on "Could not
+  load" when the last viewed person was deleted or the tree replaced: it forgets that person per
+  tree and starts from the first one, or shows the getting-started card (#60)
 
 - The export check is a POST request, only editors and owners can run it, and only one runs at a
   time; a second one is asked to wait (#58)

@@ -188,8 +188,8 @@ func TestDeleteAdminRules(t *testing.T) {
 	if err := s.DeleteAccount(ctx, User{ID: 99, Role: "user"}, a.ID); !errors.Is(err, ErrAdminOnly) {
 		t.Errorf("regular user: %v", err)
 	}
-	// Someone with a stale admin role cannot delete the last admin either.
-	if err := s.DeleteAccount(ctx, User{ID: 99, Role: UserRoleAdmin}, a.ID); !errors.Is(err, ErrLastAdmin) {
+	// Someone with a stale admin role is refused inside the transaction.
+	if err := s.DeleteAccount(ctx, User{ID: 99, Role: UserRoleAdmin}, a.ID); !errors.Is(err, ErrAdminOnly) {
 		t.Errorf("last admin: %v", err)
 	}
 }
@@ -219,7 +219,8 @@ func TestListAccounts(t *testing.T) {
 }
 
 // TestLastAdminRace has two administrators demote each other at the same
-// time; one of them must stay an administrator.
+// time; one of them must stay an administrator. The loser is refused either
+// as the last administrator or as no longer an administrator.
 func TestLastAdminRace(t *testing.T) {
 	s := newStore(t)
 	setup(t, s)
@@ -230,7 +231,7 @@ func TestLastAdminRace(t *testing.T) {
 	go func() { _, err := s.UpdateAccount(ctx, b, a.ID, AccountUpdate{Role: UserRoleUser}); errs <- err }()
 	var refused int
 	for range 2 {
-		if err := <-errs; errors.Is(err, ErrLastAdmin) {
+		if err := <-errs; errors.Is(err, ErrLastAdmin) || errors.Is(err, ErrAdminOnly) {
 			refused++
 		} else if err != nil {
 			t.Fatal(err)
@@ -239,5 +240,24 @@ func TestLastAdminRace(t *testing.T) {
 	var n int
 	if err := s.DB.QueryRow(`SELECT count(*) FROM users WHERE role = 'admin'`).Scan(&n); err != nil || n != 1 || refused != 1 {
 		t.Errorf("admins left: %d (%v), refused: %d; want 1 and 1", n, err, refused)
+	}
+}
+
+// TestDemotedAdminLosesRightsAtOnce: a caller whose role is stale (demoted
+// after their session was read) is refused inside the transaction.
+func TestDemotedAdminLosesRightsAtOnce(t *testing.T) {
+	s := newStore(t)
+	setup(t, s)
+	a := admin(t, s)
+	b := mustAccount(t, s, a, "second", UserRoleAdmin).User
+	if _, err := s.UpdateAccount(ctx, a, b.ID, AccountUpdate{Role: UserRoleUser}); err != nil {
+		t.Fatal(err)
+	}
+	// b still carries Role "admin" from before the demotion.
+	if _, err := s.CreateAccount(ctx, b, AccountInput{Username: "sneaky", Password: pw, Role: UserRoleAdmin}); !errors.Is(err, ErrAdminOnly) {
+		t.Errorf("stale admin creates an account: %v", err)
+	}
+	if err := s.ResetPassword(ctx, b, a.ID, "a brand new password"); !errors.Is(err, ErrAdminOnly) {
+		t.Errorf("stale admin resets a password: %v", err)
 	}
 }

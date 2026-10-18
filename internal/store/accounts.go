@@ -128,6 +128,18 @@ func account(ctx context.Context, q queryer, id int64) (Account, error) {
 	return list[0], nil
 }
 
+// stillAdmin checks inside the write transaction that by is still an
+// administrator: the session's role was read before the transaction, and
+// another administrator may have demoted or deleted by since.
+func stillAdmin(ctx context.Context, q queryer, by User) error {
+	var role string
+	err := q.QueryRowContext(ctx, `SELECT role FROM users WHERE id = ?`, by.ID).Scan(&role)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && role != UserRoleAdmin) {
+		return ErrAdminOnly
+	}
+	return err
+}
+
 // otherAdmins counts the administrators besides user id.
 func otherAdmins(ctx context.Context, q queryer, id int64) (int, error) {
 	var n int
@@ -159,6 +171,9 @@ func (s *Store) CreateAccount(ctx context.Context, by User, in AccountInput) (Ac
 	}
 	var out Account
 	err = s.tx(ctx, func(tx *sql.Tx) error {
+		if err := stillAdmin(ctx, tx, by); err != nil {
+			return err
+		}
 		// The column is COLLATE NOCASE, so "Admin" and "admin" clash.
 		var one int
 		err := tx.QueryRowContext(ctx, `SELECT 1 FROM users WHERE username = ?`, in.Username).Scan(&one)
@@ -197,6 +212,9 @@ func (s *Store) UpdateAccount(ctx context.Context, by User, id int64, in Account
 	}
 	var out Account
 	err := s.tx(ctx, func(tx *sql.Tx) error {
+		if err := stillAdmin(ctx, tx, by); err != nil {
+			return err
+		}
 		var role string
 		err := tx.QueryRowContext(ctx, `SELECT role FROM users WHERE id = ?`, id).Scan(&role)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -244,6 +262,9 @@ func (s *Store) ResetPassword(ctx context.Context, by User, id int64, password s
 		return err
 	}
 	return s.tx(ctx, func(tx *sql.Tx) error {
+		if err := stillAdmin(ctx, tx, by); err != nil {
+			return err
+		}
 		res, err := tx.ExecContext(ctx, `UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`, string(hash), s.now(), id)
 		if err != nil {
 			return err
@@ -267,6 +288,9 @@ func (s *Store) DeleteAccount(ctx context.Context, by User, id int64) error {
 		return ErrDeleteSelf
 	}
 	return s.tx(ctx, func(tx *sql.Tx) error {
+		if err := stillAdmin(ctx, tx, by); err != nil {
+			return err
+		}
 		var role string
 		err := tx.QueryRowContext(ctx, `SELECT role FROM users WHERE id = ?`, id).Scan(&role)
 		if errors.Is(err, sql.ErrNoRows) {

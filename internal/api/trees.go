@@ -19,8 +19,8 @@ func (s *Server) treeRoutes(r chi.Router) {
 	r.Delete("/trees/{id}/members/{userId}", s.removeMember)
 }
 
-// respondAccount is respond with the account and membership errors of the
-// store mapped to their own codes.
+// respondAccount answers like respond, but maps the account and membership
+// errors of the store to their own codes.
 func (s *Server) respondAccount(w http.ResponseWriter, status int, v any, err error) {
 	switch {
 	case errors.Is(err, store.ErrAdminOnly):

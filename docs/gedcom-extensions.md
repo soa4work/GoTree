@@ -23,7 +23,8 @@ partners or has no `PEDI` value.
 
 `<fact>._STAT <status>` with an optional `NOTE` giving the reason — marks a fact (event, attribute
 or name) as `disputed` or `disproven`. GoTree keeps such facts instead of deleting them; programs
-that do not know the tag still see the fact itself.
+that do not know the tag still see the fact itself. GoTree reads the status and the reason back on
+import; a status on the first (main) name is not kept, since the main name has none.
 
 ## _heirloom
 

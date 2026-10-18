@@ -275,13 +275,14 @@ func (im *importer) prepare(ctx context.Context) error {
 	}
 	if im.insertEvent, err = im.tx.PrepareContext(ctx, `
 		INSERT INTO events (tree_id, person_id, family_id, type, custom_label, date_raw, date, date_sort, date_sort_end,
-			date_qualifier, place_id, description, notes, sort_order, extra_json, created_at, updated_at, created_by, updated_by)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
+			date_qualifier, place_id, description, notes, status, status_reason, sort_order, extra_json, created_at, updated_at,
+			created_by, updated_by)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
 		return err
 	}
 	if im.insertName, err = im.tx.PrepareContext(ctx, `
-		INSERT INTO person_names (person_id, type, given_names, surname, name_prefix, name_suffix, nickname, sort_order)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
+		INSERT INTO person_names (person_id, type, given_names, surname, name_prefix, name_suffix, nickname, status, status_reason, sort_order)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
 		return err
 	}
 	im.insertFTS, err = im.tx.PrepareContext(ctx, `INSERT INTO persons_fts (rowid, names) VALUES (?, ?)`)
@@ -490,6 +491,33 @@ func (im *importer) other(ctx string, c *gedcom.Node, kept *[]keptNode) {
 	im.keep(ctx, c, kept)
 }
 
+// factStatus reads a GoTree _STAT line (docs/gedcom-extensions.md):
+// the status and the reason in its NOTE. ok is false for a value GoTree
+// does not know; the caller keeps such a line verbatim.
+func (im *importer) factStatus(path string, c *gedcom.Node) (status, reason string, ok bool) {
+	status = strings.ToLower(strings.TrimSpace(c.Value))
+	if !validStatus(status) {
+		return "", "", false
+	}
+	var notes []string
+	for _, sub := range c.Children {
+		if sub.Tag == "NOTE" || sub.Tag == "SNOTE" {
+			notes = append(notes, im.noteText(sub))
+			im.mapped(path + "._STAT." + sub.Tag)
+			continue
+		}
+		im.tag(path+"._STAT."+sub.Tag, TagDropped, "a status has only a reason")
+	}
+	reason = joinNotes(notes)
+	if status == StatusAccepted {
+		reason = ""
+	} else if reason == "" {
+		reason = "?" // GoTree requires a reason; the file gave none
+	}
+	im.mapped(path + "._STAT")
+	return status, reason, true
+}
+
 func (im *importer) source(ctx context.Context, r *gedcom.Node) error {
 	var kept []keptNode
 	var notes []string
@@ -636,9 +664,10 @@ func (im *importer) citation(ctx context.Context, ctxPath string, c *gedcom.Node
 // GIVN/SURN/… parts, which win over the slashes.
 type parsedName struct {
 	given, surname, prefix, suffix, nickname, nameType string
+	status, statusReason                               string
 }
 
-func (im *importer) name(n *gedcom.Node, kept *[]keptNode, ctx string) parsedName {
+func (im *importer) name(n *gedcom.Node, kept *[]keptNode, ctx string, primary bool) parsedName {
 	var p parsedName
 	v := n.Value
 	if i := strings.Index(v, "/"); i >= 0 {
@@ -670,6 +699,24 @@ func (im *importer) name(n *gedcom.Node, kept *[]keptNode, ctx string) parsedNam
 			spfx = c.Value
 		case "TYPE":
 			p.nameType = c.Value
+		case "_STAT":
+			st := strings.ToLower(strings.TrimSpace(c.Value))
+			switch {
+			case primary && st == StatusAccepted:
+				im.mapped(ctx + ".NAME._STAT") // nothing to keep
+			case primary && validStatus(st):
+				// The main name lives on the person, which has no status.
+				im.tag(ctx+".NAME._STAT", TagDropped, "the main name has no status in GoTree")
+			case !primary && p.status == "":
+				if s, reason, ok := im.factStatus(ctx+".NAME", c); ok {
+					p.status, p.statusReason = s, reason
+					break
+				}
+				im.other(ctx+".NAME", c, kept)
+			default:
+				im.other(ctx+".NAME", c, kept)
+			}
+			continue
 		case "SOUR", "NOTE", "SNOTE":
 			continue // handled by the caller
 		default:
@@ -717,7 +764,7 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 	for _, c := range r.Children {
 		switch {
 		case c.Tag == "NAME":
-			p := im.name(c, &kept, "INDI")
+			p := im.name(c, &kept, "INDI", primary == nil)
 			if primary == nil {
 				primary, primaryNode = &p, c
 			} else {
@@ -779,7 +826,8 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 		if n.given == "" && n.surname == "" && n.nickname == "" {
 			continue
 		}
-		if _, err := im.insertName.ExecContext(ctx, pid, n.nameType, n.given, n.surname, n.prefix, n.suffix, n.nickname, i); err != nil {
+		if _, err := im.insertName.ExecContext(ctx, pid, n.nameType, n.given, n.surname, n.prefix, n.suffix, n.nickname,
+			defaultStatus(n.status), n.statusReason, i); err != nil {
 			return err
 		}
 		allNames = append(allNames, n.given, n.surname, n.nickname)
@@ -847,8 +895,17 @@ func (im *importer) event(ctx context.Context, owner string, e *gedcom.Node, per
 		description = e.Value
 	}
 	var assos []*gedcom.Node
+	status, statusReason, statusSeen := StatusAccepted, "", false
 	for _, c := range e.Children {
 		switch c.Tag {
+		case "_STAT":
+			if !statusSeen {
+				if st, reason, ok := im.factStatus(path, c); ok {
+					status, statusReason, statusSeen = st, reason, true
+					break // leaves the switch
+				}
+			}
+			im.keep(path, c, &kept)
 		case "DATE":
 			var used bool
 			dateRaw, used = eventDateText(c)
@@ -911,7 +968,7 @@ func (im *importer) event(ctx context.Context, owner string, e *gedcom.Node, per
 		}
 	}
 	res, err := im.insertEvent.ExecContext(ctx, im.a.TreeID, personID, familyID, typ, label, dateRaw, date, key, keyEnd, qual,
-		placeID, description, joinNotes(notes), order, extraJSON(kept), im.now, im.now, nullID(im.a.UserID), nullID(im.a.UserID))
+		placeID, description, joinNotes(notes), status, statusReason, order, extraJSON(kept), im.now, im.now, nullID(im.a.UserID), nullID(im.a.UserID))
 	if err != nil {
 		return 0, err
 	}

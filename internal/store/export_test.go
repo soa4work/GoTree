@@ -541,3 +541,110 @@ func TestVerifyExport(t *testing.T) {
 		}
 	}
 }
+
+func TestExportStatusRoundTrip(t *testing.T) {
+	for _, v7 := range []bool{false, true} {
+		t.Run(fmt.Sprintf("v7=%v", v7), func(t *testing.T) {
+			s := newStore(t)
+			a := setup(t, s)
+			anna, err := s.CreatePerson(ctx, a, PersonInput{GivenNames: "Anna", Surname: "Weber", Sex: "F",
+				AlternateNames: []AlternateNameInput{{Type: "aka", GivenNames: "Hanna", Surname: "Weber",
+					Status: "disputed", StatusReason: "only in one letter"}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, e := range []EventInput{
+				{Type: "BIRT", Date: "1850", Status: "disproven", StatusReason: "wrong parish"},
+				{Type: "DEAT", Date: "1900", Status: "disputed", StatusReason: "line one\nline two"},
+				{Type: "OCCU", Description: "Weber"},
+			} {
+				e.PersonID = &anna.ID
+				if _, err := s.CreateEvent(ctx, a, e); err != nil {
+					t.Fatal(err)
+				}
+			}
+			res, err := s.AddRelative(ctx, a, anna.ID, RelativeInput{Relation: RelationPartner,
+				Person: &PersonInput{GivenNames: "Karl", Surname: "Weber"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.CreateEvent(ctx, a, EventInput{FamilyID: &res.Family.ID, Type: "MARR", Date: "1875",
+				Status: "disputed", StatusReason: "no record"}); err != nil {
+				t.Fatal(err)
+			}
+
+			text := exportText(t, s, a, ExportOptions{Version7: v7})
+			for _, want := range []string{"_STAT disproven", "_STAT disputed", "2 _STAT disputed\n3 NOTE only in one letter"} {
+				if !strings.Contains(text, want) {
+					t.Errorf("export lacks %q:\n%s", want, text)
+				}
+			}
+			count := strings.Count(text, "\n2 _STAT ")
+			if count != 4 {
+				t.Errorf("export has %d _STAT lines, want 4:\n%s", count, text)
+			}
+
+			doc, err := gedcom.Parse([]byte(text))
+			if err != nil {
+				t.Fatal(err)
+			}
+			s2 := newStore(t)
+			a2 := setup(t, s2)
+			report, err := s2.ImportGEDCOM(ctx, a2, doc, ImportIntoEmpty)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := findPerson(t, s2, a2, "anna")
+			type st struct{ status, reason string }
+			byType := map[string]st{}
+			for _, e := range got.Events {
+				byType[e.Type] = st{e.Status, e.StatusReason}
+			}
+			for typ, want := range map[string]st{
+				"BIRT": {"disproven", "wrong parish"},
+				"DEAT": {"disputed", "line one\nline two"},
+				"OCCU": {"accepted", ""},
+			} {
+				if byType[typ] != want {
+					t.Errorf("%s came back as %+v, want %+v", typ, byType[typ], want)
+				}
+			}
+			if len(got.AlternateNames) != 1 || got.AlternateNames[0].Status != "disputed" || got.AlternateNames[0].StatusReason != "only in one letter" {
+				t.Errorf("alternate names: %+v", got.AlternateNames)
+			}
+			if len(got.PartnerFamilies) != 1 {
+				t.Fatalf("families: %+v", got.PartnerFamilies)
+			}
+			marr := ""
+			for _, e := range got.PartnerFamilies[0].Events {
+				if e.Type == "MARR" && e.Date.Raw == "1875" {
+					marr = e.Status + "/" + e.StatusReason
+				}
+			}
+			if marr != "disputed/no record" {
+				t.Errorf("MARR came back as %q", marr)
+			}
+			for _, path := range []string{"INDI.BIRT._STAT", "INDI.NAME._STAT", "FAM.MARR._STAT"} {
+				if tagOutcome(report, path) != TagMapped {
+					t.Errorf("%s: %q, want mapped", path, tagOutcome(report, path))
+				}
+			}
+
+			again := exportText(t, s2, a2, ExportOptions{Version7: v7})
+			if n := strings.Count(again, "\n2 _STAT "); n != count {
+				t.Errorf("re-export has %d _STAT lines, want %d:\n%s", n, count, again)
+			}
+			if strings.Contains(again, "\n1 _STAT") {
+				t.Errorf("a status moved to the INDI level:\n%s", again)
+			}
+
+			r, err := s.VerifyExport(ctx, a, v7, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !r.OK {
+				t.Errorf("verify: %+v %+v", r.Rows, r.Dropped)
+			}
+		})
+	}
+}

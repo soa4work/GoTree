@@ -31,3 +31,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Node: the LTS line is chosen by hand. Go: a new minor or major comes
+      # with a go.mod bump, which test-pins.sh requires to match.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+      - dependency-name: golang
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]

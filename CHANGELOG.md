@@ -110,6 +110,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- GEDCOM files saved as IBM PC (code pages 437 and 850), Macintosh or Latin-1 text are read with
+  their own character set, so umlauts and accents come through, and a GEDCOM 7 note line that
+  starts with "@" is no longer lost on export and import (#54)
+
 - A session ends at the latest 90 days after logging in, however often it is used, and expired sessions are removed every hour instead of only at startup; sessions older than 90 days end with this update (#57)
 
 - A JSON request whose body arrives too slowly is cut off after 15 seconds (408), a body over 1 MB gets 413 instead of "invalid JSON", invalid JSON errors no longer name the server's internal types, and a GEDCOM upload that cannot be read is no longer reported as too large (#57)

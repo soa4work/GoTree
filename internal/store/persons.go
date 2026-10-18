@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/praetorianer777/gotree/internal/db"
 )
 
 // AlternateName is a further name of a person: birth name, married name, …
@@ -218,10 +220,11 @@ func (s *Store) createPerson(ctx context.Context, tx *sql.Tx, a Actor, in Person
 		now := s.now()
 		res, err := tx.ExecContext(ctx, `
 			INSERT INTO persons (tree_id, given_names, surname, name_prefix, name_suffix, nickname, sex, is_living, notes,
-				created_at, updated_at, created_by, updated_by)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				created_at, updated_at, created_by, updated_by, surname_key, given_key)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			a.TreeID, in.GivenNames, in.Surname, in.NamePrefix, in.NameSuffix, in.Nickname, in.Sex, in.IsLiving, in.Notes,
-			now, now, nullID(a.UserID), nullID(a.UserID))
+			now, now, nullID(a.UserID), nullID(a.UserID),
+			db.NamesKey(in.Surname), db.NamesKey(in.GivenNames))
 		if err != nil {
 			return err
 		}
@@ -287,10 +290,10 @@ func (s *Store) UpdatePerson(ctx context.Context, a Actor, id int64, in PersonIn
 		}
 		_, err = tx.ExecContext(ctx, `
 			UPDATE persons SET given_names = ?, surname = ?, name_prefix = ?, name_suffix = ?, nickname = ?, sex = ?,
-				is_living = ?, notes = ?, updated_at = ?, updated_by = ?
+				is_living = ?, notes = ?, updated_at = ?, updated_by = ?, surname_key = ?, given_key = ?
 			WHERE id = ? AND tree_id = ?`,
 			in.GivenNames, in.Surname, in.NamePrefix, in.NameSuffix, in.Nickname, in.Sex, in.IsLiving, in.Notes,
-			s.now(), nullID(a.UserID), id, a.TreeID)
+			s.now(), nullID(a.UserID), db.NamesKey(in.Surname), db.NamesKey(in.GivenNames), id, a.TreeID)
 		if err != nil {
 			return err
 		}
@@ -516,28 +519,18 @@ func (s *Store) ListPersons(ctx context.Context, a Actor, query string, limit, o
 	list := PersonList{Items: []PersonRef{}}
 
 	match := ftsQuery(query)
-	var ids []int64
 	var err error
 	if match == "" {
-		if err = s.DB.QueryRowContext(ctx, `SELECT count(*) FROM persons WHERE tree_id = ?`, a.TreeID).Scan(&list.Total); err != nil {
-			return list, err
-		}
-		ids, err = queryIDs(ctx, s.DB, `
-			SELECT id FROM persons WHERE tree_id = ?
-			ORDER BY surname = '', surname COLLATE NAMES, given_names COLLATE NAMES, id
-			LIMIT ? OFFSET ?`, a.TreeID, limit, offset)
+		err = s.DB.QueryRowContext(ctx, `SELECT count(*) FROM persons WHERE tree_id = ?`, a.TreeID).Scan(&list.Total)
 	} else {
-		if err = s.DB.QueryRowContext(ctx, `
+		err = s.DB.QueryRowContext(ctx, `
 			SELECT count(*) FROM persons_fts f JOIN persons p ON p.id = f.rowid
-			WHERE persons_fts MATCH ? AND p.tree_id = ?`, match, a.TreeID).Scan(&list.Total); err != nil {
-			return list, err
-		}
-		ids, err = queryIDs(ctx, s.DB, `
-			SELECT p.id FROM persons_fts f JOIN persons p ON p.id = f.rowid
-			WHERE persons_fts MATCH ? AND p.tree_id = ?
-			ORDER BY f.rank, p.surname COLLATE NAMES, p.given_names COLLATE NAMES
-			LIMIT ? OFFSET ?`, match, a.TreeID, limit, offset)
+			WHERE persons_fts MATCH ? AND p.tree_id = ?`, match, a.TreeID).Scan(&list.Total)
 	}
+	if err != nil {
+		return list, err
+	}
+	ids, err := personIDs(ctx, s.DB, a, match, limit, offset)
 	if err != nil {
 		return list, err
 	}
@@ -549,6 +542,30 @@ func (s *Store) ListPersons(ctx context.Context, a Actor, query string, limit, o
 		list.Items = append(list.Items, refs[id])
 	}
 	return list, nil
+}
+
+// listPersonsSQL orders the whole tree by the stored NAMES sort keys, which
+// persons_tree_sort serves without sorting (#49).
+const listPersonsSQL = `
+	SELECT id FROM persons WHERE tree_id = ?
+	ORDER BY surname = '', surname_key, given_key, id
+	LIMIT ? OFFSET ?`
+
+// searchPersonsSQL orders matches by relevance, then like listPersonsSQL;
+// the id keeps pages stable for names that collate equal.
+const searchPersonsSQL = `
+	SELECT p.id FROM persons_fts f JOIN persons p ON p.id = f.rowid
+	WHERE persons_fts MATCH ? AND p.tree_id = ?
+	ORDER BY f.rank, p.surname_key, p.given_key, p.id
+	LIMIT ? OFFSET ?`
+
+// personIDs returns the ids of the tree's people in list order (see
+// ListPersons); limit < 0 means all of them.
+func personIDs(ctx context.Context, q queryer, a Actor, match string, limit, offset int) ([]int64, error) {
+	if match == "" {
+		return queryIDs(ctx, q, listPersonsSQL, a.TreeID, limit, offset)
+	}
+	return queryIDs(ctx, q, searchPersonsSQL, match, a.TreeID, limit, offset)
 }
 
 // searchFold is applied to indexed names and to the query, because the FTS

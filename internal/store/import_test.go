@@ -46,6 +46,73 @@ func tagOutcome(r ImportReport, path string) string {
 	return ""
 }
 
+func TestImportChildOnlyInFAMC(t *testing.T) {
+	// Interpreted strings: the trailing space after Otto's FAMC matters.
+	src := strings.Join([]string{
+		"0 HEAD", "1 GEDC", "2 VERS 5.5.1", "1 CHAR UTF-8",
+		"0 @I1@ INDI", "1 NAME Karl /Weber/", "1 SEX M", "1 FAMS @F1@", "1 FAMC @F1@",
+		"0 @I2@ INDI", "1 NAME Maria /Weber/", "1 SEX F", "1 FAMS @F1@",
+		"0 @I3@ INDI", "1 NAME Paul /Weber/", "1 FAMC @F1@",
+		"0 @I4@ INDI", "1 NAME Lena /Weber/", "1 FAMC @F1@", "2 PEDI adopted", "1 FAMC @F1@",
+		"0 @I5@ INDI", "1 NAME Otto /Weber/", "1 FAMC @F1@ ",
+		"0 @I7@ INDI", "1 NAME Nora /Weber/", "1 FAMC @F1@", "1 FAMC @F1@", "2 PEDI adopted",
+		"0 @I6@ INDI", "1 NAME Emil /Weber/", "1 FAMC @F9@",
+		"0 @F1@ FAM", "1 HUSB @I1@", "1 WIFE @I2@", "1 CHIL @I3@",
+		"0 TRLR",
+	}, "\n")
+	doc, err := gedcom.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := newStore(t)
+	a := setup(t, s)
+	report, err := s.ImportGEDCOM(ctx, a, doc, ImportIntoEmpty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Counts["families"] != 1 {
+		t.Errorf("families: %v", report.Counts)
+	}
+	karl := findPerson(t, s, a, "karl")
+	if len(karl.PartnerFamilies) != 1 {
+		t.Fatalf("Karl's families: %+v", karl.PartnerFamilies)
+	}
+	var names []string
+	rels := map[string][2]string{}
+	for _, c := range karl.PartnerFamilies[0].Children {
+		names = append(names, c.Person.GivenNames)
+		rels[c.Person.GivenNames] = [2]string{c.RelationPartner1, c.RelationPartner2}
+	}
+	if got := strings.Join(names, ","); got != "Paul,Lena,Otto,Nora" {
+		t.Errorf("children %q, want Paul,Lena,Otto,Nora", got)
+	}
+	if rels["Lena"] != [2]string{"adopted", "adopted"} || rels["Nora"] != [2]string{"adopted", "adopted"} || rels["Otto"] != [2]string{"birth", "birth"} {
+		t.Errorf("relations: %v", rels)
+	}
+	if lena := findPerson(t, s, a, "lena"); len(lena.ParentFamilies) != 1 {
+		t.Errorf("Lena's parent families: %+v", lena.ParentFamilies)
+	}
+	if report.ChildrenFromFAMC != 3 || len(report.ChildrenFromFAMCExamples) != 3 {
+		t.Fatalf("FAMC children: %d %v", report.ChildrenFromFAMC, report.ChildrenFromFAMCExamples)
+	}
+	ex := strings.Join(report.ChildrenFromFAMCExamples, "\n")
+	for _, want := range []string{"@I4@", "@I5@", "@F1@"} {
+		if !strings.Contains(ex, want) {
+			t.Errorf("examples miss %s: %s", want, ex)
+		}
+	}
+	if strings.Contains(ex, "@I3@") {
+		t.Errorf("Paul is listed under CHIL and must not be reported: %s", ex)
+	}
+	broken := strings.Join(report.BrokenReferences, "\n")
+	if !strings.Contains(broken, "@F9@") || !strings.Contains(broken, "both a partner and a child of family @F1@") {
+		t.Errorf("broken references: %s", broken)
+	}
+	if tagOutcome(report, "INDI.FAMC") != TagMapped {
+		t.Errorf("INDI.FAMC outcome %q", tagOutcome(report, "INDI.FAMC"))
+	}
+}
+
 func TestImportAncestry551(t *testing.T) {
 	s := newStore(t)
 	a := setup(t, s)
@@ -61,6 +128,9 @@ func TestImportAncestry551(t *testing.T) {
 	}
 	if report.Source != "Ancestry.com Member Trees" || report.Version != "5.5.1" {
 		t.Errorf("header: %+v", report)
+	}
+	if report.ChildrenFromFAMC != 0 || report.ChildrenFromFAMCExamples == nil {
+		t.Errorf("FAMC children: %d %v", report.ChildrenFromFAMC, report.ChildrenFromFAMCExamples)
 	}
 
 	johann := findPerson(t, s, a, "johann weber")

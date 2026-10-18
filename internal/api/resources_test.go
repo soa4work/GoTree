@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/praetorianer777/gotree/internal/store"
@@ -205,4 +206,23 @@ func TestSourcesAPI(t *testing.T) {
 	c.call("DELETE", fmt.Sprintf("/api/citations/%d/links/person/%d", cid, p.ID), nil, http.StatusNoContent, nil)
 	c.call("GET", fmt.Sprintf("/api/citations/%d", cid), nil, http.StatusNotFound, nil)
 	c.call("DELETE", fmt.Sprintf("/api/sources/%d", src.ID), nil, http.StatusNoContent, nil)
+}
+
+func TestSearchCyrillicAPI(t *testing.T) {
+	ts := newServer(t, builtFrontend)
+	c := loggedIn(t, ts)
+
+	c.call("POST", "/api/places", map[string]any{"name": "Москва"}, http.StatusCreated, nil)
+	c.call("POST", "/api/sources", map[string]any{"title": "Метрическая книга"}, http.StatusCreated, nil)
+
+	var places []store.Place
+	c.call("GET", "/api/places?q="+url.QueryEscape("москва"), nil, http.StatusOK, &places)
+	if len(places) != 1 || places[0].Name != "Москва" {
+		t.Errorf("places: %+v", places)
+	}
+	var sources []store.Source
+	c.call("GET", "/api/sources?q="+url.QueryEscape("МЕТРИЧЕСКАЯ"), nil, http.StatusOK, &sources)
+	if len(sources) != 1 || sources[0].Title != "Метрическая книга" {
+		t.Errorf("sources: %+v", sources)
+	}
 }

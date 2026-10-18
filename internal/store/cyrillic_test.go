@@ -2,6 +2,7 @@ package store
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -115,5 +116,160 @@ func TestPersonsSortByCyrillicGivenNames(t *testing.T) {
 	want := []string{"Алия", "Әлия", "иван", "Иван", "Нұрлан", "Яков"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func placeNames(list []Place) []string {
+	got := []string{}
+	for _, p := range list {
+		got = append(got, p.Name)
+	}
+	sort.Strings(got)
+	return got
+}
+
+func TestListPlacesSearchIgnoresCyrillicCase(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	mk := func(name string, parent *int64) int64 {
+		p, err := s.CreatePlace(ctx, a, PlaceInput{Name: name, ParentID: parent})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p.ID
+	}
+	kz := mk("Казахстан", nil)
+	for _, n := range []string{"Алматы", "Әулиеата", "Қарағанды", "Өскемен", "Үштөбе", "Іле"} {
+		mk(n, &kz)
+	}
+	ru := mk("Россия", nil)
+	mk("Москва", &ru)
+	mk("Ёлкино", nil)
+	mk("Berlin", nil)
+
+	for _, c := range []struct {
+		q    string
+		want []string
+	}{
+		{"москва", []string{"Москва"}},
+		{"МОСКВА", []string{"Москва"}},
+		{"мОсКвА", []string{"Москва"}},
+		{" москва ", []string{"Москва"}},
+		{"россия", []string{"Москва", "Россия"}},
+		{"әулие", []string{"Әулиеата"}},
+		{"ӘУЛИЕ", []string{"Әулиеата"}},
+		{"қараған", []string{"Қарағанды"}},
+		{"ҚАРАҒАН", []string{"Қарағанды"}},
+		{"өскемен", []string{"Өскемен"}},
+		{"ҮШТӨБЕ", []string{"Үштөбе"}},
+		{"іле", []string{"Іле"}},
+		{"ІЛЕ", []string{"Іле"}},
+		{"елкино", []string{"Ёлкино"}},
+		{"ЁЛКИНО", []string{"Ёлкино"}},
+		{"Ёлкино", []string{"Ёлкино"}},
+		{"казахстан", []string{"Алматы", "Казахстан", "Қарағанды", "Іле", "Әулиеата", "Үштөбе", "Өскемен"}},
+		{"berlin", []string{"Berlin"}},
+		{"_", []string{}},
+		{"%", []string{}},
+		{"нет такого", []string{}},
+	} {
+		list, err := s.ListPlaces(ctx, a, c.q, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := append([]string{}, c.want...)
+		sort.Strings(want)
+		if got := placeNames(list); !reflect.DeepEqual(got, want) {
+			t.Errorf("ListPlaces(%q) = %v, want %v", c.q, got, want)
+		}
+	}
+}
+
+func TestListSourcesAndRepositoriesSearchIgnoresCyrillicCase(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	for _, n := range []string{"Центральный государственный архив", "Қазақстан ұлттық архиві"} {
+		if _, err := s.CreateRepository(ctx, a, RepositoryInput{Name: n}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, in := range []SourceInput{
+		{Title: "Метрическая книга Успенской церкви", Author: "Әбілхан Қасымов"},
+		{Title: "Kirchenbuch", Author: "Müller"},
+	} {
+		if _, err := s.CreateSource(ctx, a, in); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, c := range []struct {
+		q    string
+		want []string
+	}{
+		{"центральный", []string{"Центральный государственный архив"}},
+		{"ЦЕНТРАЛЬНЫЙ", []string{"Центральный государственный архив"}},
+		{"ҚАЗАҚСТАН", []string{"Қазақстан ұлттық архиві"}},
+		{"ұлттық", []string{"Қазақстан ұлттық архиві"}},
+		{"архив", []string{"Центральный государственный архив", "Қазақстан ұлттық архиві"}},
+	} {
+		list, err := s.ListRepositories(ctx, a, c.q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := []string{}
+		for _, r := range list {
+			got = append(got, r.Name)
+		}
+		sort.Strings(got)
+		want := append([]string{}, c.want...)
+		sort.Strings(want)
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("ListRepositories(%q) = %v, want %v", c.q, got, want)
+		}
+	}
+
+	for _, c := range []struct{ q, want string }{
+		{"метрическая", "Метрическая книга Успенской церкви"},
+		{"УСПЕНСКОЙ", "Метрическая книга Успенской церкви"},
+		{"әбілхан", "Метрическая книга Успенской церкви"},
+		{"ҚАСЫМОВ", "Метрическая книга Успенской церкви"},
+		{"kirchen", "Kirchenbuch"},
+		{"MÜLLER", "Kirchenbuch"},
+	} {
+		list, err := s.ListSources(ctx, a, c.q, 50)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(list) != 1 || list[0].Title != c.want {
+			t.Errorf("ListSources(%q) = %+v, want [%s]", c.q, list, c.want)
+		}
+	}
+}
+
+func TestListHeirloomsSearchIgnoresCyrillicCase(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	for _, in := range []HeirloomInput{
+		{Name: "Серебряные часы", Description: "Подарок от Ақмарал"},
+		{Name: "Pocket watch"},
+	} {
+		if _, err := s.CreateHeirloom(ctx, a, in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, c := range []struct{ q, want string }{
+		{"серебряные", "Серебряные часы"},
+		{"ЧАСЫ", "Серебряные часы"},
+		{"ақмарал", "Серебряные часы"},
+		{"АҚМАРАЛ", "Серебряные часы"},
+		{"WATCH", "Pocket watch"},
+	} {
+		list, err := s.ListHeirlooms(ctx, a, c.q, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(list) != 1 || list[0].Name != c.want {
+			t.Errorf("ListHeirlooms(%q) = %+v, want [%s]", c.q, list, c.want)
+		}
 	}
 }

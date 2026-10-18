@@ -3,6 +3,7 @@ import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import type { DayReport } from '../api/types'
+import { formatDayMonth } from '../lib/dates'
 import { fullName } from '../lib/people'
 import { usePersonHref } from '../lib/personHref'
 
@@ -15,7 +16,7 @@ interface Props {
 
 /** Births, marriages and deaths of deceased relatives on today's date. */
 export function OnThisDay({ queryKey, load, hideEmpty }: Props) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const id = useId()
   const href = usePersonHref()
   // The visitor's own calendar day, not the server's.
@@ -26,7 +27,7 @@ export function OnThisDay({ queryKey, load, hideEmpty }: Props) {
     queryKey: [...queryKey, 'onthisday', month, day],
     queryFn: ({ signal }) => load(month, day, signal),
   })
-  const dateText = today.toLocaleDateString(i18n.language, { day: 'numeric', month: 'long' })
+  const dateText = formatDayMonth(month, day)
 
   if (hideEmpty && (!report.data || report.data.events.length === 0)) return null
 

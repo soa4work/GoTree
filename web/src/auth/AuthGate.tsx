@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useLocation } from 'react-router'
 import { getAuthState } from '../api/client'
 import { UpdateNotice } from '../components/UpdateNotice'
 import { NoTreePage } from '../trees/NoTreePage'
@@ -10,6 +11,7 @@ import { SetupPage } from './SetupPage'
 /** Shows setup or login until there is a session, then the app. */
 export function AuthGate({ children }: { children: ReactNode }) {
   const { t } = useTranslation()
+  const location = useLocation()
   const auth = useQuery({ queryKey: ['auth'], queryFn: ({ signal }) => getAuthState(signal), staleTime: Infinity })
 
   if (auth.isPending) {
@@ -44,7 +46,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
       </>
     )
   }
-  if (!auth.data.tree) {
+  // An administrator without a tree can still manage accounts, for example to
+  // add themselves to a tree.
+  const onAdminPage = auth.data.user.role === 'admin' && location.pathname.startsWith('/admin/')
+  if (!auth.data.tree && !onAdminPage) {
     return (
       <>
         <NoTreePage />

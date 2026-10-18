@@ -22,6 +22,7 @@
     "relationship": "Relationships",
     "sharing": "Sharing",
     "members": "Members",
+    "accounts": "Accounts",
     "account": "Account",
     "research": "Research",
     "transcribe": "Transcribe",
@@ -499,6 +500,7 @@
     "more": "Show more"
   },
   "transfer": {
+    "backupAllTrees": "The backup holds every tree and every account on this server. To give someone a copy of one tree, export it as GEDCOM.",
     "importTitle": "Import a GEDCOM file",
     "importIntro": "GEDCOM is the exchange format of genealogy programs. Export your tree from Ancestry, MyHeritage, FamilySearch, webtrees, Gramps or RootsMagic and import it here. Nothing is lost: what GoTree does not use is kept and written back on export.",
     "file": "GEDCOM file",
@@ -854,6 +856,41 @@
     "leave": "Leave this tree",
     "leaveTitle": "Leave this tree?",
     "leaveMessage": "You will no longer see this tree. An owner can add you again."
+  },
+  "accounts": {
+    "intro": "Accounts of everyone who can log in to this server. Only administrators see this page.",
+    "manage": "Manage accounts",
+    "adminOnly": "Only administrators manage accounts.",
+    "count_one": "{{count}} account",
+    "count_other": "{{count}} accounts",
+    "admin": "Administrator",
+    "noTrees": "Not in any tree yet",
+    "lastSeen": "Last active {{date}}",
+    "neverSignedIn": "Has not signed in yet",
+    "new": "New account",
+    "username": "Username",
+    "displayName": "Display name",
+    "role": "Role on this server",
+    "roleHint": {
+      "admin": "Manages accounts and downloads the backup of the whole server.",
+      "user": "Works in the trees they are a member of."
+    },
+    "roles": {
+      "admin": "Administrator",
+      "user": "User"
+    },
+    "create": "Create account",
+    "created": "The account {{name}} was created.",
+    "createdNext": "Add it to a tree on the Members page.",
+    "openMembers": "Members page",
+    "resetPassword": "Reset password",
+    "resetPasswordText": "Sets a new password and signs this account out on all devices. Tell the person the new password in a safe way.",
+    "newPassword": "New password",
+    "passwordReset": "The password of {{name}} was reset.",
+    "editTitle": "Edit {{name}}",
+    "resetTitle": "Reset the password of {{name}}",
+    "deleteTitle": "Delete the account {{name}}?",
+    "deleteMessage": "The person can no longer log in and leaves all trees. What they entered stays in the trees."
   },
   "share": {
     "readOnly": "Read-only view",

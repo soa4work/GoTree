@@ -2,7 +2,7 @@ import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { axeViolations } from '../test/axe'
-import { mockApi, renderApp } from '../test/render'
+import { loggedInState, mockApi, renderApp } from '../test/render'
 
 const home: Parameters<typeof mockApi>[0] = {
   'GET /api/stats': [200, { persons: 1, families: 0, sources: 0 }],
@@ -32,12 +32,27 @@ describe('navigation', () => {
       Records: ['Sources', 'Photos & media', 'Transcribe', 'Heirlooms'],
       Explore: ['Migration map', 'Statistics'],
       Work: ['Research', 'Data quality'],
-      Settings: ['Sharing', 'Members', 'Import & export', 'Account'],
+      Settings: ['Sharing', 'Members', 'Import & export', 'Account', 'Accounts'],
     }
     for (const [group, links] of Object.entries(expected)) {
       expect(names(within(sidebar).getByRole('list', { name: group }))).toEqual(links)
     }
     expect(within(sidebar).getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('leaves the Accounts link out for users who are not administrators', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} }))
+    mockApi({
+      ...home,
+      'GET /api/auth/state': [
+        200,
+        { ...loggedInState, user: { id: 2, username: 'bob', displayName: '', role: 'user' } },
+      ],
+    })
+    renderApp('/')
+    const sidebar = await screen.findByRole('navigation', { name: 'Main navigation' })
+    expect(await within(sidebar).findByRole('link', { name: 'Members' })).toBeInTheDocument()
+    expect(names(within(sidebar).getByRole('list', { name: 'Settings' }))).toEqual(['Sharing', 'Members', 'Import & export', 'Account'])
   })
 
   it('marks the current page', async () => {

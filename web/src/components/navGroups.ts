@@ -1,6 +1,6 @@
 import type { ParseKeys } from 'i18next'
 import type { ComponentType } from 'react'
-import { AccountIcon, ChartIcon, CheckIcon, HeirloomIcon, HomeIcon, LinkIcon, MapIcon, MembersIcon, PeopleIcon, PhotoIcon, ResearchIcon, ShareIcon, SourceIcon, TranscribeIcon, TransferIcon, TreeIcon, WallChartIcon } from './icons'
+import { AccountIcon, AccountsIcon, ChartIcon, CheckIcon, HeirloomIcon, HomeIcon, LinkIcon, MapIcon, MembersIcon, PeopleIcon, PhotoIcon, ResearchIcon, ShareIcon, SourceIcon, TranscribeIcon, TransferIcon, TreeIcon, WallChartIcon } from './icons'
 
 export interface NavItem {
   to: string
@@ -9,6 +9,8 @@ export interface NavItem {
   end?: boolean
   /** One of the links on the phone bar; the rest are in its More menu. */
   phone?: boolean
+  /** Shown to administrators only. */
+  adminOnly?: boolean
 }
 
 export interface NavGroup {
@@ -64,6 +66,7 @@ export const navGroups: NavGroup[] = [
       { to: '/members', key: 'nav.members', Icon: MembersIcon },
       { to: '/import-export', key: 'nav.importExport', Icon: TransferIcon },
       { to: '/account', key: 'nav.account', Icon: AccountIcon },
+      { to: '/admin/users', key: 'nav.accounts', Icon: AccountsIcon, adminOnly: true },
     ],
   },
 ]

@@ -20,7 +20,7 @@ test('grouped navigation reaches every section', async ({ page }) => {
     await expect(more).toBeFocused()
   } else {
     await expect(nav.getByRole('list', { name: 'Tree' }).getByRole('link')).toHaveText(['People', 'Tree', 'Wall chart', 'Relationships'])
-    await expect(nav.getByRole('list', { name: 'Settings' }).getByRole('link')).toHaveText(['Sharing', 'Members', 'Import & export', 'Account'])
+    await expect(nav.getByRole('list', { name: 'Settings' }).getByRole('link')).toHaveText(['Sharing', 'Members', 'Import & export', 'Account', 'Accounts'])
   }
 
   await openSection(page, 'Sharing')

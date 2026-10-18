@@ -37,13 +37,21 @@ function SideLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void
   )
 }
 
+/** The links this user may see: administrator-only ones are left out for everyone else. */
+function useVisibleGroups() {
+  const auth = useQuery({ queryKey: ['auth'], queryFn: ({ signal }) => getAuthState(signal), staleTime: Infinity })
+  const admin = auth.data?.user?.role === 'admin'
+  return navGroups.map((g) => ({ ...g, items: g.items.filter((i) => admin || !i.adminOnly) }))
+}
+
 /** The sections as headed lists; the sidebar and the phone's More menu share it. */
 function GroupedLinks({ idPrefix, level, onNavigate }: { idPrefix: string; level: 2 | 3; onNavigate?: () => void }) {
   const { t } = useTranslation()
+  const groups = useVisibleGroups()
   const Heading = `h${level}` as const
   return (
     <>
-      {navGroups.map((group) => {
+      {groups.map((group) => {
         const headingId = `${idPrefix}-${group.id}`
         return (
           <div key={group.id} className="mt-3">
@@ -68,7 +76,7 @@ function GroupedLinks({ idPrefix, level, onNavigate }: { idPrefix: string; level
 function MoreMenu({ pathname }: { pathname: string }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const inMenu = navGroups.some((g) =>
+  const inMenu = useVisibleGroups().some((g) =>
     g.items.some((i) => !i.phone && (pathname === i.to || pathname.startsWith(`${i.to}/`))),
   )
   return (

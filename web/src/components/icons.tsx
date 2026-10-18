@@ -79,6 +79,14 @@ export const MembersIcon = () => (
   </Icon>
 )
 
+export const AccountsIcon = () => (
+  <Icon>
+    <path d="M12 3 4.5 6v5.5c0 4.4 3 8 7.5 9.5 4.5-1.5 7.5-5.1 7.5-9.5V6L12 3Z" />
+    <circle cx="12" cy="10" r="2.5" />
+    <path d="M7.8 16.2c.9-1.7 2.4-2.5 4.2-2.5s3.3.8 4.2 2.5" />
+  </Icon>
+)
+
 export const CheckIcon = () => (
   <Icon>
     <path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6l-8-3Z" />

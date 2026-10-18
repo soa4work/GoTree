@@ -72,8 +72,11 @@ says who it was. `TYPE` is how they got it: `inherited`, `gift`, `purchased`, `m
 
 ## _from
 
-`_HEIRLOOM._CUST._FROM` — since when the holder had the object, as GEDCOM date text.
+`_HEIRLOOM._CUST._FROM` — since when the holder had the object, as a GEDCOM date (`12 MAR 1850`,
+`ABT 1870`; in a 7.0 file with 7.0 keywords such as `JULIAN` and `BCE`). Text that is not a date is
+written in parentheses: `(spring 1850)`. A dual year or an interpreted date is written as in 5.5.1
+(`1750/51`) because a 7.0 date value cannot hold it.
 
 ## _to
 
-`_HEIRLOOM._CUST._TO` — until when.
+`_HEIRLOOM._CUST._TO` — until when, in the same form.

@@ -705,6 +705,27 @@ func (ex *exporter) date(n *gedcom.Node, raw string) {
 	n.Children = append(n.Children, node("DATE", d.String()))
 }
 
+// textDate renders a date for an extension tag that holds date text
+// (_HEIRLOOM._CUST._FROM/_TO): a date gendate reads in canonical form,
+// in GEDCOM 7 with 7.0 keywords when 7.0 can say it, anything else as a
+// "(phrase)" the import reads back unchanged.
+func (ex *exporter) textDate(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	d, err := gendate.Parse(raw)
+	if err != nil {
+		return "(" + strings.Trim(raw, "()") + ")"
+	}
+	if ex.opt.Version7 {
+		if value, phrase := d.GEDCOM7(); phrase == "" && value != "" {
+			return value
+		}
+	}
+	return d.String()
+}
+
 func (ex *exporter) status(n *gedcom.Node, status, reason string) {
 	if status == "" || status == StatusAccepted {
 		return
@@ -1039,8 +1060,8 @@ func (ex *exporter) heirloomRecords(ctx context.Context) ([]*gedcom.Node, error)
 			if pid.Valid && ex.included[pid.Int64] {
 				c = pointer("_CUST", personXref(pid.Int64))
 			}
-			add(c, "_FROM", from)
-			add(c, "_TO", to)
+			add(c, "_FROM", ex.textDate(from))
+			add(c, "_TO", ex.textDate(to))
 			add(c, "TYPE", how)
 			add(c, "NOTE", notes)
 			r.Children = append(r.Children, c)

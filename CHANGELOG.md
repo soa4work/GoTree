@@ -102,6 +102,13 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Replacing the tree by a GEDCOM import keeps share links to a branch when the file has the same
+  person (same GEDCOM ID and name) and lists the links it had to delete; the import page warns
+  about such links first. Transcription drafts forget the people of the old tree, and ids of
+  deleted people, families, events, places, sources and citations are never given to new ones, so
+  an old link or draft can no longer point to someone else; the first start after the update may
+  take a little longer on a large tree (#56)
+
 - Descendants of a person who married a cousin are complete again in the tree, in share links to a
   branch and on the migration map: the other marriages and children of that cousin were left out (#56)
 

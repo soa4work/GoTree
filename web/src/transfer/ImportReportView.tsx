@@ -52,6 +52,12 @@ export function ImportReportView({ report }: { report: ImportReport }) {
           {report.childrenFromFamcExamples}
         </Problem>
       )}
+      {(report.shareLinksLost?.length ?? 0) > 0 && (
+        <Problem title={t('transfer.shareLinksLost', { count: report.shareLinksLost.length })} hint={t('transfer.shareLinksLostHint')}>
+          {report.shareLinksLost}
+        </Problem>
+      )}
+      {(report.shareLinksKept ?? 0) > 0 && <p>{t('transfer.shareLinksKept', { count: report.shareLinksKept })}</p>}
       {report.warnings.length > 0 && (
         <Problem title={t('transfer.warnings', { count: report.warnings.length })}>
           {report.warnings.map((w) => (w.line ? t('transfer.atLine', { line: w.line, message: w.message }) : w.message))}

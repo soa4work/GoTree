@@ -60,8 +60,27 @@ func (s *Server) noContent(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// listPersons serves GET /api/persons?q&limit&offset&sort&sex&living. Unknown
+// sort, sex and living values are ignored, as if unset, so they need no
+// error code.
 func (s *Server) listPersons(w http.ResponseWriter, r *http.Request) {
-	list, err := s.Store.ListPersons(r.Context(), actorFrom(r), r.URL.Query().Get("q"), queryInt(r, "limit", 50), queryInt(r, "offset", 0))
+	qv := r.URL.Query()
+	var f store.PersonFilter
+	if v := qv.Get("sort"); v == "name" || v == "birth" || v == "-birth" || v == "updated" {
+		f.Sort = v
+	}
+	if v := qv.Get("sex"); v == "M" || v == "F" || v == "X" || v == "U" {
+		f.Sex = v
+	}
+	switch qv.Get("living") {
+	case "1":
+		t := true
+		f.Living = &t
+	case "0":
+		t := false
+		f.Living = &t
+	}
+	list, err := s.Store.ListPersonsFiltered(r.Context(), actorFrom(r), qv.Get("q"), f, queryInt(r, "limit", 50), queryInt(r, "offset", 0))
 	s.respond(w, http.StatusOK, list, err)
 }
 

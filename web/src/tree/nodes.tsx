@@ -1,19 +1,16 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
+import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { PersonRef } from '../api/types'
 import { fullName, lifespan } from '../lib/people'
 import { Avatar } from '../media/Avatar'
 import { HEART_PATH } from './vine'
 import type { TreeLook } from './nodeTypes'
+import { useTreeActions, useTreeUi } from './treeUi'
 
 export interface PersonNodeData extends Record<string, unknown> {
   person: PersonRef
   root: boolean
-  selected: boolean
-  tabbable: boolean
-  onSelect: (id: number) => void
-  onCenter: (id: number) => void
-  onKey: (id: number, e: React.KeyboardEvent<HTMLButtonElement>) => void
   look: TreeLook
 }
 
@@ -23,7 +20,6 @@ export interface LookData extends Record<string, unknown> {
 
 export interface RepeatNodeData extends LookData {
   person: PersonRef
-  onJump: (id: number) => void
 }
 
 const hidden = { opacity: 0, pointerEvents: 'none' as const }
@@ -42,11 +38,18 @@ function Handles() {
 }
 
 const sexMark: Record<string, string> = { M: '♂', F: '♀', X: '⚧', U: '' }
-const accent: Record<string, string> = { M: 'bg-sky-600', F: 'bg-rose-500', X: 'bg-violet-500' }
+const accent: Record<string, string> = {
+  M: 'bg-sky-600',
+  F: 'bg-rose-500',
+  X: 'bg-violet-500',
+}
 
-export function PersonNode({ data }: NodeProps<Node<PersonNodeData>>) {
+export const PersonNode = memo(function PersonNode({ data }: NodeProps<Node<PersonNodeData>>) {
   const { t } = useTranslation()
   const p = data.person
+  const selected = useTreeUi((s) => s.selectedId === p.id)
+  const tabbable = useTreeUi((s) => s.focusId === p.id)
+  const a = useTreeActions()
   const given = p.givenNames.trim()
   const surname = p.surname.trim()
   const years = lifespan(p)
@@ -57,12 +60,12 @@ export function PersonNode({ data }: NodeProps<Node<PersonNodeData>>) {
       <button
         type="button"
         data-tree-person={p.id}
-        tabIndex={data.tabbable ? 0 : -1}
-        aria-pressed={data.selected}
+        tabIndex={tabbable ? 0 : -1}
+        aria-pressed={selected}
         aria-current={data.root ? 'true' : undefined}
-        onClick={() => data.onSelect(p.id)}
-        onDoubleClick={() => data.onCenter(p.id)}
-        onKeyDown={(e) => data.onKey(p.id, e)}
+        onClick={() => a.select(p.id)}
+        onDoubleClick={() => a.center(p.id)}
+        onKeyDown={(e) => a.key(p.id, e)}
         style={interactive}
         className={[
           'nodrag relative flex h-16 w-[180px] items-center gap-2 pr-2 text-left transition-[box-shadow,translate] duration-150 hover:-translate-y-px',
@@ -80,7 +83,7 @@ export function PersonNode({ data }: NodeProps<Node<PersonNodeData>>) {
                   ? 'border-2 border-brand-700 bg-linear-to-br from-brand-50 to-white dark:border-brand-100 dark:from-brand-800 dark:to-slate-900'
                   : 'border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900',
               ].join(' '),
-          data.selected ? 'ring-4 ring-brand-500/60' : '',
+          selected ? 'ring-4 ring-brand-500/60' : '',
         ].join(' ')}
       >
         {!leafy && accent[p.sex] && (
@@ -115,9 +118,9 @@ export function PersonNode({ data }: NodeProps<Node<PersonNodeData>>) {
       </button>
     </>
   )
-}
+})
 
-export function JunctionNode({ data }: NodeProps<Node<LookData>>) {
+export const JunctionNode = memo(function JunctionNode({ data }: NodeProps<Node<LookData>>) {
   if (data.look === 'leafy') {
     return (
       <>
@@ -137,9 +140,9 @@ export function JunctionNode({ data }: NodeProps<Node<LookData>>) {
       />
     </>
   )
-}
+})
 
-export function UnknownNode({ data }: NodeProps<Node<LookData>>) {
+export const UnknownNode = memo(function UnknownNode({ data }: NodeProps<Node<LookData>>) {
   const { t } = useTranslation()
   return (
     <>
@@ -155,10 +158,11 @@ export function UnknownNode({ data }: NodeProps<Node<LookData>>) {
       </div>
     </>
   )
-}
+})
 
-export function RepeatNode({ data }: NodeProps<Node<RepeatNodeData>>) {
+export const RepeatNode = memo(function RepeatNode({ data }: NodeProps<Node<RepeatNodeData>>) {
   const { t } = useTranslation()
+  const a = useTreeActions()
   const name = fullName(data.person) ?? t('person.unknown')
   return (
     <>
@@ -166,7 +170,7 @@ export function RepeatNode({ data }: NodeProps<Node<RepeatNodeData>>) {
       <button
         type="button"
         tabIndex={-1}
-        onClick={() => data.onJump(data.person.id)}
+        onClick={() => a.jump(data.person.id)}
         style={interactive}
         className={`nodrag flex h-12 w-[132px] items-center ${data.look === 'leafy' ? 'rounded-full px-4' : 'rounded-2xl px-2'} border-2 border-dashed border-brand-500 bg-brand-50 text-left text-xs text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200`}
       >
@@ -177,4 +181,4 @@ export function RepeatNode({ data }: NodeProps<Node<RepeatNodeData>>) {
       </button>
     </>
   )
-}
+})

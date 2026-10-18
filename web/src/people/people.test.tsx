@@ -125,6 +125,41 @@ describe('people list', () => {
   })
 })
 
+describe('people list sort and filters', () => {
+  const list = { items: [ref(1, 'Paul')], total: 1 }
+  const lastUrl = (fetchMock: ReturnType<typeof mockApi>) => String(fetchMock.mock.calls.at(-1)?.[0])
+
+  it('sends the chosen sort and sex to the server', async () => {
+    const fetchMock = mockApi({ 'GET /api/persons': [200, list] })
+    const user = userEvent.setup()
+    renderApp('/people')
+    await screen.findByRole('link', { name: /Paul Weber/ })
+    await user.selectOptions(screen.getByLabelText('Sort by'), 'Birth, oldest first')
+    await waitFor(() => expect(lastUrl(fetchMock)).toContain('sort=birth'))
+    await user.selectOptions(screen.getByLabelText('Sex'), 'Female')
+    await waitFor(() => expect(lastUrl(fetchMock)).toContain('sex=F'))
+    await user.selectOptions(screen.getByLabelText('Status'), 'Living')
+    await waitFor(() => expect(lastUrl(fetchMock)).toContain('living=1'))
+  })
+
+  it('reads the filters from the address', async () => {
+    const fetchMock = mockApi({ 'GET /api/persons': [200, list] })
+    renderApp('/people?sex=F&sort=bogus')
+    await screen.findByRole('link', { name: /Paul Weber/ })
+    expect(screen.getByLabelText('Sex')).toHaveValue('F')
+    expect(screen.getByLabelText('Sort by')).toHaveValue('')
+    expect(lastUrl(fetchMock)).toContain('sex=F')
+    expect(lastUrl(fetchMock)).not.toContain('sort=')
+  })
+
+  it('says nobody matches instead of onboarding when filters find no one', async () => {
+    mockApi({ 'GET /api/persons': [200, { items: [], total: 0 }] })
+    renderApp('/people?sex=F')
+    expect(await screen.findByText('No one matches these filters.')).toBeInTheDocument()
+    expect(screen.queryByText(/No one is in your tree yet/)).not.toBeInTheDocument()
+  })
+})
+
 describe('person page', () => {
   it('shows events in date order, families and relations', async () => {
     mockApi({ 'GET /api/persons/1': [200, paul] })

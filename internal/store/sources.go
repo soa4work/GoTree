@@ -284,7 +284,7 @@ func scanSource(sc scanner) (Source, error) {
 
 // ListSources returns sources by title, filtered by a case-insensitive
 // substring of the title or author.
-func (s *Store) ListSources(ctx context.Context, a Actor, q string, limit int) ([]Source, error) {
+func (s *Store) ListSources(ctx context.Context, a Actor, q string, limit, offset int) ([]Source, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
@@ -295,10 +295,13 @@ func (s *Store) ListSources(ctx context.Context, a Actor, q string, limit int) (
 		like := containsPattern(q)
 		args = append(args, like, like)
 	}
-	args = append(args, limit)
+	if offset < 0 {
+		offset = 0
+	}
+	args = append(args, limit, offset)
 	rows, err := s.DB.QueryContext(ctx, `SELECT `+sourceColumns+`
 		FROM sources s LEFT JOIN repositories r ON r.id = s.repository_id
-		WHERE s.tree_id = ?`+filter+` ORDER BY s.title COLLATE NAMES, s.id LIMIT ?`, args...)
+		WHERE s.tree_id = ?`+filter+` ORDER BY s.title COLLATE NAMES, s.id LIMIT ? OFFSET ?`, args...)
 	if err != nil {
 		return nil, err
 	}

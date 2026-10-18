@@ -59,7 +59,7 @@ func (s *Server) deleteRepository(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listSources(w http.ResponseWriter, r *http.Request) {
-	list, err := s.Store.ListSources(r.Context(), actorFrom(r), r.URL.Query().Get("q"), queryInt(r, "limit", 100))
+	list, err := s.Store.ListSources(r.Context(), actorFrom(r), r.URL.Query().Get("q"), queryInt(r, "limit", 100), queryInt(r, "offset", 0))
 	s.respond(w, http.StatusOK, list, err)
 }
 

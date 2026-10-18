@@ -142,6 +142,7 @@ var pinned = map[string]string{
 	"is not a face tag on this photo":                                      "not_face_tag",
 	"is not a suggestion":                                                  "not_suggestion",
 	"is not one of this person's families":                                 "family_choice",
+	"is not your current password":                                         "wrong_password",
 	"is required":                                                          "required",
 	"is required for custom events":                                        "custom_label_required",
 	"is too long":                                                          "too_long",

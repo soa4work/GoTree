@@ -82,6 +82,22 @@ describe('sources', () => {
     await waitFor(() => expect(sent).toBeDefined())
     expect(sent!.addCitations).toEqual([{ sourceId: 7, page: 'S. 12', quality: 3, text: '' }])
   })
+
+  it('loads the next page of sources on demand', async () => {
+    const make = (n: number, from: number) =>
+      Array.from({ length: n }, (_, i) => ({ ...source, id: from + i, title: `Book ${from + i}`, citations: undefined }))
+    const user = userEvent.setup()
+    mockApi({
+      'GET /api/sources': (_body, url) =>
+        url.searchParams.get('offset') === '100' ? [200, make(3, 100)] : [200, make(100, 0)],
+    })
+    renderApp('/sources')
+    expect(await screen.findByText('First 100 sources shown')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show more sources' }))
+    await waitFor(() => expect(screen.getAllByRole('link', { name: /Book \d+/ })).toHaveLength(103))
+    expect(screen.queryByRole('button', { name: 'Show more sources' })).not.toBeInTheDocument()
+    expect(screen.getByText('103 sources')).toBeInTheDocument()
+  })
 })
 
 describe('repository field', () => {

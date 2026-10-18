@@ -3,10 +3,14 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/praetorianer777/gotree/internal/store"
@@ -58,6 +62,8 @@ func writeStoreError(w http.ResponseWriter, log *slog.Logger, err error) {
 		writeJSON(w, http.StatusUnprocessableEntity, validationBody(ve))
 	case errors.Is(err, store.ErrNotFound):
 		writeError(w, http.StatusNotFound, CodeNotFound, "not found")
+	case errors.Is(err, store.ErrViewOnly):
+		writeError(w, http.StatusForbidden, CodeViewOnly, err.Error())
 	case errors.Is(err, store.ErrOwnerOnly):
 		writeError(w, http.StatusForbidden, CodeOwnerOnly, err.Error())
 	case errors.Is(err, store.ErrApplied):
@@ -76,14 +82,94 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
-		writeErrorP(w, http.StatusBadRequest, CodeInvalidJSON, "invalid JSON: "+err.Error(), map[string]any{"detail": err.Error()})
+		writeDecodeError(w, err)
 		return false
 	}
 	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		if err != nil && writeBodyReadError(w, err) {
+			return false
+		}
 		writeError(w, http.StatusBadRequest, CodeTrailingData, "invalid JSON: trailing data")
 		return false
 	}
 	return true
+}
+
+// writeBodyReadError answers a body that could not be read: 413 when it is
+// over maxBody, 408 when the read deadline expired. It reports false for
+// other errors.
+func writeBodyReadError(w http.ResponseWriter, err error) bool {
+	var tooBig *http.MaxBytesError
+	switch {
+	case errors.As(err, &tooBig):
+		writeErrorP(w, http.StatusRequestEntityTooLarge, CodeRequestTooLarge,
+			fmt.Sprintf("the request is larger than %d KB", tooBig.Limit>>10), map[string]any{"limitKB": tooBig.Limit >> 10})
+	case errors.Is(err, os.ErrDeadlineExceeded):
+		writeError(w, http.StatusRequestTimeout, CodeRequestTimeout, "the request took too long to arrive; check the connection and try again")
+	default:
+		return false
+	}
+	return true
+}
+
+// writeDecodeError answers a JSON body that cannot be decoded. The detail
+// names the JSON field at most, never the Go types behind it.
+func writeDecodeError(w http.ResponseWriter, err error) {
+	if writeBodyReadError(w, err) {
+		return
+	}
+	detail := "malformed JSON"
+	var typeErr *json.UnmarshalTypeError
+	switch {
+	case errors.Is(err, io.EOF):
+		detail = "empty body"
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		detail = "unexpected end of JSON"
+	case errors.As(err, &typeErr) && typeErr.Field != "":
+		detail = fmt.Sprintf("wrong type for field %q", typeErr.Field)
+	case errors.As(err, &typeErr):
+		detail = "wrong type"
+	case strings.HasPrefix(err.Error(), "json: unknown field "):
+		detail = strings.TrimPrefix(err.Error(), "json: ") // `unknown field "x"`: a JSON name
+	}
+	writeErrorP(w, http.StatusBadRequest, CodeInvalidJSON, "invalid JSON: "+detail, map[string]any{"detail": detail})
+}
+
+// bodyReadTimeout bounds how long a request body may take to arrive on
+// routes that are not uploads; a variable so tests can shrink it.
+var bodyReadTimeout = 15 * time.Second
+
+// bodyDeadline sets a short read deadline for requests with a body, so a
+// client trickling a JSON body (to /api/auth/login, say) cannot hold the
+// connection. The deadline is cleared once the body is read, because a
+// deadline still set while a long handler runs would cancel its context.
+// Upload handlers replace it with their own (limitUpload).
+func bodyDeadline(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil && r.Body != http.NoBody {
+			rc := http.NewResponseController(w)
+			// Unsupported by some ResponseWriters (tests); then nothing changes.
+			if rc.SetReadDeadline(time.Now().Add(bodyReadTimeout)) == nil {
+				r.Body = &clearDeadlineOnEOF{ReadCloser: r.Body, rc: rc}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+type clearDeadlineOnEOF struct {
+	io.ReadCloser
+	rc   *http.ResponseController
+	done bool
+}
+
+func (b *clearDeadlineOnEOF) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	if errors.Is(err, io.EOF) && !b.done {
+		b.done = true
+		_ = b.rc.SetReadDeadline(time.Time{})
+	}
+	return n, err
 }
 
 func pathID(w http.ResponseWriter, r *http.Request, name string) (int64, bool) {

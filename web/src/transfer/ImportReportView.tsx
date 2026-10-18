@@ -47,6 +47,11 @@ export function ImportReportView({ report }: { report: ImportReport }) {
           {report.brokenReferences}
         </Problem>
       )}
+      {report.childrenFromFamc > 0 && (
+        <Problem title={t('transfer.famcChildren', { count: report.childrenFromFamc })} hint={t('transfer.famcChildrenHint')}>
+          {report.childrenFromFamcExamples}
+        </Problem>
+      )}
       {report.warnings.length > 0 && (
         <Problem title={t('transfer.warnings', { count: report.warnings.length })}>
           {report.warnings.map((w) => (w.line ? t('transfer.atLine', { line: w.line, message: w.message }) : w.message))}

@@ -76,7 +76,8 @@ func (im *importer) reportMissingFiles(path string, c *gedcom.Node) {
 		if !ok {
 			reason = missingReason(value)
 		}
-		im.tag(path+".FILE", TagDropped, reason)
+		// Kept, not dropped: the line goes back out; only the file is not here.
+		im.tag(path+".FILE", TagKept, reason)
 	}
 }
 

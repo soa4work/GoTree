@@ -49,7 +49,7 @@ func storedFiles(t *testing.T, root string) int {
 
 func tagReason(r store.ImportReport, path string) string {
 	for _, ts := range r.Tags {
-		if ts.Path == path && ts.Outcome == store.TagDropped {
+		if ts.Path == path && ts.Outcome != store.TagMapped {
 			return ts.Reason
 		}
 	}
@@ -180,7 +180,7 @@ func TestImportGedzipSkipsFilesThatFailTheUploadChecks(t *testing.T) {
 	}
 	seen := map[string]bool{}
 	for _, ts := range report.Tags {
-		if ts.Path == "INDI.OBJE.FILE" && ts.Outcome == store.TagDropped {
+		if ts.Path == "INDI.OBJE.FILE" && ts.Outcome != store.TagMapped {
 			seen[ts.Reason] = true
 		}
 	}
@@ -267,7 +267,7 @@ func TestImportGedzipCapsUnpackedSizeAndStaysInsideTheZip(t *testing.T) {
 	_ = json.Unmarshal(body, &report)
 	seen := map[string]bool{}
 	for _, ts := range report.Tags {
-		if ts.Path == "INDI.OBJE.FILE" && ts.Outcome == store.TagDropped {
+		if ts.Path == "INDI.OBJE.FILE" && ts.Outcome != store.TagMapped {
 			seen[ts.Reason] = true
 		}
 	}

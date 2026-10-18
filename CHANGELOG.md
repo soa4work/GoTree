@@ -110,6 +110,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- GEDCOM import keeps the notes and sources of every name: NAME.NOTE becomes a note on the name,
+  shown and editable on the person, sources of other and married names are attached to those names,
+  and a source of the main name stays on the name through export and import instead of moving to
+  the person (#54)
+
 - A GEDCOM 5.5.1 export of a large tree no longer goes through every event for every person (#56)
 
 - A GEDCOM export without living people (or with their names only) no longer writes the dates and

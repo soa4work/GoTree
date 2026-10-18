@@ -147,3 +147,38 @@ func TestHeirloomMigrationKeepsLinks(t *testing.T) {
 		t.Errorf("%d links left after deleting the person", n)
 	}
 }
+
+func TestNameNotesMigration(t *testing.T) {
+	ctx := context.Background()
+	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	has := func(table, column string) bool {
+		var n int
+		if err := conn.QueryRowContext(ctx, `SELECT count(*) FROM pragma_table_info(?) WHERE name = ?`, table, column).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n == 1
+	}
+	if !has("persons", "name_notes") || !has("person_names", "notes") {
+		t.Fatal("the name note columns are missing after Up")
+	}
+	provider, err := newProvider(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.DownTo(ctx, 16); err != nil {
+		t.Fatal(err)
+	}
+	if has("persons", "name_notes") || has("person_names", "notes") {
+		t.Error("the name note columns survive Down")
+	}
+	if err := Migrate(ctx, conn); err != nil {
+		t.Fatal(err)
+	}
+	if !has("persons", "name_notes") {
+		t.Error("the columns did not come back after Up")
+	}
+}

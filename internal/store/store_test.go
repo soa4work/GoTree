@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -542,4 +543,35 @@ func TestChangeLog(t *testing.T) {
 			t.Errorf("entry %d: %+v, want %+v", i, got[i], want[i])
 		}
 	}
+}
+
+func TestPersonNameNotes(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	p, err := s.CreatePerson(ctx, a, PersonInput{GivenNames: "Anna", Surname: "Weber", NameNotes: "  spelled Maier ",
+		AlternateNames: []AlternateNameInput{{Type: "married", GivenNames: "Anna", Surname: "Schmidt", Notes: "after 1890"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.NameNotes != "spelled Maier" || p.AlternateNames[0].Notes != "after 1890" {
+		t.Fatalf("created: %q %+v", p.NameNotes, p.AlternateNames)
+	}
+	id := p.AlternateNames[0].ID
+	p, err = s.UpdatePerson(ctx, a, p.ID, PersonInput{GivenNames: "Anna", Surname: "Weber", NameNotes: "changed",
+		AlternateNames: []AlternateNameInput{{ID: &id, Type: "married", GivenNames: "Anna", Surname: "Schmidt", Notes: "later"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetPersonDetail(ctx, a, p.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.NameNotes != "changed" || got.AlternateNames[0].Notes != "later" {
+		t.Errorf("updated: %q %+v", got.NameNotes, got.AlternateNames)
+	}
+	long := strings.Repeat("x", 100_001)
+	_, err = s.CreatePerson(ctx, a, PersonInput{GivenNames: "A", NameNotes: long})
+	validationField(t, err, "nameNotes")
+	_, err = s.CreatePerson(ctx, a, PersonInput{GivenNames: "A", AlternateNames: []AlternateNameInput{{Type: "other", GivenNames: "B", Notes: long}}})
+	validationField(t, err, "alternateNames")
 }

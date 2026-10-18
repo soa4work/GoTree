@@ -4,6 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"sort"
+	"strings"
+	"unicode"
+
+	"github.com/praetorianer777/gotree/internal/db"
+	"golang.org/x/text/unicode/norm"
 )
 
 // shareScope decides, per person, what a share link reveals. Everything a
@@ -195,10 +200,25 @@ func (s *Store) SharePersons(ctx context.Context, sh Share, query string) (Perso
 	if err != nil {
 		return PersonList{}, err
 	}
+	// The search index also holds nicknames and alternate names (a maiden
+	// name, say). A person shown by name only must not be found by those,
+	// or the link would reveal names it hides.
+	var words []string
+	var given, surname map[int64]string
+	if sc.namesOnly {
+		if words = searchWords(query); len(words) > 0 {
+			if given, surname, err = s.primaryNames(ctx, sh.Actor); err != nil {
+				return PersonList{}, err
+			}
+		}
+	}
 	out := PersonList{Items: []PersonRef{}}
 	var shown []int64
 	for _, id := range ids {
 		if !sc.sees(id) {
+			continue
+		}
+		if words != nil && sc.reduced(id) && !primaryNameMatches(given[id], surname[id], words) {
 			continue
 		}
 		out.Total++
@@ -214,6 +234,61 @@ func (s *Store) SharePersons(ctx context.Context, sh Share, query string) (Perso
 		out.Items = append(out.Items, sc.ref(refs[id]))
 	}
 	return out, nil
+}
+
+// primaryNames loads the given names and surname of every person of the tree.
+func (s *Store) primaryNames(ctx context.Context, a Actor) (given, surname map[int64]string, err error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, given_names, surname FROM persons WHERE tree_id = ?`, a.TreeID)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	given, surname = map[int64]string{}, map[int64]string{}
+	for rows.Next() {
+		var id int64
+		var g, sn string
+		if err := rows.Scan(&id, &g, &sn); err != nil {
+			return nil, nil, err
+		}
+		given[id], surname[id] = g, sn
+	}
+	return given, surname, rows.Err()
+}
+
+// nameTokens splits a name the way the search index does: folded like
+// searchFold, lower-cased, accents removed, split at non-letters/digits.
+func nameTokens(s string) []string {
+	var b strings.Builder
+	for _, r := range norm.NFD.String(s) {
+		if !unicode.Is(unicode.Mn, r) {
+			b.WriteRune(r)
+		}
+	}
+	return strings.FieldsFunc(db.SearchFold(b.String()), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+}
+
+// primaryNameMatches reports whether every query word starts a word of the
+// person's primary given names or surname. It only ever removes search
+// results, so a difference from the index's tokenizer hides a person
+// instead of revealing one.
+func primaryNameMatches(given, surname string, words []string) bool {
+	tokens := append(nameTokens(given), nameTokens(surname)...)
+	for _, w := range words {
+		w = strings.Join(nameTokens(w), "")
+		found := false
+		for _, t := range tokens {
+			if strings.HasPrefix(t, w) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 // SharePerson returns a person as the link may show them.

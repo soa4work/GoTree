@@ -57,6 +57,9 @@ func TestSourcesAndCitations(t *testing.T) {
 
 	_, err = s.CreateCitation(ctx, a, CitationInput{SourceID: src.ID, Quality: ptr(7)})
 	validationField(t, err, "quality")
+	validationField(t, err, "links")
+	_, err = s.CreateCitation(ctx, a, CitationInput{SourceID: src.ID})
+	validationField(t, err, "links")
 	_, err = s.CreateCitation(ctx, a, CitationInput{SourceID: src.ID, Links: []LinkInput{{EntityType: "event", EntityID: 999}}})
 	validationField(t, err, "links")
 	_, err = s.CreateEvent(ctx, a, EventInput{PersonID: &anna.ID, Type: "DEAT", AddCitations: []NewCitation{{SourceID: 999}}})
@@ -94,9 +97,16 @@ func TestSourcesAndCitations(t *testing.T) {
 	}
 
 	// Deleting the person deletes the birth, and the trigger removes the
-	// links; the orphaned citation stays with its source.
+	// links; the birth's own citation lost its last link and goes too.
 	if err := s.DeletePerson(ctx, a, anna.ID); err != nil {
 		t.Fatal(err)
+	}
+	var cits int
+	if err := s.DB.QueryRow(`SELECT count(*) FROM citations`).Scan(&cits); err != nil {
+		t.Fatal(err)
+	}
+	if cits != 0 {
+		t.Errorf("%d citations left without a fact", cits)
 	}
 	var links int
 	if err := s.DB.QueryRow(`SELECT count(*) FROM citation_links`).Scan(&links); err != nil {

@@ -446,21 +446,21 @@ func (ex *exporter) build(ctx context.Context) error {
 			}
 		}
 	}
-	eventsOf := map[string][]exportEvent{}
+	personEvents, familyEvents := map[int64][]exportEvent{}, map[int64][]exportEvent{}
 	for _, e := range ex.events {
 		if e.personID.Valid {
-			eventsOf[fmt.Sprintf("person:%d", e.personID.Int64)] = append(eventsOf[fmt.Sprintf("person:%d", e.personID.Int64)], e)
+			personEvents[e.personID.Int64] = append(personEvents[e.personID.Int64], e)
 		} else {
-			eventsOf[fmt.Sprintf("family:%d", e.familyID.Int64)] = append(eventsOf[fmt.Sprintf("family:%d", e.familyID.Int64)], e)
+			familyEvents[e.familyID.Int64] = append(familyEvents[e.familyID.Int64], e)
 		}
 	}
 
 	for _, p := range ex.persons {
-		records = append(records, ex.personRecord(p, eventsOf[fmt.Sprintf("person:%d", p.id)], partnerOf[p.id], childOf[p.id]))
+		records = append(records, ex.personRecord(p, personEvents[p.id], partnerOf[p.id], childOf[p.id]))
 		ex.out.Counts["persons"]++
 	}
 	for _, f := range ex.families {
-		if rec := ex.familyRecord(f, eventsOf[fmt.Sprintf("family:%d", f.id)]); rec != nil {
+		if rec := ex.familyRecord(f, familyEvents[f.id]); rec != nil {
 			records = append(records, rec)
 			ex.out.Counts["families"]++
 		}
@@ -552,7 +552,7 @@ func (ex *exporter) personRecord(p exportPerson, events []exportEvent, partnerFa
 		for _, e := range events {
 			r.Children = append(r.Children, ex.eventNode(e))
 		}
-		ex.participations(r, p.id)
+		ex.participations(r, events)
 		add(r, "NOTE", p.notes)
 		ex.citations(r, "person", p.id)
 		ex.mediaRefs(r, "person", p.id)
@@ -574,15 +574,14 @@ func (ex *exporter) personRecord(p exportPerson, events []exportEvent, partnerFa
 }
 
 // participations writes the shared events a person takes part in as 5.5.1
-// ASSO lines on the person; GEDCOM 7 has them on the event itself.
-func (ex *exporter) participations(r *gedcom.Node, personID int64) {
+// ASSO lines on the person; GEDCOM 7 has them on the event itself. events
+// are the person's own events, so the cost is that of their events and not
+// of every event for every person.
+func (ex *exporter) participations(r *gedcom.Node, events []exportEvent) {
 	if ex.opt.Version7 {
 		return
 	}
-	for _, e := range ex.events {
-		if !e.personID.Valid || e.personID.Int64 != personID {
-			continue
-		}
+	for _, e := range events {
 		for _, p := range ex.parts[e.id] {
 			if !ex.included[p.personID] {
 				continue
@@ -1078,14 +1077,31 @@ func (ex *exporter) heirloomRecords(ctx context.Context) ([]*gedcom.Node, error)
 				crow.Close()
 				return nil, err
 			}
+			// A holder left out for privacy (excluded, or a living person
+			// shown by name only) keeps only how the object was passed on:
+			// the dates and the note would tell when they lived, and the
+			// note often names them.
 			c := node("_CUST", "")
-			if pid.Valid && ex.included[pid.Int64] {
-				c = pointer("_CUST", personXref(pid.Int64))
+			hidden := false
+			if pid.Valid {
+				switch {
+				case !ex.included[pid.Int64]:
+					hidden = true
+				case ex.nameOnly[pid.Int64]:
+					c = pointer("_CUST", personXref(pid.Int64)) // the name is in the file anyway
+					hidden = true
+				default:
+					c = pointer("_CUST", personXref(pid.Int64))
+				}
 			}
-			add(c, "_FROM", ex.textDate(from))
-			add(c, "_TO", ex.textDate(to))
+			if !hidden {
+				add(c, "_FROM", ex.textDate(from))
+				add(c, "_TO", ex.textDate(to))
+			}
 			add(c, "TYPE", how)
-			add(c, "NOTE", notes)
+			if !hidden {
+				add(c, "NOTE", notes)
+			}
 			r.Children = append(r.Children, c)
 		}
 		crow.Close()

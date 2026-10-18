@@ -429,6 +429,9 @@ func (s *Store) validateCitation(ctx context.Context, q queryer, a Actor, in Cit
 	v.check(in.Quality == nil || (*in.Quality >= 0 && *in.Quality <= 3), "quality", "must be between 0 and 3")
 	v.check(utf8.RuneCountInString(in.Page) <= 500, "page", "is too long")
 	v.check(utf8.RuneCountInString(in.Text) <= 100_000, "text", "is too long")
+	// A citation exists only while it supports a fact: the database deletes
+	// it with its last link, so one without links would never be cleaned up.
+	v.check(len(in.Links) > 0, "links", "is required")
 	v.check(len(in.Links) <= 200, "links", "too many links")
 	seen := map[LinkInput]bool{}
 	for _, l := range in.Links {
@@ -517,10 +520,13 @@ func (s *Store) UpdateCitation(ctx context.Context, a Actor, id int64, in Citati
 			in.SourceID, in.Page, in.Quality, in.Text, in.Notes, s.now(), nullID(a.UserID), id, a.TreeID); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM citation_links WHERE citation_id = ?`, id); err != nil {
+		// New links first, then the ones no longer listed: deleting every link
+		// before writing would drop the citation (see citation_links_drop_orphans).
+		// in.Links is never empty here, so the citation keeps at least one.
+		if err := writeLinks(ctx, tx, id, in.Links); err != nil {
 			return err
 		}
-		if err := writeLinks(ctx, tx, id, in.Links); err != nil {
+		if err := dropOtherLinks(ctx, tx, id, in.Links); err != nil {
 			return err
 		}
 		if c, err = s.getCitation(ctx, tx, a, id); err != nil {
@@ -553,12 +559,26 @@ func (s *Store) GetCitation(ctx context.Context, a Actor, id int64) (Citation, e
 func writeLinks(ctx context.Context, tx *sql.Tx, citationID int64, links []LinkInput) error {
 	for _, l := range links {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO citation_links (citation_id, entity_type, entity_id, field, status, status_reason) VALUES (?, ?, ?, ?, ?, ?)`,
+			INSERT INTO citation_links (citation_id, entity_type, entity_id, field, status, status_reason) VALUES (?, ?, ?, ?, ?, ?)
+			ON CONFLICT (citation_id, entity_type, entity_id, field) DO UPDATE SET status = excluded.status, status_reason = excluded.status_reason`,
 			citationID, l.EntityType, l.EntityID, l.Field, l.Status, l.StatusReason); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// dropOtherLinks deletes the links of a citation that are not in keep.
+func dropOtherLinks(ctx context.Context, tx *sql.Tx, citationID int64, keep []LinkInput) error {
+	args := []any{citationID}
+	tuples := make([]string, 0, len(keep))
+	for _, l := range keep {
+		tuples = append(tuples, "(?, ?, ?)")
+		args = append(args, l.EntityType, l.EntityID, l.Field)
+	}
+	_, err := tx.ExecContext(ctx, `DELETE FROM citation_links WHERE citation_id = ?
+		AND (entity_type, entity_id, field) NOT IN (VALUES `+strings.Join(tuples, ", ")+`)`, args...)
+	return err
 }
 
 func (s *Store) getCitation(ctx context.Context, q queryer, a Actor, id int64) (Citation, error) {
@@ -736,7 +756,8 @@ func (s *Store) addCitations(ctx context.Context, tx *sql.Tx, a Actor, entityTyp
 }
 
 // Unlink removes one fact from a citation, and the citation itself when it
-// supports nothing else.
+// supports nothing else. The database trigger citation_links_drop_orphans
+// does the deletion; the code below only logs it.
 func (s *Store) Unlink(ctx context.Context, a Actor, citationID int64, entityType string, entityID int64) error {
 	return s.tx(ctx, func(tx *sql.Tx) error {
 		return s.unlink(ctx, tx, a, citationID, entityType, entityID)

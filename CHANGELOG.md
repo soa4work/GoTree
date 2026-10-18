@@ -110,6 +110,25 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A GEDCOM 5.5.1 export of a large tree no longer goes through every event for every person (#56)
+
+- A GEDCOM export without living people (or with their names only) no longer writes the dates and
+  notes of a living heirloom holder (#56)
+
+- Replacing the tree by a GEDCOM import keeps share links to a branch when the file has the same
+  person (same GEDCOM ID and name) and lists the links it had to delete; the import page warns
+  about such links first. Transcription drafts forget the people of the old tree, and ids of
+  deleted people, families, events, places, sources and citations are never given to new ones, so
+  an old link or draft can no longer point to someone else; the first start after the update may
+  take a little longer on a large tree (#56)
+
+- Descendants of a person who married a cousin are complete again in the tree, in share links to a
+  branch and on the migration map: the other marriages and children of that cousin were left out (#56)
+
+- Deleting a person, event, family, name or heirloom also deletes citations that supported only
+  it, instead of leaving them behind on the source; citations already left without any fact are
+  removed on update, and a citation can no longer be created through the API without a fact (#56)
+
 - Photos are served and exported in GEDZIP archives without their GPS position (EXIF and XMP, in
   JPEG, PNG and WebP); the position read on upload stays visible to members of the tree, and
   GOTREE_PHOTO_LOCATION=keep serves the originals, except in exports without living people (#58)

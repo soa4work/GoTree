@@ -222,11 +222,53 @@ func TestHeirloomExportPrivacy(t *testing.T) {
 	s := newStore(t)
 	a := setup(t, s)
 	living := mustPerson(t, s, a, "Lisa", "Weber")
-	if _, err := s.CreateHeirloom(ctx, a, HeirloomInput{Name: "Ring", Custody: []CustodyInput{{PersonID: &living.ID, FromDate: "2010"}}}); err != nil {
+	dead := mustPerson(t, s, a, "Otto", "Weber")
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &dead.ID, Type: "DEAT", Date: "1890"}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := s.CreateHeirloom(ctx, a, HeirloomInput{Name: "Ring", Custody: []CustodyInput{
+		{PersonID: &dead.ID, FromDate: "1850", ToDate: "1890", How: "inherited"},
+		{PersonID: &living.ID, FromDate: "2010", ToDate: "2020", How: "gift", Notes: "Lisa Weber's wedding ring"},
+		{PersonID: nil, FromDate: "1900", Notes: "a dealer in Halle"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	secrets := []string{"2010", "2020", "wedding ring"}
+	lisa := fmt.Sprintf("_CUST @I%d@", living.ID)
+
+	// A holder left out keeps only how the object was passed on. The
+	// deceased holder and the unknown one keep everything.
 	text := exportText(t, s, a, ExportOptions{Privacy: PrivacyExcludeLiving})
-	if strings.Contains(text, "_CUST @I") || !strings.Contains(text, "1 _CUST\n2 _FROM 2010") {
-		t.Errorf("a living holder left out keeps the entry without a pointer:\n%s", text)
+	if !strings.Contains(text, "1 _CUST\n2 TYPE gift") || strings.Contains(text, lisa) {
+		t.Errorf("an excluded holder keeps only the way of passing on:\n%s", text)
+	}
+	for _, secret := range secrets {
+		if strings.Contains(text, secret) {
+			t.Errorf("%q leaks through an excluded holder:\n%s", secret, text)
+		}
+	}
+	for _, want := range []string{fmt.Sprintf("_CUST @I%d@\n2 _FROM 1850", dead.ID), "2 _FROM 1900", "2 NOTE a dealer in Halle"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("missing %q:\n%s", want, text)
+		}
+	}
+
+	// A living holder shown by name only keeps the pointer, as the name is
+	// in the file anyway, and nothing else.
+	text = exportText(t, s, a, ExportOptions{Privacy: PrivacyLivingNameOnly})
+	if !strings.Contains(text, fmt.Sprintf("1 %s\n2 TYPE gift", lisa)) {
+		t.Errorf("a name-only holder keeps the pointer and the type:\n%s", text)
+	}
+	for _, secret := range secrets {
+		if strings.Contains(text, secret) {
+			t.Errorf("%q leaks through a name-only holder:\n%s", secret, text)
+		}
+	}
+
+	text = exportText(t, s, a, ExportOptions{Privacy: PrivacyAll})
+	for _, want := range []string{lisa + "\n2 _FROM 2010\n2 _TO 2020\n2 TYPE gift\n2 NOTE Lisa Weber's wedding ring"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("a full export drops %q:\n%s", want, text)
+		}
 	}
 }

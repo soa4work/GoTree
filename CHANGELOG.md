@@ -14,6 +14,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
   members, and where every member can leave the tree; viewers can export only without living
   people (#59)
 
+- Accounts page for administrators: create accounts, change their name and role, reset a
+  password and delete an account; the backup section says that it covers every tree and
+  account (#59)
+
 - Accounts, trees and members over the API (#59): administrators create and delete accounts,
   change their role and reset passwords (which signs the account out everywhere); owners add
   existing accounts to a tree as owner, editor or viewer, change roles and remove members, and a

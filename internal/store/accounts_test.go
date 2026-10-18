@@ -217,3 +217,27 @@ func TestListAccounts(t *testing.T) {
 		t.Errorf("fresh account: %+v", list[1])
 	}
 }
+
+// TestLastAdminRace has two administrators demote each other at the same
+// time; one of them must stay an administrator.
+func TestLastAdminRace(t *testing.T) {
+	s := newStore(t)
+	setup(t, s)
+	a := admin(t, s)
+	b := mustAccount(t, s, a, "second", UserRoleAdmin).User
+	errs := make(chan error, 2)
+	go func() { _, err := s.UpdateAccount(ctx, a, b.ID, AccountUpdate{Role: UserRoleUser}); errs <- err }()
+	go func() { _, err := s.UpdateAccount(ctx, b, a.ID, AccountUpdate{Role: UserRoleUser}); errs <- err }()
+	var refused int
+	for range 2 {
+		if err := <-errs; errors.Is(err, ErrLastAdmin) {
+			refused++
+		} else if err != nil {
+			t.Fatal(err)
+		}
+	}
+	var n int
+	if err := s.DB.QueryRow(`SELECT count(*) FROM users WHERE role = 'admin'`).Scan(&n); err != nil || n != 1 || refused != 1 {
+		t.Errorf("admins left: %d (%v), refused: %d; want 1 and 1", n, err, refused)
+	}
+}

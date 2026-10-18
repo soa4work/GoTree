@@ -344,3 +344,28 @@ func TestMemberChangesAreLogged(t *testing.T) {
 		}
 	}
 }
+
+// TestLastOwnerRace has two owners demote each other at the same time. The
+// owner count runs inside the write transaction, so one of them must stay.
+func TestLastOwnerRace(t *testing.T) {
+	s := newStore(t)
+	f := newFixture(t, s)
+	if _, err := s.SetMemberRole(ctx, f.owner.ID, f.tree, f.ed.ID, RoleOwner); err != nil {
+		t.Fatal(err)
+	}
+	errs := make(chan error, 2)
+	go func() { _, err := s.SetMemberRole(ctx, f.owner.ID, f.tree, f.ed.ID, RoleViewer); errs <- err }()
+	go func() { errs <- s.RemoveMember(ctx, f.ed.ID, f.tree, f.owner.ID) }()
+	var refused int
+	for range 2 {
+		if err := <-errs; errors.Is(err, ErrLastOwner) || errors.Is(err, ErrOwnerOnly) {
+			refused++
+		} else if err != nil {
+			t.Fatal(err)
+		}
+	}
+	n, err := ownerCount(ctx, s.DB, f.tree)
+	if err != nil || n != 1 || refused != 1 {
+		t.Errorf("owners left: %d (%v), refused: %d; want 1 and 1", n, err, refused)
+	}
+}

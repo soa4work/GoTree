@@ -162,7 +162,7 @@ func TestUserLastTreeMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.DownTo(ctx, 12); err != nil {
+	if _, err := provider.DownTo(ctx, 16); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := conn.ExecContext(ctx, `INSERT INTO users (id, username, password_hash, created_at, updated_at) VALUES (1, 'u', 'x', '', '')`); err != nil {
@@ -176,7 +176,7 @@ func TestUserLastTreeMigration(t *testing.T) {
 		t.Errorf("last_tree_id = %v, %v; want NULL", last, err)
 	}
 	// Going down again keeps the user.
-	if _, err := provider.DownTo(ctx, 12); err != nil {
+	if _, err := provider.DownTo(ctx, 16); err != nil {
 		t.Fatal(err)
 	}
 	var n int

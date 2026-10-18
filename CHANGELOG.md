@@ -123,6 +123,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- GEDCOM export keeps who took part in an event: a participant's own role name and notes are
+  written in 5.5.1 and 7.0 and read back, and witnesses of marriages and other family events are no
+  longer left out of 5.5.1 files; editing an event no longer clears its participants' notes (#54)
+
 - GEDCOM import keeps the notes and sources of every name: NAME.NOTE becomes a note on the name,
   shown and editable on the person, sources of other and married names are attached to those names,
   and a source of the main name stays on the name through export and import instead of moving to

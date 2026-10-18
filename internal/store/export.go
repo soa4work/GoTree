@@ -119,6 +119,9 @@ type exporter struct {
 	used     map[int64]bool              // media referenced by an exported record
 	xrefMap  map[string]string           // original GEDCOM xref → exported xref
 	dangling int
+
+	familyEvents map[int64][]exportEvent // family id → its events, in the order they are written
+	familyByID   map[int64]exportFamily
 }
 
 type placeInfo struct {
@@ -130,6 +133,7 @@ type participantRow struct {
 	personID   int64
 	role       string
 	customRole string
+	notes      string
 }
 
 // ExportGEDCOM builds the records of a GEDCOM file for the actor's tree.
@@ -332,14 +336,14 @@ func (ex *exporter) load(ctx context.Context) error {
 	}
 
 	rows, err = db.QueryContext(ctx, `
-		SELECT p.event_id, p.person_id, p.role, p.custom_role FROM event_participants p JOIN events e ON e.id = p.event_id WHERE e.tree_id = ?`, a.TreeID)
+		SELECT p.event_id, p.person_id, p.role, p.custom_role, p.notes FROM event_participants p JOIN events e ON e.id = p.event_id WHERE e.tree_id = ? ORDER BY p.event_id, p.rowid`, a.TreeID)
 	if err != nil {
 		return err
 	}
 	for rows.Next() {
 		var eid int64
 		var pr participantRow
-		if err := rows.Scan(&eid, &pr.personID, &pr.role, &pr.customRole); err != nil {
+		if err := rows.Scan(&eid, &pr.personID, &pr.role, &pr.customRole, &pr.notes); err != nil {
 			rows.Close()
 			return err
 		}
@@ -487,6 +491,11 @@ func (ex *exporter) build(ctx context.Context) error {
 		}
 	}
 
+	ex.familyEvents = familyEvents
+	ex.familyByID = map[int64]exportFamily{}
+	for _, f := range ex.families {
+		ex.familyByID[f.id] = f
+	}
 	for _, p := range ex.persons {
 		records = append(records, ex.personRecord(p, personEvents[p.id], partnerOf[p.id], childOf[p.id]))
 		ex.out.Counts["persons"]++
@@ -588,7 +597,7 @@ func (ex *exporter) personRecord(p exportPerson, events []exportEvent, partnerFa
 		for _, e := range events {
 			r.Children = append(r.Children, ex.eventNode(e))
 		}
-		ex.participations(r, events)
+		ex.participations(r, p.id, events, partnerFams)
 		add(r, "NOTE", p.notes)
 		ex.citations(r, "person", p.id)
 		ex.mediaRefs(r, "person", p.id)
@@ -613,20 +622,89 @@ func (ex *exporter) personRecord(p exportPerson, events []exportEvent, partnerFa
 // ASSO lines on the person; GEDCOM 7 has them on the event itself. events
 // are the person's own events, so the cost is that of their events and not
 // of every event for every person.
-func (ex *exporter) participations(r *gedcom.Node, events []exportEvent) {
+//
+// 5.5.1 allows ASSO only on a person, so the participants of a family event
+// go on the family's writing partner (see familyWriter), with the family in
+// the RELA: "witness (MARR F3)".
+func (ex *exporter) participations(r *gedcom.Node, personID int64, events []exportEvent, partnerFams []int64) {
 	if ex.opt.Version7 {
 		return
 	}
+	seen := map[string]int{}
 	for _, e := range events {
-		for _, p := range ex.parts[e.id] {
-			if !ex.included[p.personID] {
-				continue
-			}
-			r.Children = append(r.Children, pointer("ASSO", personXref(p.personID)))
-			asso := r.Children[len(r.Children)-1]
-			asso.Children = append(asso.Children, node("RELA", fmt.Sprintf("%s (%s)", p.role, e.typ)))
+		seen[e.typ]++
+		ex.assoNodes(r, e, "", seen[e.typ])
+	}
+	for _, fid := range partnerFams {
+		f := ex.familyByID[fid]
+		if w, ok := ex.familyWriter(f); !ok || w != personID {
+			continue
+		}
+		seen := map[string]int{}
+		for _, e := range ex.familyEvents[fid] {
+			seen[e.typ]++
+			ex.assoNodes(r, e, familyXref(fid), seen[e.typ])
 		}
 	}
+}
+
+// assoNodes writes the 5.5.1 ASSO line of each participant of an event.
+func (ex *exporter) assoNodes(r *gedcom.Node, e exportEvent, famXref string, ordinal int) {
+	for _, p := range ex.parts[e.id] {
+		if !ex.included[p.personID] {
+			continue
+		}
+		asso := pointer("ASSO", personXref(p.personID))
+		asso.Children = append(asso.Children, node("RELA", relaText(p.role, p.customRole, e.typ, famXref, ordinal)))
+		add(asso, "NOTE", p.notes)
+		r.Children = append(r.Children, asso)
+	}
+}
+
+// relaText is the 5.5.1 RELA of a participant: "<role>[: <custom>] (<TAG>
+// [<family>][ <n>])". The number is written only for the second and later
+// event of the same tag, so that the import finds the right one again.
+func relaText(role, custom, tag, famXref string, ordinal int) string {
+	s := role
+	if custom != "" {
+		s += ": " + custom
+	}
+	s += " (" + tag
+	if famXref != "" {
+		s += " " + famXref
+	}
+	if ordinal > 1 {
+		s += " " + strconv.Itoa(ordinal)
+	}
+	return s + ")"
+}
+
+// familyHidden reports whether a partner who is left out or reduced to a
+// name takes the family's events, notes, citations and media with them.
+// It is the same rule as the share view.
+func (ex *exporter) familyHidden(f exportFamily) bool {
+	for _, p := range []sql.NullInt64{f.p1, f.p2} {
+		if p.Valid && (!ex.included[p.Int64] || ex.nameOnly[p.Int64]) {
+			return true
+		}
+	}
+	return false
+}
+
+// familyWriter is the partner whose record carries the 5.5.1 ASSO lines of
+// the family's events: the first partner, or the second when there is no
+// first. It is false when the family's events are not exported.
+func (ex *exporter) familyWriter(f exportFamily) (int64, bool) {
+	if ex.familyHidden(f) {
+		return 0, false
+	}
+	if f.p1.Valid {
+		return f.p1.Int64, true
+	}
+	if f.p2.Valid {
+		return f.p2.Int64, true
+	}
+	return 0, false
 }
 
 // pedigree is the FAMC.PEDI value when both parents relate the same way.
@@ -673,6 +751,7 @@ func (ex *exporter) eventNode(e exportEvent) *gedcom.Node {
 			if ex.included[p.personID] {
 				asso := pointer("ASSO", personXref(p.personID))
 				asso.Children = append(asso.Children, roleNode(p.role, p.customRole))
+				add(asso, "NOTE", p.notes)
 				n.Children = append(n.Children, asso)
 			}
 		}
@@ -704,18 +783,25 @@ var roles7 = map[string]string{
 	"spouse": "SPOU", "neighbor": "NGHBR", "officiant": "OFFICIATOR", "witness": "WITN",
 }
 
-// roleNode writes a participant's 7.0 ROLE. Roles 7.0 lacks (head, sibling,
-// relative, informant) go out as OTHER with the role in a PHRASE, and so
-// does a custom role.
+// roleNode writes a participant's 7.0 ROLE. A role 7.0 knows keeps its tag
+// and carries a custom name in the PHRASE. The roles it lacks (head,
+// sibling, relative, informant) go out as OTHER with the role in the
+// PHRASE, followed by the custom name when there is one.
 func roleNode(role, custom string) *gedcom.Node {
 	if r, ok := roles7[role]; ok {
-		return node("ROLE", r)
+		if custom == "" {
+			return node("ROLE", r)
+		}
+		return node("ROLE", r, node("PHRASE", custom))
 	}
 	if role == "other" {
 		if custom == "" {
 			return node("ROLE", "OTHER")
 		}
 		return node("ROLE", "OTHER", node("PHRASE", custom))
+	}
+	if custom != "" {
+		return node("ROLE", "OTHER", node("PHRASE", role+": "+custom))
 	}
 	return node("ROLE", "OTHER", node("PHRASE", role))
 }
@@ -895,13 +981,7 @@ func (ex *exporter) familyRecord(f exportFamily, events []exportEvent) *gedcom.N
 	}
 	// Same rule as the share view: a partner who is left out or reduced to a
 	// name takes the family's events, notes, citations and media with them.
-	hidden := false
-	for _, p := range []sql.NullInt64{f.p1, f.p2} {
-		if p.Valid && (!ex.included[p.Int64] || ex.nameOnly[p.Int64]) {
-			hidden = true
-		}
-	}
-	if !hidden {
+	if !ex.familyHidden(f) {
 		for _, e := range events {
 			r.Children = append(r.Children, ex.eventNode(e))
 		}

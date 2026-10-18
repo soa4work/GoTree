@@ -33,6 +33,9 @@ SQLite file — no database server, no cloud account.
   birthdays and anniversaries
 - GEDCOM 5.5, 5.5.1 and 7.0 import and export, also zipped with media; backup as one zip
 - Light, dark or system theme and a first-run onboarding
+- Russian (default) and Kazakh interface: the first visit follows the browser language, otherwise
+  Russian, and the choice is saved in the browser. Calendar feeds, dates and server messages follow
+  the language. Kazakh is still to be proofread by a native speaker.
 - Single user today, data model ready for multiple users and trees (there is no multi-user UI yet)
 
 ## Stack
@@ -116,6 +119,14 @@ make test    # ./run-tests.sh — the same gate the pre-push hook and CI use
 The end-to-end tests (`web/e2e`, Playwright) use the installed Chrome or Chromium; set
 `CHROME_PATH` if it is not found in the usual places. `GOTREE_AUDIT=1 ./run-tests.sh` also runs
 govulncheck and `npm audit` (CI does this on every PR and nightly).
+
+### Languages
+
+`web/src/locales/en.json` is the source: `ru.json` and `kk.json` must have the same keys
+(`locales.test.ts` checks it), and Russian needs the plural forms `_one`, `_few`, `_many` and
+`_other`. English is a hidden fallback used by the unit tests and Playwright (`gotree-lang=en`).
+`npm run e2e -- e2e/i18n.spec.ts` checks the main pages in Russian and Kazakh, including the
+phone width.
 
 Layout: `cmd/gotree` (entry point), `internal/` (`config`, `db` + migrations, `gendate` GEDCOM
 dates, `store` domain logic, `api` HTTP handlers), `web/` (React app, embedded into the binary

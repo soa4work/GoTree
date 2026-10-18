@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import '../i18n'
+import i18n from '../i18n'
 import { LoginPage } from './LoginPage'
 import { axeViolations } from '../test/axe'
 import { loggedInState, mockApi, renderApp } from '../test/render'
@@ -33,6 +33,27 @@ describe('first-run setup', () => {
       password: 'correct horse battery',
       treeName: 'Weber family',
     })
+  })
+
+  it.each([
+    ['en', 'Family tree'],
+    ['ru', 'Семейное дерево'],
+  ])('names an unnamed tree in %s', async (lang, name) => {
+    await i18n.changeLanguage(lang)
+    const fetchMock = mockApi({
+      'GET /api/auth/state': [200, { setupRequired: true, user: null, tree: null }],
+      'POST /api/auth/setup': [200, loggedInState],
+    })
+    const user = userEvent.setup()
+    renderApp()
+    await screen.findByRole('heading', { level: 1 })
+    const fields = screen.getAllByLabelText(/^(Password|Repeat password|Пароль|Повторите пароль)/)
+    for (const f of fields) await user.type(f, 'correct horse battery')
+    await user.click(screen.getByRole('button', { name: /^(Create account and start|Создать)/ }))
+    await waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true))
+    const call = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')
+    expect(JSON.parse(String(call?.[1]?.body)).treeName).toBe(name)
+    await i18n.changeLanguage('en')
   })
 
   it('checks that the passwords match before sending anything', async () => {

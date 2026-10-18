@@ -137,6 +137,14 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The interface no longer falls back to English in Russian and Kazakh: tree and map zoom buttons,
+  network and proxy errors, GEDCOM import warnings, dropped-tag reasons and broken references,
+  transcription row errors, the calendar's "Unknown", the default tree name, the page language
+  and description, Kazakh sorting, decimal commas and the chart file name; the person line says
+  «умер»/«умерла» by sex; OpenStreetMap lookups keep one request per second across all places
+  and return names in the interface language; the pages are checked in Russian and Kazakh at
+  phone width (#61)
+
 - GEDCOM import keeps the notes and sources of every name: NAME.NOTE becomes a note on the name,
   shown and editable on the person, sources of other and married names are attached to those names,
   and a source of the main name stays on the name through export and import instead of moving to

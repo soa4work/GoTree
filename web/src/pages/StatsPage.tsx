@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { getStats } from '../api/endpoints'
 import type { Average, NameCount } from '../api/types'
 import { PageHeading } from '../components/PageHeading'
+import { compareText } from '../lib/collate'
 
 /** A bar beside the number it shows; the number is what assistive tech reads. */
 function Bar({
@@ -317,7 +318,7 @@ function WordCloud({ names }: { names: NameCount[] }) {
   return (
     <ul className="flex flex-wrap items-baseline justify-center gap-x-5 gap-y-2 rounded-xl bg-brand-50 px-4 py-6 dark:bg-slate-950">
       {[...names]
-        .sort((a, b) => a.name.localeCompare(b.name))
+        .sort((a, b) => compareText(a.name, b.name))
         .map((n) => (
           <li
             key={n.name}

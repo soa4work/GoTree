@@ -39,7 +39,10 @@ type TagStat struct {
 	Path    string `json:"path"`
 	Count   int    `json:"count"`
 	Outcome string `json:"outcome"`
-	Reason  string `json:"reason,omitempty"`
+	// Reason is the English reason a line was dropped; ReasonCode is its
+	// stable code (one of DropReasonCodes) that clients translate.
+	Reason     string `json:"reason,omitempty"`
+	ReasonCode string `json:"reasonCode,omitempty"`
 }
 
 // ImportReport describes what an import did.
@@ -53,14 +56,14 @@ type ImportReport struct {
 	Warnings []gedcom.Warning `json:"warnings"`
 	// InvalidDates are dates kept as written because they are not valid
 	// GEDCOM; Examples shows a few.
-	InvalidDates        int      `json:"invalidDates"`
-	InvalidDateExamples []string `json:"invalidDateExamples"`
-	BrokenReferences    []string `json:"brokenReferences"`
+	InvalidDates        int              `json:"invalidDates"`
+	InvalidDateExamples []gedcom.Warning `json:"invalidDateExamples"`
+	BrokenReferences    []gedcom.Warning `json:"brokenReferences"`
 	// ChildrenFromFAMC counts children that their family did not list under
 	// CHIL but that named the family in their own FAMC; they were added to
 	// it. The examples show a few.
-	ChildrenFromFAMC         int      `json:"childrenFromFamc"`
-	ChildrenFromFAMCExamples []string `json:"childrenFromFamcExamples"`
+	ChildrenFromFAMC         int              `json:"childrenFromFamc"`
+	ChildrenFromFAMCExamples []gedcom.Warning `json:"childrenFromFamcExamples"`
 	// ShareLinksKept counts working links to a branch whose person was
 	// found again in the file (same GEDCOM ID and name); ShareLinksLost
 	// are the labels of working links whose person was not, and which
@@ -112,11 +115,130 @@ var (
 	}
 	// Tags that GoTree replaces with its own data when exporting.
 	droppedTags = map[string]string{
-		"CHAN": "GoTree keeps its own change history",
-		"RIN":  "a record number of the old program",
-		"FAMS": "follows from the families",
+		"CHAN": DropOwnHistory,
+		"RIN":  DropOldRecordNumber,
+		"FAMS": DropFollowsFromFamilies,
 	}
 )
+
+// Codes of the lines an import report adds (the parser's are in
+// gedcom.WarningCodes). Clients translate them with the line's params.
+const (
+	ReportBrokenReference  = "broken_reference"
+	ReportPartnerAndChild  = "partner_and_child"
+	ReportFamcChild        = "famc_child"
+	ReportFamcChildUnnamed = "famc_child_unnamed"
+	ReportInvalidDate      = "invalid_date"
+)
+
+// ReportCodes lists every code an import report line can carry.
+var ReportCodes = []string{ReportBrokenReference, ReportPartnerAndChild, ReportFamcChild, ReportFamcChildUnnamed, ReportInvalidDate}
+
+// Codes of the reasons a line is dropped (TagStat.ReasonCode).
+const (
+	DropOwnHistory          = "own_history"
+	DropOldRecordNumber     = "old_record_number"
+	DropFollowsFromFamilies = "follows_from_families"
+	DropOwnSubmitter        = "own_submitter"
+	DropMediaRecords        = "media_records"
+	DropUnknownRecord       = "unknown_record"
+	DropPlaceForm           = "place_form"
+	DropHeirloomDatePhrase  = "heirloom_date_phrase"
+	DropHeirloomCustody     = "heirloom_custody_field"
+	DropHeirloomField       = "heirloom_field"
+	DropStatusOnlyReason    = "status_only_reason"
+	DropNameStatus          = "name_status"
+	DropWebLink             = "web_link"
+	DropFileNotInUpload     = "file_not_in_upload"
+	DropFileNotInZip        = "file_not_in_zip"
+	DropFileTooLarge        = "file_too_large"
+	DropZipTooLarge         = "zip_too_large"
+	DropFileType            = "file_type_unsupported"
+	DropImagePixels         = "image_too_large"
+	DropFileUnreadable      = "file_unreadable"
+	DropMediaNoFile         = "media_no_file"
+	DropMarriedNameField    = "married_name_field"
+	DropNameEmpty           = "name_empty"
+	DropHeirloomMedia       = "heirloom_media"
+	DropMediaFileField      = "media_file_field"
+	DropBlob                = "blob_not_read"
+	DropMediaRecordSkipped  = "media_record_not_imported"
+	DropMediaNoObject       = "media_no_object"
+	DropMediaFileMissing    = "media_file_not_imported"
+	DropMediaCrop           = "media_crop"
+	DropMediaLinkField      = "media_link_field"
+)
+
+// dropReasonText is the English reason of each drop code; TagStat.Reason is
+// the fallback for clients that do not know a code.
+var dropReasonText = map[string]string{
+	DropOwnHistory:          "GoTree keeps its own change history",
+	DropOldRecordNumber:     "a record number of the old program",
+	DropFollowsFromFamilies: "follows from the families",
+	DropOwnSubmitter:        "GoTree writes its own submitter",
+	DropMediaRecords:        "media files are not part of a GEDCOM file; upload them in GoTree",
+	DropUnknownRecord:       "unknown record type",
+	DropPlaceForm:           "the place hierarchy describes the levels",
+	DropHeirloomDatePhrase:  "heirlooms have nowhere to keep it",
+	DropHeirloomCustody:     "not part of an heirloom's custody in GoTree",
+	DropHeirloomField:       "not part of an heirloom in GoTree",
+	DropStatusOnlyReason:    "a status has only a reason",
+	DropNameStatus:          "the main name has no status in GoTree",
+	DropWebLink:             "links to files on the web are not imported",
+	DropFileNotInUpload:     "the file is not in the upload; import a GEDZIP or upload the file in GoTree",
+	DropFileNotInZip:        "the file is not in the zip",
+	DropFileTooLarge:        "the file is larger than the upload limit",
+	DropZipTooLarge:         "the zip unpacks to more than the import limit",
+	DropFileType:            "this kind of file is not supported",
+	DropImagePixels:         "the image is larger than the pixel limit",
+	DropFileUnreadable:      "the file in the zip cannot be read",
+	DropMediaNoFile:         "the media object has no file",
+	DropMarriedNameField:    "not kept for a married name",
+	DropNameEmpty:           "the name is empty",
+	DropHeirloomMedia:       "heirlooms have nowhere to keep a media line without a file",
+	DropMediaFileField:      "not kept on a media file",
+	DropBlob:                "embedded BLOB data is not read",
+	DropMediaRecordSkipped:  "the record it belongs to was not imported",
+	DropMediaNoObject:       "it points to no media object",
+	DropMediaFileMissing:    "the media file was not imported",
+	DropMediaCrop:           "cropping a linked photo is not kept",
+	DropMediaLinkField:      "not kept on a media link",
+}
+
+// DropReasonCodes lists every drop code.
+var DropReasonCodes = []string{
+	DropOwnHistory, DropOldRecordNumber, DropFollowsFromFamilies, DropOwnSubmitter, DropMediaRecords,
+	DropUnknownRecord, DropPlaceForm, DropHeirloomDatePhrase, DropHeirloomCustody, DropHeirloomField,
+	DropStatusOnlyReason, DropNameStatus,
+	DropWebLink, DropFileNotInUpload, DropFileNotInZip, DropFileTooLarge, DropZipTooLarge, DropFileType, DropImagePixels, DropFileUnreadable, DropMediaNoFile, DropMarriedNameField, DropNameEmpty, DropHeirloomMedia, DropMediaFileField, DropBlob, DropMediaRecordSkipped, DropMediaNoObject, DropMediaFileMissing, DropMediaCrop, DropMediaLinkField,
+}
+
+// What a broken reference points at: the keys of broken's "what" param
+// (transfer.refKind in the locale files) and their English words.
+const (
+	RefAssociatedPerson = "associatedPerson"
+	RefNote             = "note"
+	RefRepository       = "repository"
+	RefSource           = "source"
+	RefFamily           = "family"
+	RefPartner          = "partner"
+	RefChild            = "child"
+	RefHolder           = "holder"
+)
+
+var refKindText = map[string]string{
+	RefAssociatedPerson: "the associated person",
+	RefNote:             "the note",
+	RefRepository:       "the repository",
+	RefSource:           "the source",
+	RefFamily:           "the family",
+	RefPartner:          "the partner",
+	RefChild:            "the child",
+	RefHolder:           "the holder",
+}
+
+// RefKinds lists every key broken accepts.
+var RefKinds = []string{RefAssociatedPerson, RefNote, RefRepository, RefSource, RefFamily, RefPartner, RefChild, RefHolder}
 
 type importer struct {
 	s      *Store
@@ -174,13 +296,15 @@ type famcLink struct {
 	line      int
 }
 
-func (im *importer) tag(path, outcome, reason string) {
-	// Reasons are part of the key: dropped lines of one kind may have
-	// different causes, and the report should name each.
-	key := path + "|" + outcome + "|" + reason
+// tag counts one line of the given outcome. A dropped line carries the code
+// of its reason (one of DropReasonCodes); other outcomes pass "".
+// Reasons are part of the key: dropped lines of one kind may have
+// different causes, and the report should name each.
+func (im *importer) tag(path, outcome, reasonCode string) {
+	key := path + "|" + outcome + "|" + reasonCode
 	t := im.tags[key]
 	if t == nil {
-		t = &TagStat{Path: path, Outcome: outcome, Reason: reason}
+		t = &TagStat{Path: path, Outcome: outcome, Reason: dropReasonText[reasonCode], ReasonCode: reasonCode}
 		im.tags[key] = t
 	}
 	t.Count++
@@ -193,10 +317,25 @@ func (im *importer) keep(path string, n *gedcom.Node, into *[]keptNode) {
 	*into = append(*into, toKept(n))
 }
 
+// broken notes a pointer to a record that is not in the file; what is one
+// of RefKinds.
 func (im *importer) broken(n *gedcom.Node, what string) {
 	if len(im.report.BrokenReferences) < 50 {
-		im.report.BrokenReferences = append(im.report.BrokenReferences,
-			fmt.Sprintf("line %d: %s @%s@ does not exist", n.Line, what, n.Pointer))
+		im.report.BrokenReferences = append(im.report.BrokenReferences, gedcom.Warning{
+			Line: n.Line, Code: ReportBrokenReference,
+			Params:  map[string]any{"what": what, "xref": n.Pointer},
+			Message: fmt.Sprintf("%s @%s@ does not exist", refKindText[what], n.Pointer),
+		})
+	}
+}
+
+// partnerAndChild is the report line for a person listed as a child of a
+// family they are a partner in; the child link is skipped.
+func partnerAndChild(line int, xref, family string) gedcom.Warning {
+	return gedcom.Warning{
+		Line: line, Code: ReportPartnerAndChild,
+		Params:  map[string]any{"xref": xref, "family": family},
+		Message: fmt.Sprintf("@%s@ is both a partner and a child of family @%s@; the child link was skipped", xref, family),
 	}
 }
 
@@ -214,8 +353,8 @@ func (s *Store) ImportGEDCOMFiles(ctx context.Context, a Actor, doc *gedcom.Docu
 	report := ImportReport{
 		Version: doc.Version, Encoding: doc.Encoding, Source: doc.Source,
 		Counts: map[string]int{}, Warnings: doc.Warnings,
-		InvalidDateExamples: []string{}, BrokenReferences: []string{},
-		ChildrenFromFAMCExamples: []string{}, ShareLinksLost: []string{},
+		InvalidDateExamples: []gedcom.Warning{}, BrokenReferences: []gedcom.Warning{},
+		ChildrenFromFAMCExamples: []gedcom.Warning{}, ShareLinksLost: []string{},
 	}
 	if report.Warnings == nil {
 		report.Warnings = []gedcom.Warning{}
@@ -389,7 +528,7 @@ func (im *importer) run(ctx context.Context) error {
 	for _, p := range im.deferred {
 		pid, ok := im.persons[p.xref]
 		if !ok {
-			im.broken(&gedcom.Node{Line: p.line, Pointer: p.xref}, "the associated person")
+			im.broken(&gedcom.Node{Line: p.line, Pointer: p.xref}, RefAssociatedPerson)
 			continue
 		}
 		if _, err := im.tx.ExecContext(ctx, `
@@ -402,11 +541,11 @@ func (im *importer) run(ctx context.Context) error {
 		case "INDI", "FAM", "SOUR", "REPO", "NOTE", "SNOTE", "_HEIRLOOM", "OBJE":
 		case "SUBM", "SUBN":
 			for range recs {
-				im.tag(tag, TagDropped, "GoTree writes its own submitter")
+				im.tag(tag, TagDropped, DropOwnSubmitter)
 			}
 		default:
 			for range recs {
-				im.tag(tag, TagDropped, "unknown record type")
+				im.tag(tag, TagDropped, DropUnknownRecord)
 			}
 		}
 	}
@@ -429,7 +568,7 @@ func (im *importer) noteText(n *gedcom.Node) string {
 	if n.Pointer != "" {
 		text, ok := im.notes[n.Pointer]
 		if !ok {
-			im.broken(n, "the note")
+			im.broken(n, RefNote)
 		}
 		return text
 	}
@@ -529,8 +668,8 @@ func (im *importer) other(ctx string, c *gedcom.Node, kept *[]keptNode) {
 		// the report says why.
 		im.reportMissingFiles(ctx+".OBJE", c)
 	}
-	if reason, ok := droppedTags[c.Tag]; ok {
-		im.tag(ctx+"."+c.Tag, TagDropped, reason)
+	if code, ok := droppedTags[c.Tag]; ok {
+		im.tag(ctx+"."+c.Tag, TagDropped, code)
 		return
 	}
 	im.keep(ctx, c, kept)
@@ -553,7 +692,7 @@ func (im *importer) factStatus(path string, c *gedcom.Node) (status, reason stri
 			im.mapped(path + "._STAT." + sub.Tag)
 			continue
 		}
-		im.tag(path+"._STAT."+sub.Tag, TagDropped, "a status has only a reason")
+		im.tag(path+"._STAT."+sub.Tag, TagDropped, DropStatusOnlyReason)
 	}
 	reason = joinNotes(notes)
 	if reason == "" && status != StatusAccepted {
@@ -596,7 +735,7 @@ func (im *importer) source(ctx context.Context, r *gedcom.Node) error {
 			} else if c.Pointer == "" && c.Value != "" {
 				im.keep("SOUR", c, &kept)
 			} else if !ok {
-				im.broken(c, "the repository")
+				im.broken(c, RefRepository)
 			} else {
 				im.keep("SOUR", c, &kept)
 			}
@@ -655,7 +794,7 @@ func (im *importer) citationField(ctx context.Context, ctxPath string, c *gedcom
 		sourceID, ok = id, true
 	}
 	if !ok {
-		im.broken(c, "the source")
+		im.broken(c, RefSource)
 		return nil
 	}
 	page, text := "", ""
@@ -771,7 +910,7 @@ func (im *importer) name(n *gedcom.Node, kept *[]keptNode, ctx string, primary b
 				im.mapped(ctx + ".NAME._STAT") // nothing to keep
 			case primary && validStatus(st) && st != StatusAccepted:
 				// The main name lives on the person, which has no status.
-				im.tag(ctx+".NAME._STAT", TagDropped, "the main name has no status in GoTree")
+				im.tag(ctx+".NAME._STAT", TagDropped, DropNameStatus)
 			case !primary && p.status == "":
 				if s, reason, ok := im.factStatus(ctx+".NAME", c); ok {
 					p.status, p.statusReason = s, reason
@@ -850,7 +989,7 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 				case "NOTE", "SNOTE":
 					p.notes, p.noteTags = append(p.notes, im.noteText(sub)), append(p.noteTags, sub.Tag)
 				default:
-					im.tag("INDI._MARNM."+sub.Tag, TagDropped, "not kept for a married name")
+					im.tag("INDI._MARNM."+sub.Tag, TagDropped, DropMarriedNameField)
 				}
 			}
 			others = append(others, p)
@@ -872,7 +1011,7 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 			assos = append(assos, c)
 		case c.Tag == "FAMC":
 			if _, ok := im.doc.RecordByXref(c.Pointer); !ok && c.Pointer != "VOID" {
-				im.broken(c, "the family")
+				im.broken(c, RefFamily)
 			}
 			if c.Pointer != "" && c.Pointer != "VOID" {
 				famcs = append(famcs, c)
@@ -906,10 +1045,10 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 	for i, n := range others {
 		if n.given == "" && n.surname == "" && n.nickname == "" {
 			for range n.sources {
-				im.tag(n.path+".SOUR", TagDropped, "the name is empty")
+				im.tag(n.path+".SOUR", TagDropped, DropNameEmpty)
 			}
 			for _, tag := range n.noteTags {
-				im.tag(n.path+"."+tag, TagDropped, "the name is empty")
+				im.tag(n.path+"."+tag, TagDropped, DropNameEmpty)
 			}
 			continue
 		}
@@ -1059,7 +1198,9 @@ func (im *importer) event(ctx context.Context, owner string, e *gedcom.Node, per
 	if dateRaw != "" && date == "" {
 		im.report.InvalidDates++
 		if len(im.report.InvalidDateExamples) < 10 {
-			im.report.InvalidDateExamples = append(im.report.InvalidDateExamples, fmt.Sprintf("line %d: %s", e.Line, dateRaw))
+			im.report.InvalidDateExamples = append(im.report.InvalidDateExamples, gedcom.Warning{
+				Line: e.Line, Code: ReportInvalidDate, Params: map[string]any{"date": dateRaw}, Message: dateRaw,
+			})
 		}
 	}
 	res, err := im.insertEvent.ExecContext(ctx, im.a.TreeID, personID, familyID, typ, label, dateRaw, date, key, keyEnd, qual,
@@ -1146,7 +1287,7 @@ func (im *importer) place(ctx context.Context, n *gedcom.Node, path string, kept
 				im.keep(path+".PLAC", c, kept)
 			}
 		case "FORM":
-			im.tag(path+".PLAC.FORM", TagDropped, "the place hierarchy describes the levels")
+			im.tag(path+".PLAC.FORM", TagDropped, DropPlaceForm)
 		default:
 			im.keep(path+".PLAC", c, kept)
 		}
@@ -1196,7 +1337,7 @@ func (im *importer) family(ctx context.Context, r *gedcom.Node) error {
 			id, ok := im.persons[c.Pointer]
 			if !ok {
 				if c.Pointer != "VOID" {
-					im.broken(c, "the partner")
+					im.broken(c, RefPartner)
 				}
 				continue
 			}
@@ -1252,12 +1393,11 @@ func (im *importer) family(ctx context.Context, r *gedcom.Node) error {
 	for i, c := range children {
 		cid, ok := im.persons[c.Pointer]
 		if !ok {
-			im.broken(c, "the child")
+			im.broken(c, RefChild)
 			continue
 		}
 		if (p1.Valid && cid == p1.Int64) || (p2.Valid && cid == p2.Int64) {
-			im.report.BrokenReferences = append(im.report.BrokenReferences,
-				fmt.Sprintf("line %d: @%s@ is both a partner and a child of family @%s@; the child link was skipped", c.Line, c.Pointer, r.Xref))
+			im.report.BrokenReferences = append(im.report.BrokenReferences, partnerAndChild(c.Line, c.Pointer, r.Xref))
 			continue
 		}
 		rel := "birth"
@@ -1307,8 +1447,7 @@ func (im *importer) linkFAMCChildren(ctx context.Context) error {
 		partners := im.familyPartners[l.family]
 		if (partners[0].Valid && partners[0].Int64 == l.childID) || (partners[1].Valid && partners[1].Int64 == l.childID) {
 			if len(im.report.BrokenReferences) < 50 {
-				im.report.BrokenReferences = append(im.report.BrokenReferences,
-					fmt.Sprintf("line %d: @%s@ is both a partner and a child of family @%s@; the child link was skipped", l.line, l.childXref, l.family))
+				im.report.BrokenReferences = append(im.report.BrokenReferences, partnerAndChild(l.line, l.childXref, l.family))
 			}
 			continue
 		}
@@ -1332,11 +1471,16 @@ func (im *importer) linkFAMCChildren(ctx context.Context) error {
 		}
 		im.report.ChildrenFromFAMC++
 		if len(im.report.ChildrenFromFAMCExamples) < 20 {
-			msg := fmt.Sprintf("line %d: a person added as a child of family @%s@", l.line, l.family)
-			if l.childXref != "" {
-				msg = fmt.Sprintf("line %d: @%s@ added as a child of family @%s@", l.line, l.childXref, l.family)
+			w := gedcom.Warning{
+				Line: l.line, Code: ReportFamcChildUnnamed, Params: map[string]any{"family": l.family},
+				Message: fmt.Sprintf("a person added as a child of family @%s@", l.family),
 			}
-			im.report.ChildrenFromFAMCExamples = append(im.report.ChildrenFromFAMCExamples, msg)
+			if l.childXref != "" {
+				w.Code = ReportFamcChild
+				w.Params["xref"] = l.childXref
+				w.Message = fmt.Sprintf("@%s@ added as a child of family @%s@", l.childXref, l.family)
+			}
+			im.report.ChildrenFromFAMCExamples = append(im.report.ChildrenFromFAMCExamples, w)
 		}
 	}
 	return nil
@@ -1405,7 +1549,7 @@ func (im *importer) heirloom(ctx context.Context, r *gedcom.Node) error {
 			text, used := eventDateText(c)
 			in.MadeDate = canonicalDate(text)
 			if c.First("PHRASE") != nil && !used {
-				im.tag(path+".DATE.PHRASE", TagDropped, "heirlooms have nowhere to keep it")
+				im.tag(path+".DATE.PHRASE", TagDropped, DropHeirloomDatePhrase)
 			}
 		case "PLAC":
 			// Heirlooms have nowhere to keep unknown lines; place
@@ -1427,7 +1571,7 @@ func (im *importer) heirloom(ctx context.Context, r *gedcom.Node) error {
 				if id, ok := im.persons[c.Pointer]; ok {
 					cust.PersonID = &id
 				} else {
-					im.broken(c, "the holder")
+					im.broken(c, RefHolder)
 				}
 			}
 			for _, sub := range c.Children {
@@ -1443,7 +1587,7 @@ func (im *importer) heirloom(ctx context.Context, r *gedcom.Node) error {
 				case "NOTE":
 					cust.Notes = sub.Value
 				default:
-					im.tag(path+"._CUST."+sub.Tag, TagDropped, "not part of an heirloom's custody in GoTree")
+					im.tag(path+"._CUST."+sub.Tag, TagDropped, DropHeirloomCustody)
 					continue
 				}
 				im.mapped(path + "._CUST." + sub.Tag)
@@ -1457,11 +1601,11 @@ func (im *importer) heirloom(ctx context.Context, r *gedcom.Node) error {
 			continue
 		case "OBJE":
 			if im.objeFate(c) != objeImported {
-				im.tag(path+".OBJE", TagDropped, "heirlooms have nowhere to keep a media line without a file")
+				im.tag(path+".OBJE", TagDropped, DropHeirloomMedia)
 			}
 			continue // otherwise linked by linkMedia
 		default:
-			im.tag(path+"."+c.Tag, TagDropped, "not part of an heirloom in GoTree")
+			im.tag(path+"."+c.Tag, TagDropped, DropHeirloomField)
 			continue
 		}
 		im.mapped(path + "." + c.Tag)

@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { ApiError } from '../api/client'
+import { ApiError, NetworkError } from '../api/client'
 import i18n from '../i18n'
 import { loggedInState, mockApi, renderApp } from '../test/render'
 import { errorText, fieldErrors, formErrors } from './errors'
@@ -21,8 +21,29 @@ describe('errorText', () => {
 
   it('falls back to the server message for an unknown code or none', () => {
     expect(errorText(new ApiError(400, 'something new', {}, { code: 'brand_new_code' }), t)).toBe('something new')
-    expect(errorText(new ApiError(502, 'Bad Gateway'), t)).toBe('Bad Gateway')
-    expect(errorText(new Error('network down'), t)).toBe('network down')
+    expect(errorText(new Error('boom'), t)).toBe('boom')
+  })
+
+  it('translates a response without a code and a request that got no answer', () => {
+    expect(errorText(new ApiError(502, 'Bad Gateway'), t)).toBe('The server is not available right now (error 502). Try again in a moment.')
+    expect(errorText(new ApiError(404, 'Not Found'), t)).toBe('The server answered with error 404.')
+    for (const err of [
+      new NetworkError('Failed to fetch'),
+      new TypeError('Failed to fetch'),
+      new TypeError('Load failed'),
+      new TypeError('NetworkError when attempting to fetch resource.'),
+    ]) {
+      expect(errorText(err, t)).toBe('No connection to the server. Check the connection and try again.')
+    }
+    // A bug in the code stays visible.
+    expect(errorText(new TypeError("Cannot read properties of undefined (reading 'x')"), t)).toBe("Cannot read properties of undefined (reading 'x')")
+  })
+
+  it('names the field of a transcription row error and hides an unknown key', () => {
+    const row = (field: string) =>
+      new ApiError(422, 'x', { 'rows.0': `${field}: is required` }, { code: 'invalid_input', fieldCodes: { 'rows.0': { code: 'required', params: { field } } } })
+    expect(fieldErrors(row('givenNames'), t)['rows.0']).toBe('Given names: is required')
+    expect(fieldErrors(row('weird'), t)['rows.0']).toBe('is required')
   })
 
   it('translates field messages and keeps unknown ones', () => {
@@ -77,7 +98,12 @@ describe('translated server errors in the interface', () => {
       { 'rows.2': 'givenNames: is too long' },
       { code: 'invalid_input', fieldCodes: { 'rows.2': { code: 'too_long', params: { field: 'givenNames' } } } },
     )
-    expect(fieldErrors(err, t)['rows.2']).toBe('givenNames: слишком длинное значение')
+    expect(fieldErrors(err, t)['rows.2']).toBe('Имя и отчество: слишком длинное значение')
+  })
+
+  it('shows a proxy error in Russian instead of its English status text', () => {
+    expect(errorText(new ApiError(502, 'Bad Gateway'), t)).toBe('Сервер сейчас недоступен (ошибка 502). Попробуйте чуть позже.')
+    expect(errorText(new NetworkError('Failed to fetch'), t)).toBe('Нет связи с сервером. Проверьте подключение и попробуйте снова.')
   })
 
   it('translates a GEDCOM file error with its line, without the English detail', () => {

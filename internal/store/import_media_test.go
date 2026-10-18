@@ -69,7 +69,7 @@ func TestImportMediaRecordsAndLinks(t *testing.T) {
 	doc := parseLines(t, strings.Split(mediaDoc, "\n")...)
 	files := ImportFiles{
 		Media:   map[string]NewMedia{"media/a.png": pngMedia("a", "a.png"), "media/b.png": pngMedia("b", "b.png")},
-		Skipped: map[string]string{"missing.jpg": "the file is not in the zip"},
+		Skipped: map[string]string{"missing.jpg": DropFileNotInZip},
 	}
 	report, err := s.ImportGEDCOMFiles(ctx, a, doc, ImportIntoEmpty, files)
 	if err != nil {
@@ -110,7 +110,7 @@ func TestImportMediaRecordsAndLinks(t *testing.T) {
 	}
 	dropped := false
 	for _, ts := range report.Tags {
-		if ts.Path == "OBJE" && ts.Outcome == TagDropped && ts.Reason == "the file is not in the zip" {
+		if ts.Path == "OBJE" && ts.Outcome == TagDropped && ts.ReasonCode == DropFileNotInZip && ts.Reason == "the file is not in the zip" {
 			dropped = true
 		}
 		if strings.HasSuffix(ts.Path, ".OBJE") && ts.Outcome == TagKept {
@@ -172,7 +172,7 @@ func TestImportMediaWebFileRoundTrip(t *testing.T) {
 		"plain": {},
 		"zip": {
 			Media:   map[string]NewMedia{"media/z.png": pngMedia("z", "z.png")},
-			Skipped: map[string]string{"https://example.com/a.jpg": webFileReason, "http://example.com/b.jpg": webFileReason},
+			Skipped: map[string]string{"https://example.com/a.jpg": DropWebLink, "http://example.com/b.jpg": DropWebLink},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -192,10 +192,10 @@ func TestImportMediaWebFileRoundTrip(t *testing.T) {
 				t.Errorf("kept OBJE lines: %d, tags %+v", keptLines, report.Tags)
 			}
 			for _, ts := range report.Tags {
-				if ts.Outcome == TagDropped && ts.Reason == noFilesInUpload && strings.Contains(ts.Path, "FILE") && name == "zip" {
+				if ts.Outcome == TagDropped && ts.ReasonCode == DropFileNotInUpload && strings.Contains(ts.Path, "FILE") && name == "zip" {
 					t.Errorf("a web address is reported as missing: %+v", ts)
 				}
-				if name == "plain" && ts.Path == "OBJE" && ts.Outcome == TagDropped && ts.Reason != webFileReason {
+				if name == "plain" && ts.Path == "OBJE" && ts.Outcome == TagDropped && ts.ReasonCode != DropWebLink {
 					t.Errorf("reason for a web file: %q", ts.Reason)
 				}
 			}

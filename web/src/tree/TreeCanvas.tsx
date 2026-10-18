@@ -4,6 +4,7 @@ import {
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
+  type AriaLabelConfig,
   getViewportForBounds,
   useReactFlow,
   useStoreApi,
@@ -84,6 +85,23 @@ function neighbour(nodes: LayoutNode[], from: LayoutNode, key: string): LayoutNo
 function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy', sheetOpen = false }: Props) {
   const { t } = useTranslation()
   const flow = useReactFlow()
+  // React Flow's own texts are English; its keys are fixed, ours follow the language.
+  const ariaLabels = useMemo<Partial<AriaLabelConfig>>(
+    () => ({
+      'controls.ariaLabel': t('tree.controls.panel'),
+      'controls.zoomIn.ariaLabel': t('tree.controls.zoomIn'),
+      'controls.zoomOut.ariaLabel': t('tree.controls.zoomOut'),
+      'controls.fitView.ariaLabel': t('tree.controls.fitView'),
+      'controls.interactive.ariaLabel': t('tree.controls.interactive'),
+      'minimap.ariaLabel': t('tree.minimap'),
+      // Nodes and edges are not selectable through React Flow (disableKeyboardA11y), so its
+      // "press enter to select" hints are wrong in any language.
+      'node.a11yDescription.default': '',
+      'node.a11yDescription.keyboardDisabled': '',
+      'edge.a11yDescription.default': '',
+    }),
+    [t],
+  )
   const store = useStoreApi()
   const dark = useDark()
   const helpId = useId()
@@ -253,6 +271,7 @@ function Canvas({ layout, index, selectedId, onSelect, onCenter, look = 'leafy',
           onlyRenderVisibleElements={layout.nodes.length > 300}
           colorMode={dark ? 'dark' : 'light'}
           disableKeyboardA11y
+          ariaLabelConfig={ariaLabels}
         >
           <Background
             bgColor={leafy ? (dark ? '#0b140f' : '#f7f3e6') : dark ? '#0f1510' : '#faf7ef'}

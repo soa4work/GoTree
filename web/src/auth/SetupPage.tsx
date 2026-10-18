@@ -32,7 +32,7 @@ export function SetupPage() {
       return
     }
     setMismatch(false)
-    mutation.mutate({ username, password, treeName })
+    mutation.mutate({ username, password, treeName: treeName.trim() || t('auth.treeNamePlaceholder') })
   }
 
   return (

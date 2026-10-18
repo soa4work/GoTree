@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getAuthState } from '../api/client'
 import { updatePlace } from '../api/endpoints'
@@ -9,9 +9,6 @@ import { TextField } from '../components/TextField'
 import { lookupPlace, parseCoordinate, type GeoCandidate } from './nominatim'
 import { unmappedPlacesKey, useUnmappedPlaces } from './useUnmappedPlaces'
 import { errorText } from '../lib/errors'
-
-/** Nominatim allows one request per second; clicks closer together are ignored. */
-const LOOKUP_GAP_MS = 1100
 
 /**
  * Places used by dated events that have no coordinates, each with a quick
@@ -63,7 +60,6 @@ function PlaceCoordinates({ place, readOnly, onSaved }: { place: UnmappedPlace; 
   const [candidates, setCandidates] = useState<GeoCandidate[] | null>(null)
   const [looking, setLooking] = useState(false)
   const [lookupError, setLookupError] = useState(false)
-  const lastLookup = useRef(0)
 
   const save = useMutation({
     mutationFn: (c: { lat: number; lng: number }) =>
@@ -99,9 +95,7 @@ function PlaceCoordinates({ place, readOnly, onSaved }: { place: UnmappedPlace; 
   }
 
   async function lookup() {
-    const now = Date.now()
-    if (looking || now - lastLookup.current < LOOKUP_GAP_MS) return
-    lastLookup.current = now
+    if (looking) return
     setLooking(true)
     setLookupError(false)
     try {

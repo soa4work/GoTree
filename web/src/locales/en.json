@@ -9,7 +9,8 @@
     "signedInAs": "Signed in as {{name}}",
     "updateReady": "A new version of GoTree is ready.",
     "reload": "Reload now",
-    "gopherCredit": "Logo based on the Go gopher by <author>Renée French</author>, licensed under <license>CC BY 4.0</license>."
+    "gopherCredit": "Logo based on the Go gopher by <author>Renée French</author>, licensed under <license>CC BY 4.0</license>.",
+    "description": "GoTree — self-hosted family tree"
   },
   "nav": {
     "dashboard": "Home",
@@ -21,8 +22,6 @@
     "quality": "Data quality",
     "relationship": "Relationships",
     "sharing": "Sharing",
-    "members": "Members",
-    "accounts": "Accounts",
     "account": "Account",
     "research": "Research",
     "transcribe": "Transcribe",
@@ -38,7 +37,9 @@
       "explore": "Explore",
       "work": "Work",
       "settings": "Settings"
-    }
+    },
+    "members": "Members",
+    "accounts": "Accounts"
   },
   "dashboard": {
     "title": "Welcome to GoTree",
@@ -180,6 +181,10 @@
     "pickerHint": "Type a name to search the tree.",
     "relationshipLink": "Relationship to…",
     "viewInTree": "View in tree",
+    "living_M": "living",
+    "living_F": "living",
+    "deceased_M": "deceased",
+    "deceased_F": "deceased",
     "nameNotes": "Notes on the name",
     "nameNote": "Note on this name",
     "nameNotesShown": "About the name: {{notes}}"
@@ -383,7 +388,14 @@
     "openPage": "Open page",
     "addRelative": "Add a relative",
     "leafy": "Leafy look",
-    "options": "Options"
+    "options": "Options",
+    "controls": {
+      "panel": "Zoom controls",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fitView": "Show the whole chart",
+      "interactive": "Lock or unlock the chart"
+    }
   },
   "citation": {
     "sources": "Sources",
@@ -503,7 +515,6 @@
     "more": "Show more"
   },
   "transfer": {
-    "backupAllTrees": "The backup holds every tree and every account on this server. To give someone a copy of one tree, export it as GEDCOM.",
     "importTitle": "Import a GEDCOM file",
     "importIntro": "GEDCOM is the exchange format of genealogy programs. Export your tree from Ancestry, MyHeritage, FamilySearch, webtrees, Gramps or RootsMagic and import it here. Nothing is lost: what GoTree does not use is kept and written back on export.",
     "file": "GEDCOM file",
@@ -601,6 +612,64 @@
       "heirlooms": "Heirlooms",
       "custody": "Heirloom holders"
     },
+    "warning": {
+      "not_utf8": "The file says {{declared}} but is not valid UTF-8; it was read as Windows-1252.",
+      "unreadable_line": "Unreadable line skipped: {{text}}",
+      "orphan_line": "A line at level {{level}} without a record above it was skipped.",
+      "level_jump": "The level jumps from {{from}} to {{to}}; the line was attached to the line above.",
+      "no_header": "The file has no header (HEAD).",
+      "ansel_unreadable_one": "{{count}} ANSEL character could not be read and was replaced with �",
+      "ansel_unreadable_other": "{{count}} ANSEL characters could not be read and were replaced with �",
+      "broken_reference": "{{what}} @{{xref}}@ does not exist",
+      "partner_and_child": "@{{xref}}@ is both a partner and a child of family @{{family}}@; the child link was skipped",
+      "famc_child": "@{{xref}}@ added as a child of family @{{family}}@",
+      "famc_child_unnamed": "A person added as a child of family @{{family}}@",
+      "invalid_date": "{{date}}"
+    },
+    "refKind": {
+      "associatedPerson": "the associated person",
+      "note": "the note",
+      "repository": "the repository",
+      "source": "the source",
+      "family": "the family",
+      "partner": "the partner",
+      "child": "the child",
+      "holder": "the holder"
+    },
+    "dropReason": {
+      "own_history": "GoTree keeps its own change history",
+      "old_record_number": "a record number of the old program",
+      "follows_from_families": "follows from the families",
+      "own_submitter": "GoTree writes its own submitter",
+      "media_records": "media files are not part of a GEDCOM file; upload them in GoTree",
+      "unknown_record": "unknown record type",
+      "place_form": "the place hierarchy describes the levels",
+      "heirloom_date_phrase": "heirlooms have nowhere to keep it",
+      "heirloom_custody_field": "not part of an heirloom's custody in GoTree",
+      "heirloom_field": "not part of an heirloom in GoTree",
+      "status_only_reason": "a status has only a reason",
+      "name_status": "the main name has no status in GoTree",
+      "web_link": "links to files on the web are not imported",
+      "file_not_in_upload": "the file is not in the upload; import a GEDZIP or upload the file in GoTree",
+      "file_not_in_zip": "the file is not in the zip",
+      "file_too_large": "the file is larger than the upload limit",
+      "zip_too_large": "the zip unpacks to more than the import limit",
+      "file_type_unsupported": "this kind of file is not supported",
+      "image_too_large": "the image is larger than the pixel limit",
+      "file_unreadable": "the file in the zip cannot be read",
+      "media_no_file": "the media object has no file",
+      "married_name_field": "not kept for a married name",
+      "name_empty": "the name is empty",
+      "heirloom_media": "heirlooms have nowhere to keep a media line without a file",
+      "media_file_field": "not kept on a media file",
+      "blob_not_read": "embedded BLOB data is not read",
+      "media_record_not_imported": "the record it belongs to was not imported",
+      "media_no_object": "it points to no media object",
+      "media_file_not_imported": "the media file was not imported",
+      "media_crop": "cropping a linked photo is not kept",
+      "media_link_field": "not kept on a media link"
+    },
+    "backupAllTrees": "The backup holds every tree and every account on this server. To give someone a copy of one tree, export it as GEDCOM.",
     "viewerPrivacy": "As a viewer you can export the tree without living people."
   },
   "relationship": {
@@ -820,81 +889,6 @@
     "reissueConfirm": "The current address of “{{label}}” will stop working. Send the new one to everyone who should keep access.",
     "reissuedTitle": "New address for “{{label}}”",
     "copyFailed": "Could not copy. Select the address and copy it by hand."
-  },
-  "roles": {
-    "owner": "Owner",
-    "editor": "Editor",
-    "viewer": "Viewer"
-  },
-  "trees": {
-    "title": "Your trees",
-    "switcherLabel": "Tree: {{name}}. Switch tree",
-    "current": "current",
-    "newName": "Name of the new tree",
-    "create": "Create tree",
-    "switchFailed": "Could not switch: {{message}}",
-    "noTreeTitle": "Choose a tree",
-    "noTreeText": "You are not working in a tree right now. Open one of your trees, create a new one, or ask the owner of a family tree to add you."
-  },
-  "members": {
-    "intro": "People with an account can work in this tree. Owners manage members, editors change the tree, viewers only read it.",
-    "manage": "Manage members",
-    "treeName": "Name of the tree",
-    "count_one": "{{count}} member",
-    "count_other": "{{count}} members",
-    "roleFor": "Role of {{name}}",
-    "username": "Username of the account",
-    "role": "Role",
-    "roleHint": {
-      "owner": "Manages members and sharing, can replace the tree.",
-      "editor": "Adds and changes people, sources and media.",
-      "viewer": "Only reads the tree; exports leave out living people."
-    },
-    "add": "Add member",
-    "added": "{{name}} was added.",
-    "remove": "Remove from tree",
-    "removeTitle": "Remove {{name}}?",
-    "removeMessage": "{{name}} will no longer see or change this tree. Their account stays.",
-    "ownerOnly": "Only the owners of this tree manage its members.",
-    "yourRole": "Your role in this tree: {{role}}.",
-    "leave": "Leave this tree",
-    "leaveTitle": "Leave this tree?",
-    "leaveMessage": "You will no longer see this tree. An owner can add you again."
-  },
-  "accounts": {
-    "intro": "Accounts of everyone who can log in to this server. Only administrators see this page.",
-    "manage": "Manage accounts",
-    "adminOnly": "Only administrators manage accounts.",
-    "count_one": "{{count}} account",
-    "count_other": "{{count}} accounts",
-    "admin": "Administrator",
-    "noTrees": "Not in any tree yet",
-    "lastSeen": "Last active {{date}}",
-    "neverSignedIn": "Has not signed in yet",
-    "new": "New account",
-    "username": "Username",
-    "displayName": "Display name",
-    "role": "Role on this server",
-    "roleHint": {
-      "admin": "Manages accounts and downloads the backup of the whole server.",
-      "user": "Works in the trees they are a member of."
-    },
-    "roles": {
-      "admin": "Administrator",
-      "user": "User"
-    },
-    "create": "Create account",
-    "created": "The account {{name}} was created.",
-    "createdNext": "Add it to a tree on the Members page.",
-    "openMembers": "Members page",
-    "resetPassword": "Reset password",
-    "resetPasswordText": "Sets a new password and signs this account out on all devices. Tell the person the new password in a safe way.",
-    "newPassword": "New password",
-    "passwordReset": "The password of {{name}} was reset.",
-    "editTitle": "Edit {{name}}",
-    "resetTitle": "Reset the password of {{name}}",
-    "deleteTitle": "Delete the account {{name}}?",
-    "deleteMessage": "The person can no longer log in and leaves all trees. What they entered stays in the trees."
   },
   "share": {
     "readOnly": "Read-only view",
@@ -1151,7 +1145,8 @@
       "classic": "Classic",
       "heritage": "Heritage (sepia, serif)",
       "modern": "Modern (coloured title band)"
-    }
+    },
+    "fileName": "family-tree"
   },
   "heirloom": {
     "intro": "Objects handed down in the family — a watch, a chest, a family Bible — with who held them and how they got them.",
@@ -1293,7 +1288,9 @@
     "status_other": "{{count}} people on the map in {{year}}.",
     "legendMarker": "People at a place",
     "legendApproximate": "Place shown at an enclosing place",
-    "legendTrail": "Moves so far; older ones fade"
+    "legendTrail": "Moves so far; older ones fade",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out"
   },
   "account": {
     "passwordTitle": "Change password",
@@ -1311,6 +1308,25 @@
     "signOutEverywhere": "Sign out everywhere",
     "signOutEverywhereTitle": "Sign out everywhere?",
     "signOutEverywhereMessage": "All sessions end, including this one, and you will need to log in again."
+  },
+  "clientError": {
+    "network": "No connection to the server. Check the connection and try again.",
+    "unavailable": "The server is not available right now (error {{status}}). Try again in a moment.",
+    "http": "The server answered with error {{status}}."
+  },
+  "fieldName": {
+    "withColumn": "{{column}}: {{message}}",
+    "givenNames": "Given names",
+    "surname": "Surname",
+    "sex": "Sex",
+    "notes": "Notes",
+    "date": "Date",
+    "placeId": "Place",
+    "description": "Details",
+    "type": "Event",
+    "customLabel": "Name of the event",
+    "page": "Where in the source",
+    "text": "Text"
   },
   "apiError": {
     "invalid_json": "The request was not valid JSON.",
@@ -1462,5 +1478,80 @@
       "disputed": "disputed",
       "disproven": "disproven"
     }
+  },
+  "roles": {
+    "owner": "Owner",
+    "editor": "Editor",
+    "viewer": "Viewer"
+  },
+  "trees": {
+    "title": "Your trees",
+    "switcherLabel": "Tree: {{name}}. Switch tree",
+    "current": "current",
+    "newName": "Name of the new tree",
+    "create": "Create tree",
+    "switchFailed": "Could not switch: {{message}}",
+    "noTreeTitle": "Choose a tree",
+    "noTreeText": "You are not working in a tree right now. Open one of your trees, create a new one, or ask the owner of a family tree to add you."
+  },
+  "members": {
+    "intro": "People with an account can work in this tree. Owners manage members, editors change the tree, viewers only read it.",
+    "manage": "Manage members",
+    "treeName": "Name of the tree",
+    "count_one": "{{count}} member",
+    "count_other": "{{count}} members",
+    "roleFor": "Role of {{name}}",
+    "username": "Username of the account",
+    "role": "Role",
+    "roleHint": {
+      "owner": "Manages members and sharing, can replace the tree.",
+      "editor": "Adds and changes people, sources and media.",
+      "viewer": "Only reads the tree; exports leave out living people."
+    },
+    "add": "Add member",
+    "added": "{{name}} was added.",
+    "remove": "Remove from tree",
+    "removeTitle": "Remove {{name}}?",
+    "removeMessage": "{{name}} will no longer see or change this tree. Their account stays.",
+    "ownerOnly": "Only the owners of this tree manage its members.",
+    "yourRole": "Your role in this tree: {{role}}.",
+    "leave": "Leave this tree",
+    "leaveTitle": "Leave this tree?",
+    "leaveMessage": "You will no longer see this tree. An owner can add you again."
+  },
+  "accounts": {
+    "intro": "Accounts of everyone who can log in to this server. Only administrators see this page.",
+    "manage": "Manage accounts",
+    "adminOnly": "Only administrators manage accounts.",
+    "count_one": "{{count}} account",
+    "count_other": "{{count}} accounts",
+    "admin": "Administrator",
+    "noTrees": "Not in any tree yet",
+    "lastSeen": "Last active {{date}}",
+    "neverSignedIn": "Has not signed in yet",
+    "new": "New account",
+    "username": "Username",
+    "displayName": "Display name",
+    "role": "Role on this server",
+    "roleHint": {
+      "admin": "Manages accounts and downloads the backup of the whole server.",
+      "user": "Works in the trees they are a member of."
+    },
+    "roles": {
+      "admin": "Administrator",
+      "user": "User"
+    },
+    "create": "Create account",
+    "created": "The account {{name}} was created.",
+    "createdNext": "Add it to a tree on the Members page.",
+    "openMembers": "Members page",
+    "resetPassword": "Reset password",
+    "resetPasswordText": "Sets a new password and signs this account out on all devices. Tell the person the new password in a safe way.",
+    "newPassword": "New password",
+    "passwordReset": "The password of {{name}} was reset.",
+    "editTitle": "Edit {{name}}",
+    "resetTitle": "Reset the password of {{name}}",
+    "deleteTitle": "Delete the account {{name}}?",
+    "deleteMessage": "The person can no longer log in and leaves all trees. What they entered stays in the trees."
   }
 }

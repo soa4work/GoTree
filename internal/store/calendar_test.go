@@ -2,8 +2,32 @@ package store
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 )
+
+func TestCalendarFeedKeepsEmptyName(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	p, err := s.CreatePerson(ctx, a, PersonInput{Sex: "F"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &p.ID, Type: "BIRT", Date: "3 JAN 1900"}); err != nil {
+		t.Fatal(err)
+	}
+	feed, err := s.CreateCalendarFeed(ctx, a, CalendarFeedInput{Label: "All", IncludeLiving: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cal, err := s.CalendarByToken(ctx, feed.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cal.Entries) != 1 || !reflect.DeepEqual(cal.Entries[0].Names, []string{""}) {
+		t.Errorf("entries: %+v", cal.Entries)
+	}
+}
 
 func TestCalendarFeed(t *testing.T) {
 	s := newStore(t)

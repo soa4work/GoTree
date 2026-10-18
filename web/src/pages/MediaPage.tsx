@@ -44,7 +44,7 @@ export function MediaPage() {
     return <p role="alert">{t('common.loadFailed')}</p>
   }
   if (media.isPending) return <p role="status">{t('app.loading')}</p>
-  return <MediaView media={media.data} />
+  return <MediaView key={media.data.id} media={media.data} />
 }
 
 function MediaView({ media: m }: { media: Media }) {
@@ -416,6 +416,17 @@ function RegionItem({
           {t('media.removeFace')}
         </Button>
       </div>
+      {remove.error ? (
+        <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-400">
+          {t('common.deleteFailed', { message: errorText(remove.error, t) })}
+        </p>
+      ) : (
+        (match.error ?? portrait.error) && (
+          <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-400">
+            {t('common.saveFailed', { message: errorText(match.error ?? portrait.error, t) })}
+          </p>
+        )
+      )}
     </li>
   )
 }
@@ -470,6 +481,11 @@ function Links({ media: m, onChanged }: { media: Media; onChanged: (m?: Media) =
           if (p) link.mutate(p)
         }}
       />
+      {(link.error ?? unlink.error ?? portrait.error) && (
+        <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-400">
+          {t('common.saveFailed', { message: errorText(link.error ?? unlink.error ?? portrait.error, t) })}
+        </p>
+      )}
     </Section>
   )
 }

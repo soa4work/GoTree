@@ -82,3 +82,36 @@ test('unsupported files are refused with a message', async ({ page }) => {
   })
   await expect(page.getByRole('alert')).toContainText('evil.svg: This kind of file is not supported')
 })
+
+test('switching to another medium does not carry the title over', async ({ page }) => {
+  await login(page)
+  const tag = unique('Switch', page)
+  const upload = async (name: string) => {
+    const res = await page.request.post('/api/media', { multipart: { file: { ...uniquePhoto(`${tag}${name}`), name: `${name}.jpg` } } })
+    return (await res.json()) as { id: number }
+  }
+  const a = await upload('a')
+  const b = await upload('b')
+  for (const [m, title] of [
+    [a, `${tag} A`],
+    [b, `${tag} B`],
+  ] as const) {
+    await page.request.put(`/api/media/${m.id}`, { data: { title, date: '', description: '', transcript: '' } })
+  }
+
+  await page.goto(`/media/${a.id}`)
+  const field = page.getByLabel('Title', { exact: true })
+  await expect(field).toHaveValue(`${tag} A`)
+  await field.fill('Typed but not saved')
+
+  // A client-side navigation, as the links of the app do.
+  await page.evaluate(
+    `history.pushState({}, '', '/media/${b.id}'); window.dispatchEvent(new PopStateEvent('popstate'))`,
+  )
+  await expect(field).toHaveValue(`${tag} B`)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByText('Saved.')).toBeVisible()
+
+  await page.goto(`/media/${a.id}`)
+  await expect(page.getByLabel('Title', { exact: true })).toHaveValue(`${tag} A`)
+})

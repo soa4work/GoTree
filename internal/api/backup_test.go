@@ -18,12 +18,17 @@ func TestBackup(t *testing.T) {
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	c.call("POST", "/api/persons", map[string]any{"givenNames": "Anna"}, http.StatusCreated, nil)
-	photo := jpegBytes(t, 40, 30)
+	// With a GPS position, so a location-free copy exists; the backup keeps the original.
+	photo := gpsJPEG(t)
 	if status, body := c.upload("/api/media", "photo.jpg", photo); status != http.StatusCreated {
 		t.Fatalf("upload: %d %s", status, body)
 	}
 	// Thumbnails are left out; they can be made again.
 	c.do("GET", "/api/media/1/thumb?size=200", nil)
+	// Nor are location-free copies.
+	if status, _ := c.do("GET", "/api/media/1/file", nil); status != http.StatusOK {
+		t.Fatalf("file: %d", status)
+	}
 
 	resp, err := c.http.Get(ts.URL + "/api/backup")
 	if err != nil {
@@ -48,7 +53,7 @@ func TestBackup(t *testing.T) {
 	}
 	var mediaFile *zip.File
 	for name, f := range files {
-		if strings.HasPrefix(name, "media/") && !strings.Contains(name, "thumbs") {
+		if strings.HasPrefix(name, "media/") && !strings.Contains(name, "thumbs") && !strings.Contains(name, "clean") {
 			mediaFile = f
 		}
 	}

@@ -64,6 +64,18 @@ func TestDBPath(t *testing.T) {
 	}
 }
 
+func TestPhotoLocation(t *testing.T) {
+	for value, want := range map[string]bool{"": false, "strip": false, "keep": true} {
+		cfg, err := Load(nil, env(map[string]string{"GOTREE_PHOTO_LOCATION": value}))
+		if err != nil || cfg.KeepPhotoLocation != want {
+			t.Errorf("%q: keep %v, err %v; want keep %v", value, cfg.KeepPhotoLocation, err, want)
+		}
+	}
+	if _, err := Load(nil, env(map[string]string{"GOTREE_PHOTO_LOCATION": "foo"})); err == nil {
+		t.Error("foo accepted")
+	}
+}
+
 func TestTrustedProxies(t *testing.T) {
 	tests := []struct {
 		name    string

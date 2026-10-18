@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/pressly/goose/v3"
 )
 
 func TestNamesCollation(t *testing.T) {
@@ -144,7 +142,7 @@ func TestMigrationFoldsExistingSearchIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	provider, err := goose.NewProvider(goose.DialectSQLite3, conn, migrations)
+	provider, err := newProvider(conn)
 	if err != nil {
 		t.Fatal(err)
 	}

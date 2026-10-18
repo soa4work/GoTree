@@ -111,7 +111,53 @@ and the versioning [Semantic Versioning](https://semver.org/).
   photo tools wrote, and use a photo or a face as a person's portrait, shown in lists and on the
   tree (#15)
 
+- Share links can get a new address at any time, for example when the first one was not
+  copied: the old address stops working and the new one is shown once; copying a share or
+  calendar address says when the browser refused it (#60)
+
 ### Fixed
+
+- Switching between media no longer carries the form over (saving could overwrite the other
+  medium), saving a transcription keeps unsaved rows, failed task, repository, photo link, face,
+  match search and logout actions say so, an expired session during a save brings up the login screen, and a new version is
+  offered even if it arrived on the login page (#60)
+
+- A GEDCOM 5.5.1 export of a large tree no longer goes through every event for every person (#56)
+
+- A GEDCOM export without living people (or with their names only) no longer writes the dates and
+  notes of a living heirloom holder (#56)
+
+- Replacing the tree by a GEDCOM import keeps share links to a branch when the file has the same
+  person (same GEDCOM ID and name) and lists the links it had to delete; the import page warns
+  about such links first. Transcription drafts forget the people of the old tree, and ids of
+  deleted people, families, events, places, sources and citations are never given to new ones, so
+  an old link or draft can no longer point to someone else; the first start after the update may
+  take a little longer on a large tree (#56)
+
+- Descendants of a person who married a cousin are complete again in the tree, in share links to a
+  branch and on the migration map: the other marriages and children of that cousin were left out (#56)
+
+- Deleting a person, event, family, name or heirloom also deletes citations that supported only
+  it, instead of leaving them behind on the source; citations already left without any fact are
+  removed on update, and a citation can no longer be created through the API without a fact (#56)
+
+- Photos are served and exported in GEDZIP archives without their GPS position (EXIF and XMP, in
+  JPEG, PNG and WebP); the position read on upload stays visible to members of the tree, and
+  GOTREE_PHOTO_LOCATION=keep serves the originals, except in exports without living people (#58)
+
+- Deleting a medium while the same file is uploaded again no longer leaves the new upload without
+  its file (#58)
+
+- Dates: dual years count by their second year, so "29 FEB 1751/52" is accepted, "FEB 1750/51"
+  sorts in 1751 and "BET 1 DEC 1750 AND 10 FEB 1750/51" is a valid range; Julian dates without
+  a day are converted to the Gregorian calendar too, so the plausibility checks no longer
+  flag a Julian month against a Gregorian day; dates B.C. are no longer misread by the checks
+  and record matching; GEDCOM 7.0 export writes the later year of a dual date beside the
+  5.5.1 form as a phrase, and dates already stored are re-sorted on the next start (#55)
+
+- GEDCOM files saved as IBM PC (code pages 437 and 850), Macintosh or Latin-1 text are read with
+  their own character set, so umlauts and accents come through, and a GEDCOM 7 note line that
+  starts with "@" is no longer lost on export and import (#54)
 
 - A session ends at the latest 90 days after logging in, however often it is used, and expired sessions are removed every hour instead of only at startup; sessions older than 90 days end with this update (#57)
 

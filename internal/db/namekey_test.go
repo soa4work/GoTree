@@ -8,8 +8,6 @@ import (
 	"reflect"
 	"sort"
 	"testing"
-
-	"github.com/pressly/goose/v3"
 )
 
 func TestNamesKeyMatchesCollation(t *testing.T) {
@@ -109,7 +107,7 @@ func TestMigrationFillsPersonSortKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	provider, err := goose.NewProvider(goose.DialectSQLite3, conn, migrations)
+	provider, err := newProvider(conn)
 	if err != nil {
 		t.Fatal(err)
 	}

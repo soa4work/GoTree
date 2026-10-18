@@ -58,6 +58,8 @@ jobs:
           node-version: lts/*
 
       - run: ./run-tests.sh
+        env:
+          GOTREE_RACE: "1"
 
   binaries:
     needs: test

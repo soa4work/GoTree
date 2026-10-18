@@ -91,7 +91,8 @@ made again when first shown.
 
 ## Development
 
-Requires Go, a C compiler (for the race detector) and Node.js (LTS).
+Requires Go and Node.js (LTS). `GOTREE_RACE=1 ./run-tests.sh` runs the Go tests with the race
+detector, which also needs a C compiler (CI does this).
 
 ```bash
 make dev     # API on :8080, Vite on :5173 with hot reload (proxies /api)

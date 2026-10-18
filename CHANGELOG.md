@@ -9,6 +9,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- People list: sort by surname, birth (oldest or youngest first) or recent changes, and filter by
+  sex and living or deceased, kept in the address; the sources list and the media gallery load more
+  with a "Show more" button instead of stopping at 100 sources and 200 media (#60)
+
 - Account page: change your password (your other devices are then signed out), see the devices you are signed in on and sign any of them out, or sign out everywhere (#57)
 
 - `GOTREE_TRUSTED_PROXIES` names the reverse proxies whose X-Forwarded-For is trusted, so behind a proxy failed logins are counted per real client (#57)
@@ -124,6 +128,24 @@ and the versioning [Semantic Versioning](https://semver.org/).
 - Deleting a person, event, family, name or heirloom also deletes citations that supported only
   it, instead of leaving them behind on the source; citations already left without any fact are
   removed on update, and a citation can no longer be created through the API without a fact (#56)
+
+- Photos are served and exported in GEDZIP archives without their GPS position (EXIF and XMP, in
+  JPEG, PNG and WebP); the position read on upload stays visible to members of the tree, and
+  GOTREE_PHOTO_LOCATION=keep serves the originals, except in exports without living people (#58)
+
+- Deleting a medium while the same file is uploaded again no longer leaves the new upload without
+  its file (#58)
+
+- Dates: dual years count by their second year, so "29 FEB 1751/52" is accepted, "FEB 1750/51"
+  sorts in 1751 and "BET 1 DEC 1750 AND 10 FEB 1750/51" is a valid range; Julian dates without
+  a day are converted to the Gregorian calendar too, so the plausibility checks no longer
+  flag a Julian month against a Gregorian day; dates B.C. are no longer misread by the checks
+  and record matching; GEDCOM 7.0 export writes the later year of a dual date beside the
+  5.5.1 form as a phrase, and dates already stored are re-sorted on the next start (#55)
+
+- GEDCOM files saved as IBM PC (code pages 437 and 850), Macintosh or Latin-1 text are read with
+  their own character set, so umlauts and accents come through, and a GEDCOM 7 note line that
+  starts with "@" is no longer lost on export and import (#54)
 
 - A session ends at the latest 90 days after logging in, however often it is used, and expired sessions are removed every hour instead of only at startup; sessions older than 90 days end with this update (#57)
 

@@ -35,6 +35,8 @@ type ExportOptions struct {
 type MediaFile struct {
 	SHA256 string
 	Path   string
+	// Mime tells the exporter whether the file may carry a GPS position.
+	Mime string
 }
 
 // Export is a GEDCOM file as records, ready for gedcom.Write.
@@ -977,7 +979,7 @@ func (ex *exporter) mediaRecords(ctx context.Context) ([]*gedcom.Node, error) {
 			add(file, "TITL", title)
 		}
 		out = append(out, &gedcom.Node{Xref: fmt.Sprintf("O%d", id), Tag: "OBJE", Children: []*gedcom.Node{file}})
-		ex.out.Media = append(ex.out.Media, MediaFile{SHA256: sha, Path: path})
+		ex.out.Media = append(ex.out.Media, MediaFile{SHA256: sha, Path: path, Mime: mime})
 		ex.out.Counts["media"]++
 	}
 	return out, rows.Err()
@@ -1013,7 +1015,7 @@ func (s *Store) livingAll(ctx context.Context, a Actor) (map[int64]bool, error) 
 		case dead:
 			out[id] = false
 		case birthSort.Valid:
-			out[id] = int(birthSort.Int64/10000) > thisYear-livingCutoffYears
+			out[id] = gendate.KeyYear(int(birthSort.Int64)) > thisYear-livingCutoffYears
 		default:
 			out[id] = true
 		}

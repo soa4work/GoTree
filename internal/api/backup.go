@@ -20,7 +20,8 @@ media/     the uploaded photos, documents and recordings
 
 To restore, stop GoTree, put gotree.db and the media folder into an empty
 data directory (GOTREE_DATA_DIR, /data in Docker), and start GoTree again.
-Thumbnails are not included; they are made again when first shown.
+Thumbnails and location-free copies are not included; they are made again when
+first needed.
 `
 
 // backup streams a zip of a database snapshot and the media files. It
@@ -77,7 +78,7 @@ func (s *Server) writeBackup(zw *zip.Writer, snapshot string) error {
 		rel, _ := filepath.Rel(root, path)
 		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
-			if rel == "tmp" || rel == "thumbs" {
+			if rel == "tmp" || rel == "thumbs" || rel == "clean" {
 				return filepath.SkipDir
 			}
 			return nil

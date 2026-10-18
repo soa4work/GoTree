@@ -54,8 +54,19 @@ import type {
 const qs = (params: Record<string, string | number>) =>
   new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()
 
-export const listPersons = (q: string, limit: number, offset: number, signal?: AbortSignal) =>
-  getJSON<PersonList>(`/persons?${qs({ q, limit, offset })}`, signal)
+export interface PersonFilter {
+  sort?: 'name' | 'birth' | '-birth' | 'updated'
+  sex?: 'M' | 'F' | 'X' | 'U'
+  living?: boolean
+}
+
+export const listPersons = (q: string, limit: number, offset: number, signal?: AbortSignal, filter: PersonFilter = {}) => {
+  const extra: Record<string, string> = {}
+  if (filter.sort) extra.sort = filter.sort
+  if (filter.sex) extra.sex = filter.sex
+  if (filter.living !== undefined) extra.living = filter.living ? '1' : '0'
+  return getJSON<PersonList>(`/persons?${qs({ q, limit, offset, ...extra })}`, signal)
+}
 export const getPerson = (id: number, signal?: AbortSignal) => getJSON<PersonDetail>(`/persons/${id}`, signal)
 export const createPerson = (input: PersonInput) => postJSON<Person>('/persons', input)
 export const updatePerson = (id: number, input: PersonInput) => putJSON<Person>(`/persons/${id}`, input)
@@ -80,7 +91,8 @@ export const parseDate = (q: string, signal?: AbortSignal) => getJSON<ParsedDate
 export const getTree = (id: number, opts: { up: number; down: number; siblings: boolean }, signal?: AbortSignal) =>
   getJSON<TreeGraph>(`/tree/${id}?${qs({ up: opts.up, down: opts.down, siblings: opts.siblings ? 1 : 0 })}`, signal)
 
-export const listSources = (q: string, signal?: AbortSignal) => getJSON<Source[]>(`/sources?${qs({ q, limit: 100 })}`, signal)
+export const listSources = (q: string, signal?: AbortSignal, page = { limit: 100, offset: 0 }) =>
+  getJSON<Source[]>(`/sources?${qs({ q, ...page })}`, signal)
 export const getSource = (id: number, signal?: AbortSignal) => getJSON<SourceDetail>(`/sources/${id}`, signal)
 export const createSource = (input: SourceInput) => postJSON<Source>('/sources', input)
 export const updateSource = (id: number, input: SourceInput) => putJSON<Source>(`/sources/${id}`, input)
@@ -93,8 +105,10 @@ export const createRepository = (name: string) =>
 
 export type MediaOwner = { entityType: 'person' | 'event' | 'family' | 'source' | 'heirloom'; entityId: number }
 
-export const listMedia = (owner: MediaOwner | null, signal?: AbortSignal) =>
-  getJSON<MediaRef[]>(`/media${owner ? `?${qs(owner)}` : '?limit=200'}`, signal)
+// A person's gallery is not paged: the server default of 100 would truncate it, so ask for the
+// server maximum.
+export const listMedia = (owner: MediaOwner | null, signal?: AbortSignal, page = { limit: 120, offset: 0 }) =>
+  getJSON<MediaRef[]>(`/media?${owner ? qs({ ...owner, limit: 500 }) : qs(page)}`, signal)
 export const uploadMedia = (file: File, owner: MediaOwner | null) =>
   uploadFile<Media>(`/media${owner ? `?${qs(owner)}` : ''}`, file)
 export const getMedia = (id: number, signal?: AbortSignal) => getJSON<Media>(`/media/${id}`, signal)

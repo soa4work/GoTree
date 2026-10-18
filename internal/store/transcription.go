@@ -357,10 +357,10 @@ func recordYear(date string) int {
 		return 0
 	}
 	k, ok := d.SortKey()
-	if !ok || k <= 0 {
+	if !ok {
 		return 0
 	}
-	return k / 10000
+	return gendate.KeyYear(k)
 }
 
 // sexOf reads M/F from the ways records write it.
@@ -418,11 +418,11 @@ func (s *Store) Match(ctx context.Context, a Actor, req MatchRequest) ([][]Match
 			rows.Close()
 			return nil, err
 		}
-		if birth.Valid && birth.Int64 > 0 {
-			p.c.BirthYear = int(birth.Int64 / 10000)
+		if birth.Valid {
+			p.c.BirthYear = gendate.KeyYear(int(birth.Int64))
 		}
-		if death.Valid && death.Int64 > 0 {
-			p.c.DeathYear = int(death.Int64 / 10000)
+		if death.Valid {
+			p.c.DeathYear = gendate.KeyYear(int(death.Int64))
 		}
 		people = append(people, p)
 	}

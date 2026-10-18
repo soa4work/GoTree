@@ -56,6 +56,10 @@ func Open(ctx context.Context, path string) (*sql.DB, error) {
 		conn.Close()
 		return nil, err
 	}
+	if err := refreshDateKeys(ctx, conn); err != nil {
+		conn.Close()
+		return nil, err
+	}
 	return conn, nil
 }
 

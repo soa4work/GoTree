@@ -88,7 +88,9 @@ type Warning struct {
 type Document struct {
 	// Version is HEAD.GEDC.VERS, e.g. "5.5.1" or "7.0", or "" if missing.
 	Version string
-	// Encoding is the character set the file was decoded from.
+	// Encoding is the character set the file was decoded from: "UTF-8",
+	// "UTF-16", "ANSI" (Windows-1252), "ANSEL", "CP437", "CP850",
+	// "MACINTOSH" or "ISO-8859-1".
 	Encoding string
 	// Source is HEAD.SOUR: the program that wrote the file.
 	Source string
@@ -125,7 +127,10 @@ func (d *Document) warn(line int, format string, args ...any) {
 	}
 }
 
-var charDecl = regexp.MustCompile(`(?m)^\s*1\s+CHAR\s+(\S+)`)
+// charDecl captures the whole CHAR value (it may hold spaces, as in "IBM
+// WINDOWS") and the optional "2 VERS" line right below it. Lines may end
+// in CR alone, as in files from classic Mac OS.
+var charDecl = regexp.MustCompile(`(?:^|[\r\n])[ \t]*1[ \t]+CHAR[ \t]+([^\r\n]*?)[ \t]*(?:\r\n?|\n|\z)(?:[ \t]*2[ \t]+VERS[ \t]+(\S+))?`)
 
 // Parse reads a GEDCOM file. Only input that is not GEDCOM at all is an
 // error; problems inside the file become warnings.
@@ -155,19 +160,43 @@ func decode(data []byte, doc *Document) (string, error) {
 		return string(out), nil
 	}
 
-	declared := "UTF-8"
+	declared, vers := "UTF-8", ""
 	head := data[:min(len(data), 4096)]
 	if m := charDecl.FindSubmatch(head); m != nil {
-		declared = strings.ToUpper(string(m[1]))
+		declared = strings.ToUpper(strings.TrimSpace(string(m[1])))
+		vers = strings.TrimSpace(string(m[2]))
 	}
 	switch declared {
 	case "ANSEL":
 		doc.Encoding = "ANSEL"
 		return decodeANSEL(data, doc), nil
-	case "ANSI", "WINDOWS-1252", "CP1252", "IBMPC", "IBM", "MACINTOSH":
+	case "ANSI", "WINDOWS-1252", "CP1252", "IBM WINDOWS", "IBM":
 		doc.Encoding = "ANSI"
-		out, _, err := transform.Bytes(charmap.Windows1252.NewDecoder(), data)
-		return string(out), err
+		return decodeWith(charmap.Windows1252, data)
+	case "IBMPC", "IBM PC", "IBM-PC", "PC", "DOS", "IBM437", "CP437", "437", "IBM850", "CP850", "850":
+		// The CHAR value IBMPC does not say which DOS code page it is; the
+		// optional VERS does. Without it CP850 is the safer guess: it has the
+		// same German and French letters as CP437 at the same codes (ä ö ü Ä
+		// Ö Ü ß é è à ...). They differ where CP437 has box-drawing characters
+		// and CP850 more letters (Ø, Á, Â, À, ã ...), and box drawing does not
+		// occur in names.
+		cm := charmap.CodePage850
+		doc.Encoding = "CP850"
+		switch declared {
+		case "IBM437", "CP437", "437":
+			cm, doc.Encoding = charmap.CodePage437, "CP437"
+		case "IBMPC", "IBM PC", "IBM-PC", "PC", "DOS":
+			if vers == "437" {
+				cm, doc.Encoding = charmap.CodePage437, "CP437"
+			}
+		}
+		return decodeWith(cm, data)
+	case "MACINTOSH", "MAC", "MACROMAN", "MAC-ROMAN":
+		doc.Encoding = "MACINTOSH"
+		return decodeWith(charmap.Macintosh, data)
+	case "ISO-8859-1", "ISO8859-1", "LATIN1":
+		doc.Encoding = "ISO-8859-1"
+		return decodeWith(charmap.ISO8859_1, data)
 	case "UNICODE":
 		// UNICODE means UTF-16, which needs a BOM; without one the file is
 		// in practice UTF-8.
@@ -181,9 +210,14 @@ func decode(data []byte, doc *Document) (string, error) {
 		// Windows code page; reading it as such recovers umlauts.
 		doc.warn(0, "the file says %s but is not valid UTF-8; read as Windows-1252", declared)
 		doc.Encoding = "ANSI"
-		out, _, err := transform.Bytes(charmap.Windows1252.NewDecoder(), data)
-		return string(out), err
+		return decodeWith(charmap.Windows1252, data)
 	}
+}
+
+// decodeWith converts single-byte text of the code page to UTF-8.
+func decodeWith(cm *charmap.Charmap, data []byte) (string, error) {
+	out, _, err := transform.Bytes(cm.NewDecoder(), data)
+	return string(out), err
 }
 
 func (d *Document) parseLines(text string) error {
@@ -313,21 +347,33 @@ func parseLine(line string) (*Node, bool) {
 }
 
 // joinContinuations folds CONC and CONT lines into their parent's value
-// and unescapes @@, recursively: every @@ in 5.5.1, only a leading one in
-// GEDCOM 7.
+// and unescapes @@, recursively: every @@ in 5.5.1, a leading @@ of every
+// line in GEDCOM 7. A continuation line is never a pointer: one that looks
+// like "@I1@" is text from a program that did not escape it.
 func joinContinuations(n *Node, v7 bool) {
+	unescape := func(v string) string {
+		if v7 && strings.HasPrefix(v, "@@") {
+			return v[1:]
+		}
+		return v
+	}
 	kept := n.Children[:0]
 	var b strings.Builder
-	b.WriteString(n.Value)
+	b.WriteString(unescape(n.Value))
 	joined := false
 	for _, c := range n.Children {
 		switch c.Tag {
-		case "CONT":
-			b.WriteByte('\n')
-			b.WriteString(c.Value)
-			joined = true
-		case "CONC":
-			b.WriteString(c.Value)
+		case "CONT", "CONC":
+			text := c.Value
+			if c.Pointer != "" {
+				text = "@" + c.Pointer + "@"
+			} else if c.Tag == "CONT" {
+				text = unescape(text)
+			}
+			if c.Tag == "CONT" {
+				b.WriteByte('\n')
+			}
+			b.WriteString(text)
 			joined = true
 		default:
 			kept = append(kept, c)
@@ -336,13 +382,11 @@ func joinContinuations(n *Node, v7 bool) {
 	n.Children = kept
 	if joined {
 		n.Value = b.String()
+	} else {
+		n.Value = unescape(n.Value)
 	}
 	n.Value = strings.TrimRight(n.Value, " \t")
-	if v7 {
-		if strings.HasPrefix(n.Value, "@@") {
-			n.Value = n.Value[1:]
-		}
-	} else {
+	if !v7 {
 		n.Value = strings.ReplaceAll(n.Value, "@@", "@")
 	}
 	for _, c := range n.Children {

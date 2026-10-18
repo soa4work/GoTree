@@ -2,8 +2,10 @@ import i18n from '../i18n'
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 
-// "en" alone would give the US order ("February 26, 1820").
-const locale = () => (i18n.language === 'en' ? 'en-GB' : i18n.language)
+// "en" alone would give the US order ("February 26, 1820"). With a day and a
+// month, ru gives the genitive ("26 февраля 1820") through Intl.
+const LOCALES: Record<string, string> = { en: 'en-GB', ru: 'ru-RU', kk: 'kk-KZ' }
+const locale = () => LOCALES[i18n.language] ?? i18n.language
 
 /**
  * Day, month and year in the interface language. Intl puts the words in the

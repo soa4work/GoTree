@@ -1,7 +1,10 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
-import '../i18n'
+import i18n from '../i18n'
+
+// The app defaults to ru; tests assert the English source strings.
+await i18n.changeLanguage('en')
 
 // React Flow measures its container; jsdom has no layout, so these stubs
 // report zero sizes, which is enough to render nodes.

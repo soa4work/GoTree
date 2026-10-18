@@ -8,6 +8,7 @@ import { mdQuery, useMediaQuery } from '../hooks/useMediaQuery'
 import { useShortcuts } from '../hooks/useShortcuts'
 import { Button } from './Button'
 import { ShortcutsHelp } from './ShortcutsHelp'
+import { LanguageSwitch } from './LanguageSwitch'
 import { ThemeSwitch } from './ThemeSwitch'
 import { UpdateNotice } from './UpdateNotice'
 import { DialogShell } from './DialogShell'
@@ -152,12 +153,13 @@ export function Layout() {
 
       <header className="sticky top-0 z-30 flex print:hidden h-14 items-center gap-3 border-b border-slate-200 bg-slate-100/95 px-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
         <img src="/icons/logo-64.png" alt="" width={32} height={32} className="size-8 rounded-md" />
-        <span className="text-lg font-semibold text-brand-700 dark:text-brand-100">{t('app.name')}</span>
+        <span className="max-sm:sr-only text-lg font-semibold text-brand-700 dark:text-brand-100">{t('app.name')}</span>
         {auth.data?.tree && (
           <span className="hidden truncate text-slate-600 sm:inline dark:text-slate-400">· {auth.data.tree.name}</span>
         )}
         {user && (
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            <LanguageSwitch />
             <ThemeSwitch />
             <span className="sr-only">{t('app.signedInAs', { name: user.displayName || user.username })}</span>
             <span aria-hidden="true" className="hidden text-sm text-slate-600 sm:inline dark:text-slate-400">

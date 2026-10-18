@@ -706,6 +706,9 @@
       "invalid_date": "Unreadable date"
     }
   },
+  "language": {
+    "label": "Language"
+  },
   "theme": {
     "label": "Theme",
     "system": "System",

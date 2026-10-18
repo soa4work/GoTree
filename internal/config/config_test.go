@@ -2,6 +2,7 @@ package config
 
 import (
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -58,5 +59,34 @@ func TestDBPath(t *testing.T) {
 	cfg := Config{DataDir: "/x"}
 	if got, want := cfg.DBPath(), filepath.Join("/x", "gotree.db"); got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTrustedProxies(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		want    []string
+		wantErr bool
+	}{
+		{name: "list", value: "127.0.0.1, 10.0.0.0/8 ,::1", want: []string{"127.0.0.1/32", "10.0.0.0/8", "::1/128"}},
+		{name: "unset"},
+		{name: "masked", value: "10.0.0.1/8", want: []string{"10.0.0.0/8"}},
+		{name: "not an address", value: "proxy.local", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := Load(nil, env(map[string]string{"GOTREE_TRUSTED_PROXIES": tt.value}))
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+			var got []string
+			for _, p := range cfg.TrustedProxies {
+				got = append(got, p.String())
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("TrustedProxies = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

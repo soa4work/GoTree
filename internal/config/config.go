@@ -23,6 +23,10 @@ type Config struct {
 	AdminPassword string
 	// MaxUploadMB limits the size of one uploaded file.
 	MaxUploadMB int
+	// HealthCheck asks a running server on ListenAddr whether it is healthy
+	// and exits, instead of starting one (the Docker HEALTHCHECK).
+	HealthCheck bool
+
 	// KeepPhotoLocation serves photos with their GPS position. By default
 	// (GOTREE_PHOTO_LOCATION=strip) it is removed from files that leave the server.
 	KeepPhotoLocation bool
@@ -77,6 +81,7 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	fs := flag.NewFlagSet("gotree", flag.ContinueOnError)
 	fs.StringVar(&cfg.DataDir, "data-dir", cfg.DataDir, "directory for the database and media (env GOTREE_DATA_DIR)")
 	fs.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "HTTP listen address (env GOTREE_LISTEN_ADDR)")
+	fs.BoolVar(&cfg.HealthCheck, "healthcheck", false, "check that the server on the listen address is healthy, then exit")
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
 	}

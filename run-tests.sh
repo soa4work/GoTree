@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 # The one entry point for the whole suite: the branch-guard hook runs this
-# before every push, and ci.yml has no other step.
+# before every push, and ci.yml has no other step (it only sets GOTREE_AUDIT=1 and
+# GOTREE_RACE=1).
+#
+# GOTREE_RACE=1 runs the Go tests with the race detector.
+#
+# GOTREE_AUDIT=1 adds govulncheck and npm audit. They need the network and
+# their result changes with every new advisory, so they would make the local
+# pre-push gate flaky: CI and the nightly schedule run them, the hook does not.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 echo "🐚 Shell tests"
 ./tests/test-release.sh
+./tests/test-image-tags.sh
+./tests/test-pins.sh
 ./.claude/hooks/tests/branch-guard-test.sh
 
 # The backend and frontend arrive in later milestones; until then each stage
@@ -36,8 +45,24 @@ if [[ -f go.mod ]]; then
   echo "🔍 go vet"
   go vet "${go_pkgs[@]}"
 
-  echo "🧪 Go tests"
-  go test "${go_pkgs[@]}"
+  # The race detector is opt-in (CI sets it): it needs cgo and so a C
+  # compiler, and it makes the suite several times slower.
+  if [[ "${GOTREE_RACE:-}" == 1 ]]; then
+    if ! command -v "$(go env CC)" >/dev/null 2>&1; then
+      echo "❌ no C compiler ($(go env CC)) for go test -race — see README 'Development'" >&2
+      exit 1
+    fi
+    echo "🧪 Go tests (race detector)"
+    CGO_ENABLED=1 go test -race "${go_pkgs[@]}"
+  else
+    echo "🧪 Go tests"
+    go test "${go_pkgs[@]}"
+  fi
+
+  if [[ "${GOTREE_AUDIT:-}" == 1 ]]; then
+    echo "🛡️  govulncheck"
+    go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 "${go_pkgs[@]}"
+  fi
 fi
 
 if [[ -f web/package.json ]]; then
@@ -48,6 +73,11 @@ if [[ -f web/package.json ]]; then
 
   echo "📦 npm ci"
   (cd web && npm ci --no-audit --no-fund)
+
+  if [[ "${GOTREE_AUDIT:-}" == 1 ]]; then
+    echo "🛡️  npm audit"
+    (cd web && npm audit --audit-level=high)
+  fi
 
   echo "🔍 Lint & types"
   (cd web && npm run lint && npm run typecheck)

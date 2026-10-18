@@ -55,7 +55,12 @@ type ImportReport struct {
 	InvalidDates        int      `json:"invalidDates"`
 	InvalidDateExamples []string `json:"invalidDateExamples"`
 	BrokenReferences    []string `json:"brokenReferences"`
-	DurationMS          int64    `json:"durationMs"`
+	// ChildrenFromFAMC counts children that their family did not list under
+	// CHIL but that named the family in their own FAMC; they were added to
+	// it. The examples show a few.
+	ChildrenFromFAMC         int      `json:"childrenFromFamc"`
+	ChildrenFromFAMCExamples []string `json:"childrenFromFamcExamples"`
+	DurationMS               int64    `json:"durationMs"`
 }
 
 // keptNode is a GEDCOM line stored verbatim in extra_json, so an export can
@@ -124,6 +129,13 @@ type importer struct {
 	// pedigree[child][family] is the FAMC.PEDI relation of a child.
 	pedigree map[string]map[string]string
 	deferred []deferredParticipant
+	// famcLinks are the children's own FAMC lines, applied after all
+	// families are imported.
+	famcLinks []famcLink
+	// chilSeen holds famXref + "\x00" + childXref for every CHIL line.
+	chilSeen map[string]bool
+	// familyPartners are the partners of each family by its xref.
+	familyPartners map[string][2]sql.NullInt64
 
 	insertPerson, insertEvent, insertName, insertFTS *sql.Stmt
 }
@@ -133,6 +145,16 @@ type deferredParticipant struct {
 	xref    string
 	role    string
 	line    int
+}
+
+// famcLink is a child's own INDI.FAMC line; families that do not list
+// the child under CHIL get it after all families are imported.
+type famcLink struct {
+	childID   int64
+	childXref string
+	family    string // the FAM xref
+	pedi      string // FAMC.PEDI, "" when absent
+	line      int
 }
 
 func (im *importer) tag(path, outcome, reason string) {
@@ -167,6 +189,7 @@ func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document,
 		Version: doc.Version, Encoding: doc.Encoding, Source: doc.Source,
 		Counts: map[string]int{}, Warnings: doc.Warnings,
 		InvalidDateExamples: []string{}, BrokenReferences: []string{},
+		ChildrenFromFAMCExamples: []string{},
 	}
 	if report.Warnings == nil {
 		report.Warnings = []gedcom.Warning{}
@@ -197,6 +220,7 @@ func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document,
 			persons: map[string]int64{}, families: map[string]int64{}, sources: map[string]int64{},
 			repos: map[string]int64{}, notes: map[string]string{}, places: map[string]int64{},
 			pedigree: map[string]map[string]string{},
+			chilSeen: map[string]bool{}, familyPartners: map[string][2]sql.NullInt64{},
 		}
 		if err := im.prepare(ctx); err != nil {
 			return err
@@ -314,6 +338,9 @@ func (im *importer) run(ctx context.Context) error {
 		if err := im.family(ctx, r); err != nil {
 			return err
 		}
+	}
+	if err := im.linkFAMCChildren(ctx); err != nil {
+		return err
 	}
 	for _, r := range byTag["_HEIRLOOM"] {
 		if err := im.heirloom(ctx, r); err != nil {
@@ -684,7 +711,7 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 	var others []parsedName
 	var primaryNode *gedcom.Node
 	sex := "U"
-	var events, citations, assos []*gedcom.Node
+	var events, citations, assos, famcs []*gedcom.Node
 
 	for _, c := range r.Children {
 		switch {
@@ -721,6 +748,9 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 			if _, ok := im.doc.RecordByXref(c.Pointer); !ok && c.Pointer != "VOID" {
 				im.broken(c, "the family")
 			}
+			if c.Pointer != "" && c.Pointer != "VOID" {
+				famcs = append(famcs, c)
+			}
 			im.mapped("INDI.FAMC")
 		default:
 			im.other("INDI", c, &kept)
@@ -736,6 +766,9 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 	}
 	pid, _ := res.LastInsertId()
 	im.persons[r.Xref] = pid
+	for _, c := range famcs {
+		im.famcLinks = append(im.famcLinks, famcLink{childID: pid, childXref: r.Xref, family: c.Pointer, pedi: c.Text("PEDI"), line: c.Line})
+	}
 	im.report.Counts["persons"]++
 	im.mapped("INDI")
 
@@ -1010,6 +1043,7 @@ func (im *importer) family(ctx context.Context, r *gedcom.Node) error {
 			*target = sql.NullInt64{Int64: id, Valid: true}
 			im.mapped("FAM." + c.Tag)
 		case c.Tag == "CHIL":
+			im.chilSeen[r.Xref+"\x00"+c.Pointer] = true
 			children = append(children, c)
 		case familyEventTagsIn[c.Tag]:
 			if c.Tag == "MARR" {
@@ -1043,6 +1077,7 @@ func (im *importer) family(ctx context.Context, r *gedcom.Node) error {
 	}
 	fid, _ := res.LastInsertId()
 	im.families[r.Xref] = fid
+	im.familyPartners[r.Xref] = [2]sql.NullInt64{p1, p2}
 	im.report.Counts["families"]++
 	im.mapped("FAM")
 
@@ -1085,6 +1120,51 @@ func (im *importer) family(ctx context.Context, r *gedcom.Node) error {
 	for i, e := range events {
 		if _, err := im.event(ctx, "FAM", e, sql.NullInt64{}, sql.NullInt64{Int64: fid, Valid: true}, i); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// linkFAMCChildren adds the children that name a family in their own FAMC
+// line but are not listed under the family's CHIL.
+func (im *importer) linkFAMCChildren(ctx context.Context) error {
+	for _, l := range im.famcLinks {
+		fid, ok := im.families[l.family]
+		if !ok {
+			continue
+		}
+		if l.childXref != "" && im.chilSeen[l.family+"\x00"+l.childXref] {
+			continue
+		}
+		partners := im.familyPartners[l.family]
+		if (partners[0].Valid && partners[0].Int64 == l.childID) || (partners[1].Valid && partners[1].Int64 == l.childID) {
+			if len(im.report.BrokenReferences) < 50 {
+				im.report.BrokenReferences = append(im.report.BrokenReferences,
+					fmt.Sprintf("line %d: @%s@ is both a partner and a child of family @%s@; the child link was skipped", l.line, l.childXref, l.family))
+			}
+			continue
+		}
+		rel := relation(l.pedi)
+		var order int
+		if err := im.tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(sort_order), -1) + 1 FROM family_children WHERE family_id = ?`, fid).Scan(&order); err != nil {
+			return err
+		}
+		res, err := im.tx.ExecContext(ctx, `
+			INSERT OR IGNORE INTO family_children (family_id, child_id, relation_partner1, relation_partner2, sort_order)
+			VALUES (?, ?, ?, ?, ?)`, fid, l.childID, rel, rel, order)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			continue
+		}
+		im.report.ChildrenFromFAMC++
+		if len(im.report.ChildrenFromFAMCExamples) < 20 {
+			msg := fmt.Sprintf("line %d: a person added as a child of family @%s@", l.line, l.family)
+			if l.childXref != "" {
+				msg = fmt.Sprintf("line %d: @%s@ added as a child of family @%s@", l.line, l.childXref, l.family)
+			}
+			im.report.ChildrenFromFAMCExamples = append(im.report.ChildrenFromFAMCExamples, msg)
 		}
 	}
 	return nil

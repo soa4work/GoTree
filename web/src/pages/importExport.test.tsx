@@ -23,6 +23,44 @@ describe('import page', () => {
     expect(screen.getByRole('button', { name: 'Replace the tree' })).toBeDisabled()
   })
 
+  describe('report of children added from their own FAMC', () => {
+    const report = (childrenFromFamc: number) => ({
+      version: '5.5.1',
+      encoding: 'UTF-8',
+      source: 'Test',
+      counts: { persons: 5, families: 1 },
+      tags: [],
+      warnings: [],
+      invalidDates: 0,
+      invalidDateExamples: [],
+      brokenReferences: [],
+      childrenFromFamc,
+      childrenFromFamcExamples:
+        childrenFromFamc > 0
+          ? ['line 20: @I4@ added as a child of family @F1@', 'line 24: @I5@ added as a child of family @F1@']
+          : [],
+      durationMs: 10,
+    })
+    const runImport = async (childrenFromFamc: number) => {
+      mockApi({ ...people(0), 'POST /api/import/gedcom': [200, report(childrenFromFamc)] as [number, unknown] })
+      renderApp('/import-export')
+      await userEvent.upload(await screen.findByLabelText('GEDCOM file'), new File(['0 HEAD'], 'tree.ged'))
+      await userEvent.click(await screen.findByRole('button', { name: 'Import' }))
+    }
+
+    it('lists children added from their own FAMC in the report', async () => {
+      await runImport(2)
+      expect(await screen.findByText('2 children added to families from their own records')).toBeInTheDocument()
+      expect(screen.getByText('line 20: @I4@ added as a child of family @F1@')).toBeInTheDocument()
+    })
+
+    it('says nothing when no child was added that way', async () => {
+      await runImport(0)
+      await screen.findByText('Test', { exact: false })
+      expect(screen.queryByText(/from their own record/)).not.toBeInTheDocument()
+    })
+  })
+
   it('lets an editor import into an empty tree', async () => {
     mockApi({ ...people(0), ...asEditor })
     renderApp('/import-export')

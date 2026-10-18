@@ -102,6 +102,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- GEDCOM import no longer loses family links: a pointer followed by spaces (`1 FAMC @F1@ `) and a
+  record line with several spaces after its identifier are read, and a child that names its family
+  only in its own record (INDI.FAMC, no FAM.CHIL) is added to the family and listed in the import
+  report (#53)
+
 - Kazakh and Russian wording proofread (#46)
 
 - Errors in transcription rows and in GEDCOM files are shown in the interface language (#43)

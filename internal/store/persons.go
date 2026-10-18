@@ -48,14 +48,17 @@ type Person struct {
 
 // PersonRef is the short form of a person used in lists and relations.
 type PersonRef struct {
-	ID         int64        `json:"id"`
-	GivenNames string       `json:"givenNames"`
-	Surname    string       `json:"surname"`
-	Sex        string       `json:"sex"`
-	BirthDate  string       `json:"birthDate"`
-	DeathDate  string       `json:"deathDate"`
-	Living     bool         `json:"living"`
-	Portrait   *PortraitRef `json:"portrait"`
+	ID         int64  `json:"id"`
+	GivenNames string `json:"givenNames"`
+	Surname    string `json:"surname"`
+	Sex        string `json:"sex"`
+	BirthDate  string `json:"birthDate"`
+	// BirthSort is the birth date as YYYYMMDD for ordering people by age
+	// (relationship names by seniority); 0 when no dated birth is known.
+	BirthSort int64        `json:"birthSort,omitempty"`
+	DeathDate string       `json:"deathDate"`
+	Living    bool         `json:"living"`
+	Portrait  *PortraitRef `json:"portrait"`
 }
 
 // AlternateNameInput is the editable part of an AlternateName. ID keeps an
@@ -387,9 +390,9 @@ func reindexPerson(ctx context.Context, tx *sql.Tx, id int64) error {
 	}
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO persons_fts (rowid, names)
-		SELECT p.id, p.given_names || ' ' || p.surname || ' ' || p.nickname || ' ' ||
+		SELECT p.id, `+foldSQL(`p.given_names || ' ' || p.surname || ' ' || p.nickname || ' ' ||
 			coalesce((SELECT group_concat(n.given_names || ' ' || n.surname || ' ' || n.nickname, ' ')
-				FROM person_names n WHERE n.person_id = p.id), '')
+				FROM person_names n WHERE n.person_id = p.id), '')`)+`
 		FROM persons p WHERE p.id = ?`, id)
 	return err
 }
@@ -521,7 +524,7 @@ func (s *Store) ListPersons(ctx context.Context, a Actor, query string, limit, o
 		}
 		ids, err = queryIDs(ctx, s.DB, `
 			SELECT id FROM persons WHERE tree_id = ?
-			ORDER BY surname = '', surname COLLATE NOCASE, given_names COLLATE NOCASE, id
+			ORDER BY surname = '', surname COLLATE NAMES, given_names COLLATE NAMES, id
 			LIMIT ? OFFSET ?`, a.TreeID, limit, offset)
 	} else {
 		if err = s.DB.QueryRowContext(ctx, `
@@ -532,7 +535,7 @@ func (s *Store) ListPersons(ctx context.Context, a Actor, query string, limit, o
 		ids, err = queryIDs(ctx, s.DB, `
 			SELECT p.id FROM persons_fts f JOIN persons p ON p.id = f.rowid
 			WHERE persons_fts MATCH ? AND p.tree_id = ?
-			ORDER BY f.rank, p.surname COLLATE NOCASE, p.given_names COLLATE NOCASE
+			ORDER BY f.rank, p.surname COLLATE NAMES, p.given_names COLLATE NAMES
 			LIMIT ? OFFSET ?`, match, a.TreeID, limit, offset)
 	}
 	if err != nil {
@@ -548,8 +551,20 @@ func (s *Store) ListPersons(ctx context.Context, a Actor, query string, limit, o
 	return list, nil
 }
 
+// searchFold is applied to indexed names and to the query, because the FTS
+// tokenizer removes accents of Latin letters only: ё and й would otherwise
+// not match е and и ("петр" finds "Пётр").
+var searchFold = strings.NewReplacer("ё", "е", "Ё", "Е", "й", "и", "Й", "И")
+
+// foldSQL is searchFold as an SQL expression over expr; migration 00010
+// spells out the same replacements.
+func foldSQL(expr string) string {
+	return `replace(replace(replace(replace(` + expr + `, 'ё', 'е'), 'Ё', 'Е'), 'й', 'и'), 'Й', 'И')`
+}
+
 // ftsQuery turns user input into an FTS5 prefix query; every word must match.
 func ftsQuery(input string) string {
+	input = searchFold.Replace(input)
 	words := strings.FieldsFunc(input, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '\''
 	})
@@ -628,6 +643,7 @@ func (s *Store) personRefs(ctx context.Context, q queryer, a Actor, ids []int64)
 			r.Portrait = &PortraitRef{MediaID: portrait.Int64, RegionID: ptrID(portraitRegion)}
 		}
 		r.BirthDate, r.DeathDate = birth.String, death.String
+		r.BirthSort = birthSort.Int64
 		switch {
 		case stated.Valid:
 			r.Living = stated.Int64 == 1

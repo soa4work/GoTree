@@ -11,6 +11,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 - Error messages from the server are shown in the interface language (#24)
 
+- Kazakh relationship names (to be proofread by a native speaker) (#24)
+
 - Russian relationship names (#24): the relationship page names kin in correct Russian with gender,
   half-blood (единокровный/единоутробный), step and in-law terms (свёкор, тёща, деверь, золовка,
   шурин, невестка…) by the spouse's side, and cousins of any degree (двоюродный, троюродный…)
@@ -97,6 +99,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
   tree (#15)
 
 ### Fixed
+
+- Russian and Kazakh names sort in alphabetical order and match their Latin spellings when looking
+  for duplicates, and searching «петр» finds «Пётр» (#24)
 
 - A GEDCOM file inside a zip that unpacks to more than four times the upload limit is refused
   (413) instead of being silently cut off and, with "Replace the tree", imported truncated after

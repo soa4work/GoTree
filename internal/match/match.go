@@ -1,7 +1,8 @@
 // Package match scores how likely a person named in a record is a person
 // already in the tree. Old records spell names freely (Meyer, Maier,
 // Mayr; Schmidt, Schmitt), so names are compared by their Cologne
-// phonetic code (Kölner Phonetik, made for German names) and by edit
+// phonetic code (Kölner Phonetik, made for German names; Russian and Kazakh
+// names are transliterated first) and by edit
 // distance; ages and life dates rule out the impossible.
 package match
 
@@ -106,13 +107,32 @@ var folds = strings.NewReplacer(
 	"ú", "u", "ù", "u", "û", "u", "ç", "c", "ñ", "n", "ÿ", "y", "š", "s", "ž", "z", "č", "c",
 )
 
-// Normalize lower-cases a name, spells out umlauts and drops accents and
-// everything that is not a letter.
+// translit maps Russian and Kazakh letters to a simple GOST/BGN-like Latin
+// spelling close to how German and English records spell the same names, so
+// the Cologne phonetic code (which only knows Latin letters) works on them:
+// Мейер, Майер and Meyer all code alike, as do Иванов, Ivanov and Iwanow.
+// The Kazakh letters fall back to their base letters.
+var translit = map[rune]string{
+	'а': "a", 'б': "b", 'в': "v", 'г': "g", 'д': "d", 'е': "e", 'ё': "e", 'ж': "zh",
+	'з': "z", 'и': "i", 'й': "i", 'к': "k", 'л': "l", 'м': "m", 'н': "n", 'о': "o",
+	'п': "p", 'р': "r", 'с': "s", 'т': "t", 'у': "u", 'ф': "f", 'х': "kh", 'ц': "ts",
+	'ч': "ch", 'ш': "sh", 'щ': "shch", 'ъ': "", 'ы': "y", 'ь': "", 'э': "e", 'ю': "yu",
+	'я': "ya",
+	// Ukrainian
+	'є': "ye", 'ї': "yi", 'ґ': "g",
+	// Kazakh
+	'ә': "a", 'ғ': "g", 'қ': "k", 'ң': "n", 'ө': "o", 'ұ': "u", 'ү': "u", 'һ': "h", 'і': "i",
+}
+
+// Normalize lower-cases a name, transliterates Cyrillic, spells out umlauts
+// and drops accents and everything that is not a letter.
 func Normalize(s string) string {
 	s = folds.Replace(strings.ToLower(s))
 	var b strings.Builder
 	for _, r := range s {
-		if unicode.IsLetter(r) {
+		if t, ok := translit[r]; ok {
+			b.WriteString(t)
+		} else if unicode.IsLetter(r) {
 			b.WriteRune(r)
 		}
 	}

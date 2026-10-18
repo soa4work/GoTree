@@ -334,7 +334,7 @@ func (s *Store) ListHeirlooms(ctx context.Context, a Actor, query string, person
 			(SELECT c.person_id FROM heirloom_custody c WHERE c.heirloom_id = h.id ORDER BY c.sort_order DESC, c.id DESC LIMIT 1),
 			(SELECT m.id FROM media_links l JOIN media m ON m.id = l.media_id
 				WHERE l.entity_type = 'heirloom' AND l.entity_id = h.id AND m.kind = 'image' ORDER BY l.sort_order LIMIT 1)
-		FROM heirlooms h WHERE `+strings.Join(where, " AND ")+` ORDER BY h.name COLLATE NOCASE, h.id LIMIT 500`, args...)
+		FROM heirlooms h WHERE `+strings.Join(where, " AND ")+` ORDER BY h.name COLLATE NAMES, h.id LIMIT 500`, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -11,6 +11,8 @@ export interface PersonRef {
   surname: string
   sex: Sex
   birthDate: string
+  /** Birth as YYYYMMDD for ordering by age; absent when no dated birth is known. */
+  birthSort?: number
   deathDate: string
   living: boolean
   portrait: PortraitRef | null

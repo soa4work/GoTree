@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import type { PersonRef, ShareLink } from '../api/types'
 import { axeViolations } from '../test/axe'
@@ -28,6 +28,14 @@ const link: ShareLink = {
   lastUsedAt: null,
   createdAt: '2026-10-06T08:00:00Z',
 }
+
+function setClipboard(clipboard: unknown) {
+  Object.defineProperty(navigator, 'clipboard', { value: clipboard, configurable: true })
+}
+
+afterEach(() => {
+  Reflect.deleteProperty(navigator, 'clipboard')
+})
 
 describe('sharing page', () => {
   it('creates a link and shows it once', async () => {
@@ -61,6 +69,54 @@ describe('sharing page', () => {
     expect(await screen.findByRole('heading', { name: 'Share link “Aunt Erna” is ready' })).toBeInTheDocument()
     expect(screen.getByLabelText('Share link')).toHaveValue(`${window.location.origin}/share/tok123`)
     expect(sent).toEqual({ label: 'Aunt Erna', scope: 'tree', rootPersonId: null, privacy: 'deceased', expiresOn: '' })
+  })
+
+  it('re-issues an address', async () => {
+    mockApi({
+      'GET /api/share-links': [200, [link]],
+      'GET /api/calendar-feeds': [200, []],
+      'POST /api/share-links/1/token': [200, { ...link, token: 'abc123' }],
+    })
+    renderApp('/sharing')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'New address: Cousins' }))
+    const dialog = screen.getByRole('dialog', { name: 'Make a new address?' })
+    expect(within(dialog).getByText(/current address of “Cousins” will stop working/)).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'New address' }))
+
+    expect(await screen.findByRole('heading', { name: 'New address for “Cousins”' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Share link')).toHaveValue(`${window.location.origin}/share/abc123`)
+    await waitFor(() => expect(screen.getByRole('region', { name: 'New address for “Cousins”' })).toHaveFocus())
+  })
+
+  it('says when copying fails', async () => {
+    mockApi({
+      'GET /api/share-links': [200, []],
+      'GET /api/calendar-feeds': [200, []],
+      'POST /api/share-links': [201, { ...link, id: 2, token: 'tok123' }],
+    })
+    setClipboard({ writeText: () => Promise.reject(new Error('denied')) })
+    renderApp('/sharing')
+    fireEvent.click(await screen.findByRole('button', { name: '+ New share link' }))
+    const dialog = screen.getByRole('dialog', { name: 'New share link' })
+    fireEvent.change(within(dialog).getByLabelText(/^Name/), { target: { value: 'Aunt Erna' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /Create link/ }))
+    await screen.findByLabelText('Share link')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not copy. Select the address and copy it by hand.')
+
+    // Over plain http there is no clipboard at all.
+    setClipboard(undefined)
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not copy')
+
+    const writeText = vi.fn(() => Promise.resolve())
+    setClipboard({ writeText })
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
+    await waitFor(() => expect(screen.getByText('Copied.')).toBeInTheDocument())
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/share/tok123`)
   })
 })
 
@@ -110,6 +166,27 @@ describe('calendar feeds', () => {
     } finally {
       await i18n.changeLanguage('en')
     }
+  })
+
+  it('says when copying a calendar address fails', async () => {
+    mockApi({
+      'GET /api/share-links': [200, []],
+      'GET /api/calendar-feeds': [200, []],
+      'POST /api/calendar-feeds': [
+        201,
+        { id: 1, label: 'My phone', includeLiving: false, revokedAt: null, lastUsedAt: null, createdAt: '', token: 'cal1' },
+      ],
+    })
+    setClipboard(undefined)
+    renderApp('/sharing')
+    fireEvent.click(await screen.findByRole('button', { name: '+ New calendar address' }))
+    const dialog = screen.getByRole('dialog', { name: 'New calendar address' })
+    fireEvent.change(within(dialog).getByLabelText(/^Name/), { target: { value: 'My phone' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /Create address/ }))
+    await screen.findByLabelText('Calendar address', { exact: true })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not copy. Select the address and copy it by hand.')
   })
 })
 

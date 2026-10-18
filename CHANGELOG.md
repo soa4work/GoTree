@@ -108,6 +108,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
   photo tools wrote, and use a photo or a face as a person's portrait, shown in lists and on the
   tree (#15)
 
+- Share links can get a new address at any time, for example when the first one was not
+  copied: the old address stops working and the new one is shown once; copying a share or
+  calendar address says when the browser refused it (#60)
+
 ### Fixed
 
 - Switching between media no longer carries the form over (saving could overwrite the other

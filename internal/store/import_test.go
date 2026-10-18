@@ -600,6 +600,9 @@ func TestImportAssoVariants(t *testing.T) {
 		"1 BAPM", "2 ASSO @I2@", "3 RELA Witness",
 		"1 ASSO @I2@", "2 RELA witness (MARR F99)",
 		"1 ASSO @I2@", "2 RELA friend (BAPM 3)",
+		"1 CHR", "2 ASSO @I2@", "3 RELA Godfather",
+		"1 ASSO @I2@", "2 RELA Godfather",
+		"1 ASSO @I2@", "2 RELA witness",
 		"0 @I2@ INDI", "1 NAME Bert /Weber/",
 		"0 @F1@ FAM", "1 HUSB @I1@",
 		"0 TRLR", "",
@@ -614,11 +617,17 @@ func TestImportAssoVariants(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var bapm []Participant
+	var bapm, chr []Participant
 	for _, e := range findPerson(t, s2, a2, "anna").Events {
-		if e.Type == "BAPM" {
+		switch e.Type {
+		case "BAPM":
 			bapm = e.Participants
+		case "CHR":
+			chr = e.Participants
 		}
+	}
+	if len(chr) != 1 || chr[0].Role != "other" || chr[0].CustomRole != "Godfather" {
+		t.Errorf("an event-level RELA Godfather: %+v", chr)
 	}
 	if len(bapm) != 1 || bapm[0].Role != "witness" || bapm[0].CustomRole != "" {
 		t.Errorf("an event-level RELA Witness: %+v", bapm)
@@ -627,7 +636,11 @@ func TestImportAssoVariants(t *testing.T) {
 		t.Errorf("an unknown family event: %v", report.BrokenReferences)
 	}
 	// "friend (BAPM 3)" has no third BAPM: it is kept verbatim on the person.
-	if text := exportText(t, s2, a2, ExportOptions{}); !strings.Contains(text, "RELA friend (BAPM 3)") {
-		t.Errorf("the unplaceable association was lost:\n%s", text)
+	// Person-level associations of other programs are kept verbatim too.
+	text := exportText(t, s2, a2, ExportOptions{})
+	for _, want := range []string{"RELA friend (BAPM 3)", "2 RELA Godfather", "2 RELA witness\n"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the unplaceable association %q was lost:\n%s", want, text)
+		}
 	}
 }

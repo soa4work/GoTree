@@ -957,3 +957,45 @@ func TestExportFamilyWitnessesOnFirstPartner(t *testing.T) {
 		t.Errorf("the witness belongs on the first partner only:\n%s", text)
 	}
 }
+
+func TestExportFamilyWitnessesPrivacy(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	born := func(given string) Person {
+		p := mustPerson(t, s, a, given, "Weber")
+		if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &p.ID, Type: "BIRT", Date: "1850"}); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	anna, karl := born("Anna"), born("Karl")
+	hans := mustPerson(t, s, a, "Hans", "Weber") // no dates: living
+	lena := mustPerson(t, s, a, "Lena", "Weber") // living
+	fam, err := s.CreateFamily(ctx, a, FamilyInput{Partner1ID: &anna.ID, Partner2ID: &hans.ID, UnionType: "married"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{FamilyID: &fam.ID, Type: "MARR", Date: "1880",
+		Participants: []ParticipantInput{{PersonID: karl.ID, Role: "witness", Notes: "best man"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &anna.ID, Type: "BAPM", Date: "1850",
+		Participants: []ParticipantInput{{PersonID: lena.ID, Role: "godparent"}}}); err != nil {
+		t.Fatal(err)
+	}
+	marr := fmt.Sprintf("(MARR F%d)", fam.ID)
+	if text := exportText(t, s, a, ExportOptions{Privacy: PrivacyAll}); !strings.Contains(indiBlock(t, text, anna.ID), marr) {
+		t.Errorf("full export lacks the family witness:\n%s", text)
+	}
+	for _, mode := range []string{PrivacyExcludeLiving, PrivacyLivingNameOnly} {
+		text := exportText(t, s, a, ExportOptions{Privacy: mode})
+		// The living partner takes the family's events, and so their witnesses.
+		if strings.Contains(text, marr) || strings.Contains(text, "best man") {
+			t.Errorf("%s: the witness of a hidden family event leaked:\n%s", mode, text)
+		}
+		lenaRef := fmt.Sprintf("ASSO @I%d@", lena.ID)
+		if mode == PrivacyExcludeLiving && strings.Contains(text, lenaRef) {
+			t.Errorf("%s: an association with an excluded person:\n%s", mode, text)
+		}
+	}
+}

@@ -1,11 +1,11 @@
 import type { EdgeProps } from '@xyflow/react'
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { useDark } from '../lib/theme'
 import { VineArt } from './Nature'
 import { darkPalette, growVine, lightPalette } from './vine'
 
 /** A connector drawn as a climbing vine; decoration only. */
-export function VineEdge({ id, sourceX, sourceY, targetX, targetY }: EdgeProps) {
+export const VineEdge = memo(function VineEdge({ id, sourceX, sourceY, targetX, targetY }: EdgeProps) {
   const dark = useDark()
   const vine = useMemo(
     () =>
@@ -19,4 +19,4 @@ export function VineEdge({ id, sourceX, sourceY, targetX, targetY }: EdgeProps) 
       <VineArt vine={vine} palette={dark ? darkPalette : lightPalette} />
     </g>
   )
-}
+})

@@ -13,15 +13,18 @@ import { SelectField } from '../components/Field'
 import { PageHeading } from '../components/PageHeading'
 import { TextField } from '../components/TextField'
 import { formatDay } from '../lib/dates'
+import { mapLimit } from '../lib/mapLimit'
 import { fullName } from '../lib/people'
 import { PersonPicker } from '../people/PersonPicker'
-import { layoutTree, type TreeView } from '../tree/layout'
-import { indexGraph } from '../tree/model'
+import { layoutTree, type TreeLayout, type TreeView } from '../tree/layout'
+import { indexGraph, type TreeIndex } from '../tree/model'
 
 const views: TreeView[] = ['pedigree', 'descendants', 'hourglass']
 
 async function asDataUri(url: string): Promise<string> {
-  const blob = await (await fetch(url, { credentials: 'same-origin' })).blob()
+  const res = await fetch(url, { credentials: 'same-origin' })
+  if (!res.ok) throw new Error(`photo ${res.status}`)
+  const blob = await res.blob()
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result))
@@ -44,6 +47,7 @@ export function ChartPage() {
   const [title, setTitle] = useState<string | null>(null)
   const [subtitle, setSubtitle] = useState<string | null>(null)
   const [theme, setTheme] = useState<ChartThemeName>('tree')
+  const [downloading, setDownloading] = useState(false)
   const [embedded, setEmbedded] = useState<Record<string, string> | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
 
@@ -80,15 +84,30 @@ export function ChartPage() {
   const rootRef: PersonRef | null = root.data ? { ...root.data, birthDate: '', deathDate: '' } : null
 
   const download = async () => {
-    if (!index || !svgRef.current) return
+    if (!index || !layout || !svgRef.current || downloading) return
+    setDownloading(true)
+    try {
+      await save(index, layout)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  const save = async (index: TreeIndex, layout: TreeLayout) => {
     // A file on its own cannot load photos from the server, so they go in.
-    const urls = photos ? [...index.persons.values()].map(photoUrl).filter((u): u is string => u !== null) : []
-    const map: Record<string, string> = {}
-    await Promise.all(
-      urls.map(async (u) => {
-        map[u] = await asDataUri(u).catch(() => u)
-      }),
-    )
+    // Only the people drawn on the chart need one, and a few at a time.
+    const urls = photos
+      ? [
+          ...new Set(
+            layout.nodes
+              .filter((n) => n.kind === 'person')
+              .map((n) => photoUrl(index.persons.get(n.personId!)!))
+              .filter((u): u is string => u !== null),
+          ),
+        ]
+      : []
+    const pairs = await mapLimit(urls, 4, async (u) => [u, await asDataUri(u).catch(() => u)] as const)
+    const map: Record<string, string> = Object.fromEntries(pairs)
     setEmbedded(map)
     // Let React render the embedded images before serialising.
     await new Promise((r) => setTimeout(r, 0))
@@ -186,7 +205,11 @@ export function ChartPage() {
             disabled={chartTitle === ''}
             onChange={(e) => setSubtitle(e.target.value)}
           />
-          <SelectField label={t('chart.theme')} value={theme} onChange={(e) => setTheme(e.target.value as ChartThemeName)}>
+          <SelectField
+            label={t('chart.theme')}
+            value={theme}
+            onChange={(e) => setTheme(e.target.value as ChartThemeName)}
+          >
             {Object.keys(chartThemes).map((name) => (
               <option key={name} value={name}>
                 {t(`chart.themes.${name}` as 'chart.themes.classic')}
@@ -239,7 +262,7 @@ export function ChartPage() {
         {fit && (
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => window.print()}>{t('chart.print')}</Button>
-            <Button variant="secondary" onClick={() => void download()}>
+            <Button variant="secondary" busy={downloading} onClick={() => void download()}>
               {t('chart.downloadSvg')}
             </Button>
           </div>

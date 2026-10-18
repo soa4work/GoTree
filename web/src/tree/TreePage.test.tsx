@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { PersonRef, TreeGraph } from '../api/types'
 import { axeViolations } from '../test/axe'
 import { mockApi, renderApp } from '../test/render'
@@ -33,6 +33,8 @@ const graph: TreeGraph = {
 }
 
 describe('tree page', () => {
+  beforeEach(() => localStorage.clear())
+
   it('draws the chart with one tab stop and selects a person', async () => {
     const fetchMock = mockApi({ 'GET /api/tree/1': [200, graph] })
     renderApp('/tree?root=1&view=hourglass&gen=2')
@@ -89,6 +91,71 @@ describe('tree page', () => {
     })
     renderApp('/tree')
     expect(await screen.findByRole('heading', { level: 1, name: 'Tree of Paul Weber' })).toBeInTheDocument()
+  })
+})
+
+describe('tree page root', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('forgets a remembered root that is gone', async () => {
+    localStorage.setItem('gotree.treeRoot.1', '99')
+    mockApi({
+      'GET /api/tree/99': [404, { error: 'not found' }],
+      'GET /api/persons': [200, { items: [graph.persons['1']], total: 1 }],
+      'GET /api/tree/1': [200, graph],
+    })
+    renderApp('/tree')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Tree of Paul Weber' })).toBeInTheDocument()
+    await waitFor(() => expect(localStorage.getItem('gotree.treeRoot.1')).toBe('1'))
+    expect(screen.queryByText('Could not load the data. Please try again.')).toBeNull()
+  })
+
+  it('shows onboarding after the tree was emptied', async () => {
+    localStorage.setItem('gotree.treeRoot.1', '99')
+    mockApi({
+      'GET /api/tree/99': [404, { error: 'not found' }],
+      'GET /api/persons': [200, { items: [], total: 0 }],
+    })
+    renderApp('/tree')
+    await waitFor(() => expect(localStorage.getItem('gotree.treeRoot.1')).toBeNull())
+    expect(await screen.findByRole('heading', { name: 'No one is in your tree yet' })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Family tree chart' })).toBeNull()
+  })
+
+  it('explains a root from the URL that is gone', async () => {
+    mockApi({ 'GET /api/tree/99': [404, { error: 'not found' }] })
+    renderApp('/tree?root=99')
+    expect(await screen.findByRole('alert')).toHaveTextContent('This person is no longer in the tree.')
+    expect(screen.getByRole('link', { name: 'Show the tree' })).toHaveAttribute('href', '/tree')
+  })
+
+  it('opens the last centered person when the Tree link is followed again', async () => {
+    localStorage.setItem('gotree.treeRoot.1', '1')
+    mockApi({
+      'GET /api/tree/1': [200, graph],
+      'GET /api/tree/2': [200, { ...graph, rootId: 2 }],
+    })
+    renderApp('/tree')
+    const chart = await screen.findByRole('group', { name: 'Family tree chart' })
+    fireEvent.doubleClick(within(chart).getByRole('button', { name: /^Hans Weber/ }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Tree of Hans Weber' })).toBeInTheDocument()
+    await waitFor(() => expect(localStorage.getItem('gotree.treeRoot.1')).toBe('2'))
+
+    fireEvent.click(screen.getAllByRole('link', { name: 'Tree' })[0]!)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Tree of Hans Weber' })).toBeInTheDocument()
+    expect(localStorage.getItem('gotree.treeRoot.1')).toBe('2')
+  })
+
+  it('keys the remembered root by tree', async () => {
+    localStorage.setItem('gotree.treeRoot.2', '5')
+    const fetchMock = mockApi({
+      'GET /api/persons': [200, { items: [graph.persons['1']], total: 1 }],
+      'GET /api/tree/1': [200, graph],
+    })
+    renderApp('/tree')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Tree of Paul Weber' })).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/api/tree/5'))).toBe(false)
+    expect(localStorage.getItem('gotree.treeRoot.2')).toBe('5')
   })
 })
 

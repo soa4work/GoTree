@@ -58,6 +58,7 @@ func run(log *slog.Logger) error {
 	if err := st.PruneSessions(ctx); err != nil {
 		return err
 	}
+	go pruneSessions(ctx, st, sessionPruneInterval, log)
 
 	// baseCtx is the parent of every request context; it is cancelled only
 	// when the graceful shutdown ran out of time, to abort what is still running.
@@ -72,11 +73,13 @@ func run(log *slog.Logger) error {
 		Version:           version,
 		Frontend:          web.Dist(),
 		Log:               log,
+
+		TrustedProxies: cfg.TrustedProxies,
 	}).Handler()), baseCtx)
 
 	errc := make(chan error, 1)
 	go func() {
-		log.Info("gotree listening", "addr", cfg.ListenAddr, "version", version, "data", cfg.DataDir)
+		log.Info("gotree listening", "addr", cfg.ListenAddr, "version", version, "data", cfg.DataDir, "trustedProxies", len(cfg.TrustedProxies))
 		errc <- srv.ListenAndServe()
 	}()
 
@@ -118,12 +121,31 @@ const (
 	handlerWait = 5 * time.Second
 )
 
+// sessionPruneInterval is how often expired sessions are removed.
+const sessionPruneInterval = time.Hour
+
+// pruneSessions removes expired sessions every interval until ctx ends.
+func pruneSessions(ctx context.Context, st *store.Store, every time.Duration, log *slog.Logger) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if err := st.PruneSessions(ctx); err != nil && ctx.Err() == nil {
+				log.Warn("prune sessions", "err", err)
+			}
+		}
+	}
+}
+
 // newHTTPServer builds the server with the timeouts that are safe for every
 // route. There is deliberately no global ReadTimeout or WriteTimeout: they
 // would cut off legitimate large uploads, imports, backups and GEDZIP
-// downloads. Slow request bodies are bounded per handler instead, with a
-// read deadline sized to the upload limit (api.Server.limitUpload). Request
-// contexts derive from base.
+// downloads. Slow request bodies are bounded per request instead: JSON bodies
+// by a short deadline (api bodyDeadline), uploads by one sized to the upload
+// limit (api.Server.limitUpload). Request contexts derive from base.
 func newHTTPServer(addr string, h http.Handler, base context.Context) *http.Server {
 	return &http.Server{
 		Addr:              addr,

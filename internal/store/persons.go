@@ -579,22 +579,33 @@ func foldSQL(expr string) string {
 	return `replace(replace(replace(replace(` + expr + `, 'ё', 'е'), 'Ё', 'Е'), 'й', 'и'), 'Й', 'И')`
 }
 
-// ftsQuery turns user input into an FTS5 prefix query; every word must match.
-func ftsQuery(input string) string {
+// searchWords splits user input into the folded words of a people search,
+// at most eight; every word must match.
+func searchWords(input string) []string {
 	input = searchFold.Replace(input)
-	words := strings.FieldsFunc(input, func(r rune) bool {
+	fields := strings.FieldsFunc(input, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '\''
 	})
-	parts := make([]string, 0, len(words))
-	for _, w := range words {
+	words := make([]string, 0, len(fields))
+	for _, w := range fields {
 		w = strings.ReplaceAll(w, "'", "")
 		if w == "" {
 			continue
 		}
-		parts = append(parts, `"`+w+`"*`)
-		if len(parts) == 8 {
+		words = append(words, w)
+		if len(words) == 8 {
 			break
 		}
+	}
+	return words
+}
+
+// ftsQuery turns user input into an FTS5 prefix query; every word must match.
+func ftsQuery(input string) string {
+	words := searchWords(input)
+	parts := make([]string, len(words))
+	for i, w := range words {
+		parts[i] = `"` + w + `"*`
 	}
 	return strings.Join(parts, " ")
 }

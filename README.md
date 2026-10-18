@@ -62,12 +62,20 @@ the position read on upload stays visible to members of the tree. `GOTREE_PHOTO_
 serves the originals instead, but a GEDZIP export without living people strips it anyway.
 Backups always hold the originals.
 
+| Trusted reverse proxies (their X-Forwarded-For names the client) | | `GOTREE_TRUSTED_PROXIES` | unset |
+
 On first start GoTree asks you in the browser to create the admin account and name your tree.
 For unattended installs, set `GOTREE_ADMIN_PASSWORD` instead.
 
 Behind a reverse proxy, terminate TLS there and forward `X-Forwarded-Proto: https` so the session
-cookie is marked secure. Failed logins are throttled per client address; GoTree sees the proxy's
-address, so the limit then applies to all clients together.
+cookie is marked secure. Failed logins are limited per username and per client address. Behind a
+reverse proxy, set `GOTREE_TRUSTED_PROXIES` to the proxy's address or range (e.g. `127.0.0.1` or
+`172.16.0.0/12`) and have it set `X-Forwarded-For`; otherwise GoTree sees only the proxy's address
+and the per-address limit applies to all clients together. Never list addresses that clients can
+reach GoTree from directly. A username's limit does not lock out a client address that logged in as that
+user within the last 120 days (remembered in memory only, so a restart forgets it), so someone
+guessing the owner's name cannot lock the owner out of their usual device; the per-address limit
+still applies to it.
 
 Behind a reverse proxy, allow request bodies as large as the upload limit.
 

@@ -114,7 +114,22 @@ func (s *Server) addToZip(zw *zip.Writer, m store.MediaFile, strip bool) error {
 	return err
 }
 
+// verifyExport runs the export check. It exports, imports into a scratch
+// database and compares, which is costly, so only editors may start it and
+// only one check runs at a time on the whole instance.
 func (s *Server) verifyExport(w http.ResponseWriter, r *http.Request) {
+	if !actorFrom(r).CanEdit() {
+		writeError(w, http.StatusForbidden, CodeViewOnly, "you can only view this tree")
+		return
+	}
+	select {
+	case s.verifySlot <- struct{}{}:
+		defer func() { <-s.verifySlot }()
+	default:
+		w.Header().Set("Retry-After", "10")
+		writeError(w, http.StatusTooManyRequests, CodeExportCheckBusy, "an export check is already running; try again in a moment")
+		return
+	}
 	report, err := s.Store.VerifyExport(r.Context(), actorFrom(r), r.URL.Query().Get("version") == "7.0", s.Version)
 	s.respond(w, http.StatusOK, report, err)
 }

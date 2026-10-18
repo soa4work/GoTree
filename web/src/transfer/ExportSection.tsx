@@ -1,7 +1,8 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { exportUrl, verifyExport, type ExportVersion, type Privacy } from '../api/endpoints'
+import { getAuthState } from '../api/client'
 import { Button } from '../components/Button'
 import { Choice } from '../components/Choice'
 import { errorText } from '../lib/errors'
@@ -11,6 +12,9 @@ export function ExportSection() {
   const [version, setVersion] = useState<ExportVersion>('5.5.1')
   const [privacy, setPrivacy] = useState<Privacy>('all')
   const [format, setFormat] = useState<'ged' | 'gedzip'>('ged')
+  const auth = useQuery({ queryKey: ['auth'], queryFn: ({ signal }) => getAuthState(signal), staleTime: Infinity })
+  // The check builds a whole database, so the server only lets editors start it.
+  const canVerify = auth.data?.tree?.role !== 'viewer'
   const verify = useMutation({ mutationFn: () => verifyExport(version) })
 
   return (
@@ -55,9 +59,11 @@ export function ExportSection() {
         >
           {t('transfer.download')}
         </a>
-        <Button variant="secondary" busy={verify.isPending} onClick={() => verify.mutate()}>
-          {t('transfer.check')}
-        </Button>
+        {canVerify && (
+          <Button variant="secondary" busy={verify.isPending} onClick={() => verify.mutate()}>
+            {t('transfer.check')}
+          </Button>
+        )}
       </div>
       <p role="status" className="text-sm text-slate-600 dark:text-slate-400">
         {verify.isPending ? t('transfer.checking') : ''}

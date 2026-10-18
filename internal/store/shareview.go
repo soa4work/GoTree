@@ -4,6 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"sort"
+	"strings"
+	"unicode"
+
+	"github.com/praetorianer777/gotree/internal/db"
+	"golang.org/x/text/unicode/norm"
 )
 
 // shareScope decides, per person, what a share link reveals. Everything a
@@ -191,7 +196,24 @@ func (s *Store) SharePersons(ctx context.Context, sh Share, query string) (Perso
 	if err != nil {
 		return PersonList{}, err
 	}
-	ids, err := personIDs(ctx, s.DB, sh.Actor, ftsQuery(query), -1, 0)
+	// The search index also holds nicknames and alternate names (a maiden
+	// name, say). A person shown by name only must not be found by those,
+	// or the link would reveal names it hides. Relevance is computed over
+	// all names too, so such links list matches in name order instead.
+	var ids []int64
+	var words []string
+	var given, surname map[int64]string
+	if sc.namesOnly {
+		words = searchWords(query)
+	}
+	if len(words) > 0 {
+		if given, surname, err = s.primaryNames(ctx, sh.Actor); err != nil {
+			return PersonList{}, err
+		}
+		ids, err = queryIDs(ctx, s.DB, searchPersonsByNameSQL, ftsQuery(query), sh.Actor.TreeID, -1, 0)
+	} else {
+		ids, err = personIDs(ctx, s.DB, sh.Actor, ftsQuery(query), -1, 0)
+	}
 	if err != nil {
 		return PersonList{}, err
 	}
@@ -199,6 +221,9 @@ func (s *Store) SharePersons(ctx context.Context, sh Share, query string) (Perso
 	var shown []int64
 	for _, id := range ids {
 		if !sc.sees(id) {
+			continue
+		}
+		if len(words) > 0 && sc.reduced(id) && !primaryNameMatches(given[id], surname[id], words) {
 			continue
 		}
 		out.Total++
@@ -214,6 +239,78 @@ func (s *Store) SharePersons(ctx context.Context, sh Share, query string) (Perso
 		out.Items = append(out.Items, sc.ref(refs[id]))
 	}
 	return out, nil
+}
+
+// searchPersonsByNameSQL is searchPersonsSQL in list order, without the
+// relevance that hidden names would sway.
+const searchPersonsByNameSQL = `
+	SELECT p.id FROM persons_fts f JOIN persons p ON p.id = f.rowid
+	WHERE persons_fts MATCH ? AND p.tree_id = ?
+	ORDER BY p.surname = '', p.surname_key, p.given_key, p.id
+	LIMIT ? OFFSET ?`
+
+// primaryNames loads the given names and surname of every person of the tree.
+func (s *Store) primaryNames(ctx context.Context, a Actor) (given, surname map[int64]string, err error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, given_names, surname FROM persons WHERE tree_id = ?`, a.TreeID)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	given, surname = map[int64]string{}, map[int64]string{}
+	for rows.Next() {
+		var id int64
+		var g, sn string
+		if err := rows.Scan(&id, &g, &sn); err != nil {
+			return nil, nil, err
+		}
+		given[id], surname[id] = g, sn
+	}
+	return given, surname, rows.Err()
+}
+
+// nameTokens splits a name the way the search index does: folded like
+// searchFold, lower-cased, accents of Latin letters removed, split at
+// non-letters/digits. The index keeps other accents (ї stays ї), so they
+// stay here too: dropping them would let «і» match «Їжак» while the index
+// matched a hidden «Іван».
+func nameTokens(s string) []string {
+	var b strings.Builder
+	latin := false
+	for _, r := range norm.NFD.String(s) {
+		if unicode.Is(unicode.Mn, r) {
+			if latin {
+				continue
+			}
+		} else {
+			latin = unicode.Is(unicode.Latin, r)
+		}
+		b.WriteRune(r)
+	}
+	return strings.FieldsFunc(db.SearchFold(b.String()), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+}
+
+// primaryNameMatches reports whether every query word starts a word of the
+// person's primary given names or surname. It only ever removes search
+// results, so a difference from the index's tokenizer hides a person
+// instead of revealing one.
+func primaryNameMatches(given, surname string, words []string) bool {
+	tokens := append(nameTokens(given), nameTokens(surname)...)
+	for _, w := range words {
+		w = strings.Join(nameTokens(w), "")
+		found := false
+		for _, t := range tokens {
+			if strings.HasPrefix(t, w) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 // SharePerson returns a person as the link may show them.

@@ -51,6 +51,22 @@ test('pedigree chart: keyboard navigation, selection and centering', async ({ pa
   await expect(page.getByRole('heading', { level: 1, name: `Tree of Hans ${surname}` })).toBeVisible()
 })
 
+test('a remembered person that was deleted does not break the tree', async ({ page }) => {
+  await login(page)
+  const { surname, paul } = await family(page)
+
+  await page.goto(`/tree?root=${paul}`)
+  await expect(page.getByRole('heading', { level: 1, name: `Tree of Paul ${surname}` })).toBeVisible()
+  await page.goto('/')
+  expect((await page.request.delete(`/api/persons/${paul}`)).ok()).toBe(true)
+
+  await page.goto('/tree')
+  await expect(page.getByRole('heading', { level: 1, name: /^(Tree of |Tree$)/ })).toBeVisible()
+  await expect(page.getByText('Could not load the data. Please try again.')).toHaveCount(0)
+  // The deleted person is not shown; the tree starts from another one.
+  await expect(page.getByRole('heading', { level: 1, name: `Tree of Paul ${surname}` })).toHaveCount(0)
+})
+
 test('family group and list view', async ({ page }) => {
   await login(page)
   const { surname, paul } = await family(page)

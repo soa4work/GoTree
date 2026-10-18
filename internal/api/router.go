@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -33,12 +34,25 @@ type Server struct {
 	// fileLocks keeps "this file is unused, remove it" and an upload of the same
 	// content from interleaving.
 	fileLocks media.HashLocks
+
+	// TrustedProxies are the reverse proxies whose X-Forwarded-For names the
+	// client (GOTREE_TRUSTED_PROXIES). Empty: the TCP peer is the client.
+	TrustedProxies []netip.Prefix
+
+	// verifySlot lets one export check run at a time; each one builds a whole database.
+	verifySlot chan struct{}
 }
 
 // Handler builds the complete HTTP handler.
 func (s *Server) Handler() http.Handler {
 	if s.throttle == nil {
 		s.throttle = newLoginThrottle()
+		s.throttle.onFull = func() {
+			s.Log.Warn("login throttle is full of locked keys; refusing logins from unknown addresses")
+		}
+	}
+	if s.verifySlot == nil {
+		s.verifySlot = make(chan struct{}, 1)
 	}
 
 	r := chi.NewRouter()
@@ -47,6 +61,7 @@ func (s *Server) Handler() http.Handler {
 
 	r.Route("/api", func(r chi.Router) {
 		r.Use(middleware.NoCache)
+		r.Use(bodyDeadline)
 		// Refuses state-changing requests from other origins (CSRF), based on
 		// Sec-Fetch-Site and Origin; same-origin requests and non-browser
 		// clients pass.
@@ -59,6 +74,16 @@ func (s *Server) Handler() http.Handler {
 		r.Post("/auth/logout", s.logout)
 		s.shareRoutes(r)
 
+		// Account settings need a login but no tree, and viewers may change
+		// their own password, so these sit outside requireEditor.
+		r.Group(func(r chi.Router) {
+			r.Use(s.requireUser)
+			r.Get("/auth/sessions", s.listSessions)
+			r.Delete("/auth/sessions/{id}", s.endSession)
+			r.Post("/auth/logout-all", s.logoutAll)
+			r.Post("/auth/password", s.changePassword)
+		})
+
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireSession)
 			r.Use(requireEditor)
@@ -68,7 +93,7 @@ func (s *Server) Handler() http.Handler {
 			s.qualityRoutes(r)
 			r.Post("/import/gedcom", s.importGEDCOM)
 			r.Get("/export/gedcom", s.exportGEDCOM)
-			r.Get("/export/verify", s.verifyExport)
+			r.Post("/export/verify", s.verifyExport)
 			r.Get("/backup", s.backup)
 			s.shareLinkRoutes(r)
 			s.calendarFeedRoutes(r)

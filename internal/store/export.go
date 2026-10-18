@@ -125,8 +125,9 @@ type placeInfo struct {
 }
 
 type participantRow struct {
-	personID int64
-	role     string
+	personID   int64
+	role       string
+	customRole string
 }
 
 // ExportGEDCOM builds the records of a GEDCOM file for the actor's tree.
@@ -299,14 +300,14 @@ func (ex *exporter) load(ctx context.Context) error {
 	rows.Close()
 
 	rows, err = db.QueryContext(ctx, `
-		SELECT p.event_id, p.person_id, p.role FROM event_participants p JOIN events e ON e.id = p.event_id WHERE e.tree_id = ?`, a.TreeID)
+		SELECT p.event_id, p.person_id, p.role, p.custom_role FROM event_participants p JOIN events e ON e.id = p.event_id WHERE e.tree_id = ?`, a.TreeID)
 	if err != nil {
 		return err
 	}
 	for rows.Next() {
 		var eid int64
 		var pr participantRow
-		if err := rows.Scan(&eid, &pr.personID, &pr.role); err != nil {
+		if err := rows.Scan(&eid, &pr.personID, &pr.role, &pr.customRole); err != nil {
 			rows.Close()
 			return err
 		}
@@ -636,7 +637,7 @@ func (ex *exporter) eventNode(e exportEvent) *gedcom.Node {
 		for _, p := range ex.parts[e.id] {
 			if ex.included[p.personID] {
 				asso := pointer("ASSO", personXref(p.personID))
-				asso.Children = append(asso.Children, roleNode(p.role))
+				asso.Children = append(asso.Children, roleNode(p.role, p.customRole))
 				n.Children = append(n.Children, asso)
 			}
 		}
@@ -668,9 +669,18 @@ var roles7 = map[string]string{
 	"spouse": "SPOU", "neighbor": "NGHBR", "officiant": "OFFICIATOR", "witness": "WITN",
 }
 
-func roleNode(role string) *gedcom.Node {
+// roleNode writes a participant's 7.0 ROLE. Roles 7.0 lacks (head, sibling,
+// relative, informant) go out as OTHER with the role in a PHRASE, and so
+// does a custom role.
+func roleNode(role, custom string) *gedcom.Node {
 	if r, ok := roles7[role]; ok {
 		return node("ROLE", r)
+	}
+	if role == "other" {
+		if custom == "" {
+			return node("ROLE", "OTHER")
+		}
+		return node("ROLE", "OTHER", node("PHRASE", custom))
 	}
 	return node("ROLE", "OTHER", node("PHRASE", role))
 }
@@ -701,10 +711,41 @@ func (ex *exporter) date(n *gedcom.Node, raw string) {
 		return
 	}
 	if err != nil {
-		n.Children = append(n.Children, node("DATE", "("+strings.Trim(raw, "()")+")"))
+		n.Children = append(n.Children, node("DATE", datePhrase(raw)))
 		return
 	}
 	n.Children = append(n.Children, node("DATE", d.String()))
+}
+
+// datePhrase wraps text that is not a date in the parentheses of a 5.5.1
+// date phrase. Text already in parentheses stays as it is; any other text
+// keeps all its own parentheses, so "spring (1850)" is not cut short.
+func datePhrase(raw string) string {
+	if strings.HasPrefix(raw, "(") && strings.HasSuffix(raw, ")") {
+		return raw
+	}
+	return "(" + raw + ")"
+}
+
+// textDate renders a date for an extension tag that holds date text
+// (_HEIRLOOM._CUST._FROM/_TO): a date gendate reads in canonical form,
+// in GEDCOM 7 with 7.0 keywords when 7.0 can say it, anything else as a
+// "(phrase)" the import reads back unchanged.
+func (ex *exporter) textDate(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	d, err := gendate.Parse(raw)
+	if err != nil {
+		return datePhrase(raw)
+	}
+	if ex.opt.Version7 {
+		if value, phrase := d.GEDCOM7(); phrase == "" && value != "" {
+			return value
+		}
+	}
+	return d.String()
 }
 
 func (ex *exporter) status(n *gedcom.Node, status, reason string) {
@@ -1041,8 +1082,8 @@ func (ex *exporter) heirloomRecords(ctx context.Context) ([]*gedcom.Node, error)
 			if pid.Valid && ex.included[pid.Int64] {
 				c = pointer("_CUST", personXref(pid.Int64))
 			}
-			add(c, "_FROM", from)
-			add(c, "_TO", to)
+			add(c, "_FROM", ex.textDate(from))
+			add(c, "_TO", ex.textDate(to))
 			add(c, "TYPE", how)
 			add(c, "NOTE", notes)
 			r.Children = append(r.Children, c)

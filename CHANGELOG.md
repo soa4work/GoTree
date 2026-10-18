@@ -102,6 +102,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Share links that show living people by name only no longer find them by nickname or other names,
+  such as a maiden name; only their given names and surname are searched, and such links list
+  matches in name order, since relevance also weighed the hidden names (#58)
+
 - GEDCOM export and import no longer lose data on a round trip (#51): heirloom custody dates
   are written as GEDCOM dates (`12 MAR 1850` instead of `12.3.1850`), disputed and disproven
   events and names keep their status and reason, GEDCOM 7 participant roles (head, sibling,

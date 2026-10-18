@@ -18,7 +18,77 @@ type ImportFiles struct {
 	Skipped map[string]string
 }
 
-const noFilesInUpload = "the file is not in the upload; import a GEDZIP or upload the file in GoTree"
+const (
+	noFilesInUpload = "the file is not in the upload; import a GEDZIP or upload the file in GoTree"
+	webFileReason   = "links to files on the web are not imported"
+)
+
+// missingReason says why a FILE value has no file: a web address is never
+// imported, anything else is not in the upload.
+func missingReason(value string) string {
+	lower := strings.ToLower(strings.TrimSpace(value))
+	for _, scheme := range []string{"http://", "https://", "ftp://"} {
+		if strings.HasPrefix(lower, scheme) {
+			return webFileReason
+		}
+	}
+	return noFilesInUpload
+}
+
+// objeFate is what happens to an OBJE line under a record.
+type objeFate int
+
+const (
+	// objeKeep: the line is kept as written (the default of other()).
+	objeKeep objeFate = iota
+	// objeImported: it yields media, which linkMedia attaches.
+	objeImported
+	// objeInline: it points to a media object that has no file here; the
+	// object is kept as an inline copy, so that what it says survives.
+	objeInline
+)
+
+func (im *importer) objeFate(c *gedcom.Node) objeFate {
+	if c.Pointer != "" {
+		ids, ok := im.mediaByXref[c.Pointer]
+		switch {
+		case ok && len(ids) > 0:
+			return objeImported
+		case ok:
+			return objeInline
+		}
+		return objeKeep
+	}
+	for _, f := range c.All("FILE") {
+		if _, ok := im.files.Media[strings.TrimSpace(f.Value)]; ok {
+			return objeImported
+		}
+	}
+	return objeKeep
+}
+
+// reportMissingFiles reports why the files of an inline OBJE line were not
+// imported, for a line that is kept as written.
+func (im *importer) reportMissingFiles(path string, c *gedcom.Node) {
+	for _, f := range c.All("FILE") {
+		value := strings.TrimSpace(f.Value)
+		reason, ok := im.files.Skipped[value]
+		if !ok {
+			reason = missingReason(value)
+		}
+		im.tag(path+".FILE", TagDropped, reason)
+	}
+}
+
+// inlineObje is the media object that c points to, written out in place of
+// the pointer, with the lines of the pointer added.
+func (im *importer) inlineObje(c *gedcom.Node) *gedcom.Node {
+	rec, _ := im.doc.RecordByXref(c.Pointer)
+	cp := &gedcom.Node{Tag: "OBJE", Line: c.Line}
+	cp.Children = append(cp.Children, rec.Children...)
+	cp.Children = append(cp.Children, c.Children...)
+	return cp
+}
 
 // importedMedia is what the link pass needs to know about a medium.
 type importedMedia struct {
@@ -192,11 +262,13 @@ func (im *importer) mediaRecords(ctx context.Context, recs []*gedcom.Node) error
 			im.mapped("OBJE")
 			continue
 		}
-		reason := noFilesInUpload
+		reason := ""
 		if f := r.First("FILE"); f == nil {
 			reason = "the media object has no file"
 		} else if why, ok := im.files.Skipped[strings.TrimSpace(f.Value)]; ok {
 			reason = why
+		} else {
+			reason = missingReason(f.Value)
 		}
 		im.tag("OBJE", TagDropped, reason)
 	}
@@ -219,7 +291,7 @@ func (im *importer) objeMedia(ctx context.Context, path string, n *gedcom.Node) 
 			if !ok {
 				reason, skipped := im.files.Skipped[value]
 				if !skipped {
-					reason = noFilesInUpload
+					reason = missingReason(value)
 				}
 				im.tag(path+".FILE", TagDropped, reason)
 				continue
@@ -328,6 +400,9 @@ func (im *importer) mediaTitle(ctx context.Context, id int64, title string) erro
 // them or contain them. It runs once all records exist.
 func (im *importer) linkMedia(ctx context.Context) error {
 	for _, l := range objeLinks(im.doc) {
+		if im.objeFate(l.obje) != objeImported {
+			continue // kept with its owner by other()
+		}
 		var id int64
 		var ok bool
 		switch l.entity {

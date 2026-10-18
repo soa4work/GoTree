@@ -147,11 +147,75 @@ func TestImportMediaPlainGed(t *testing.T) {
 	if !strings.Contains(reason, "GEDZIP") {
 		t.Errorf("reason: %q", reason)
 	}
-	if n := countRows(t, s, `SELECT count(*) FROM persons WHERE extra_json LIKE '%OBJE%'`); n != 0 {
+	// Without files the media objects stay where they were, written out in
+	// place of the pointers, which would lead nowhere.
+	if n := countRows(t, s, `SELECT count(*) FROM persons WHERE extra_json LIKE '%"p":"O%'`); n != 0 {
 		t.Error("an OBJE pointer was kept")
 	}
-	if out := exportText(t, s, a, ExportOptions{Version7: true, WithMedia: true}); strings.Contains(out, "OBJE") {
-		t.Errorf("export has OBJE:\n%s", out)
+	out := exportText(t, s, a, ExportOptions{Version7: true, WithMedia: true})
+	if strings.Contains(out, "OBJE @") || !strings.Contains(out, "1 OBJE\n2 FILE media/a.png") || !strings.Contains(out, "3 TITL Wedding") {
+		t.Errorf("export:\n%s", out)
+	}
+}
+
+// A web address is not imported, in a plain file or in a zip, but the line
+// goes back out as it came in.
+func TestImportMediaWebFileRoundTrip(t *testing.T) {
+	doc := func() *gedcom.Document {
+		return parseLines(t, "0 HEAD", "1 GEDC", "2 VERS 5.5.1", "1 CHAR UTF-8",
+			"0 @I1@ INDI", "1 NAME Anna /Weber/", "1 OBJE @O1@", "1 OBJE", "2 FILE https://example.com/a.jpg",
+			"1 OBJE", "2 FILE media/z.png",
+			"0 @O1@ OBJE", "1 FILE http://example.com/b.jpg", "2 FORM jpg",
+			"0 TRLR")
+	}
+	for name, files := range map[string]ImportFiles{
+		"plain": {},
+		"zip": {
+			Media:   map[string]NewMedia{"media/z.png": pngMedia("z", "z.png")},
+			Skipped: map[string]string{"https://example.com/a.jpg": webFileReason, "http://example.com/b.jpg": webFileReason},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newStore(t)
+			a := setup(t, s)
+			report, err := s.ImportGEDCOMFiles(ctx, a, doc(), ImportIntoEmpty, files)
+			if err != nil {
+				t.Fatal(err)
+			}
+			keptLines := 0
+			for _, ts := range report.Tags {
+				if ts.Path == "INDI.OBJE" && ts.Outcome == TagKept {
+					keptLines = ts.Count
+				}
+			}
+			if want := map[bool]int{true: 3, false: 2}[name == "plain"]; keptLines != want {
+				t.Errorf("kept OBJE lines: %d, tags %+v", keptLines, report.Tags)
+			}
+			for _, ts := range report.Tags {
+				if ts.Outcome == TagDropped && ts.Reason == noFilesInUpload && strings.Contains(ts.Path, "FILE") && name == "zip" {
+					t.Errorf("a web address is reported as missing: %+v", ts)
+				}
+				if name == "plain" && ts.Path == "OBJE" && ts.Outcome == TagDropped && ts.Reason != webFileReason {
+					t.Errorf("reason for a web file: %q", ts.Reason)
+				}
+			}
+			out := exportText(t, s, a, ExportOptions{WithMedia: true})
+			for _, want := range []string{"2 FILE https://example.com/a.jpg", "2 FILE http://example.com/b.jpg"} {
+				if !strings.Contains(out, want) {
+					t.Errorf("%q lost:\n%s", want, out)
+				}
+			}
+			if strings.Contains(out, "OBJE @") && name == "plain" {
+				t.Errorf("a pointer to nothing:\n%s", out)
+			}
+			wantMedia := 0
+			if name == "zip" {
+				wantMedia = 1
+			}
+			if n := countRows(t, s, `SELECT count(*) FROM media`); n != wantMedia {
+				t.Errorf("media rows: %d", n)
+			}
+		})
 	}
 }
 

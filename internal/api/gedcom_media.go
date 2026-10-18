@@ -107,6 +107,8 @@ func (s *Server) stageGedzipMedia(ctx context.Context, zr *zip.Reader, gedName s
 	ix := newZipIndex(zr, gedName)
 	staged := map[*zip.File]*stagedFile{}
 	byValue := map[string]*zip.File{}
+	// gedSize is the unzipped GEDCOM file, which counts against the same
+	// limit as the files.
 	budget := s.maxGedcom() - int64(gedSize)
 
 	discard := func() {
@@ -117,6 +119,10 @@ func (s *Server) stageGedzipMedia(ctx context.Context, zr *zip.Reader, gedName s
 		}
 	}
 	for _, value := range values {
+		if err := ctx.Err(); err != nil {
+			discard()
+			return files, nil, err
+		}
 		entry, reason := ix.resolve(value)
 		if entry == nil {
 			files.Skipped[value] = reason

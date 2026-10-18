@@ -283,3 +283,35 @@ func TestImportGedzipCapsUnpackedSizeAndStaysInsideTheZip(t *testing.T) {
 		t.Errorf("%d files written outside the media root", n)
 	}
 }
+
+func TestImportGedzipWebFileSurvivesExport(t *testing.T) {
+	c := loggedIn(t, newServer(t, builtFrontend))
+	ged := "0 HEAD\n1 GEDC\n2 VERS 5.5.1\n1 CHAR UTF-8\n0 @I1@ INDI\n1 NAME Anna /Weber/\n" +
+		"1 OBJE\n2 FILE a.jpg\n1 OBJE\n2 FILE https://example.com/web.jpg\n0 TRLR\n"
+	archive := buildZip(t, map[string][]byte{"gedcom.ged": []byte(ged), "a.jpg": jpegBytes(t, 20, 20)}, "gedcom.ged", "a.jpg")
+	status, body := c.upload("/api/import/gedcom", "x.zip", archive)
+	if status != http.StatusOK {
+		t.Fatalf("import: %d %s", status, body)
+	}
+	var report store.ImportReport
+	_ = json.Unmarshal(body, &report)
+	if report.Counts["media"] != 1 {
+		t.Errorf("counts: %v", report.Counts)
+	}
+	for _, url := range []string{"/api/export/gedcom?version=5.5.1", "/api/export/gedcom?version=7.0&format=gedzip"} {
+		resp, out := c.get(url)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("export: %d", resp.StatusCode)
+		}
+		if strings.HasSuffix(url, "gedzip") {
+			zr, err := zip.NewReader(bytes.NewReader(out), int64(len(out)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			out = readZip(t, zr.File[0])
+		}
+		if !strings.Contains(string(out), "FILE https://example.com/web.jpg") {
+			t.Errorf("%s: the web file is lost:\n%s", url, out)
+		}
+	}
+}

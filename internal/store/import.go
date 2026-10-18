@@ -518,7 +518,16 @@ func containsLine(lines []string, s string) bool {
 // kept verbatim.
 func (im *importer) other(ctx string, c *gedcom.Node, kept *[]keptNode) {
 	if c.Tag == "OBJE" && objeHandled(ctx) {
-		return // the link pass (linkMedia) reads it
+		switch im.objeFate(c) {
+		case objeImported:
+			return // the link pass (linkMedia) reads it
+		case objeInline:
+			im.keep(ctx, im.inlineObje(c), kept)
+			return
+		}
+		// The line is kept as written, but its files are not imported, and
+		// the report says why.
+		im.reportMissingFiles(ctx+".OBJE", c)
 	}
 	if reason, ok := droppedTags[c.Tag]; ok {
 		im.tag(ctx+"."+c.Tag, TagDropped, reason)
@@ -1404,7 +1413,10 @@ func (im *importer) heirloom(ctx context.Context, r *gedcom.Node) error {
 			citations = append(citations, c)
 			continue
 		case "OBJE":
-			continue // linked by linkMedia
+			if im.objeFate(c) != objeImported {
+				im.tag(path+".OBJE", TagDropped, "heirlooms have nowhere to keep a media line without a file")
+			}
+			continue // otherwise linked by linkMedia
 		default:
 			im.tag(path+"."+c.Tag, TagDropped, "not part of an heirloom in GoTree")
 			continue

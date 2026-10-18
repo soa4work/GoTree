@@ -97,6 +97,23 @@ func TestPersonFilterPagingIsStable(t *testing.T) {
 // The SQL living rule must agree with the Go rule in personRefs.
 func TestPersonFilterLivingMatchesRefs(t *testing.T) {
 	f := newFilterFixture(t)
+	// Edge cases of the rule: a stated flag beats a death record, and a
+	// disproven death does not count.
+	ida, err := f.s.CreatePerson(ctx, f.a, PersonInput{GivenNames: "Ida", Surname: "Weber", IsLiving: ptr(true)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.s.CreateEvent(ctx, f.a, EventInput{PersonID: &ida.ID, Type: "BURI", Date: "1960"}); err != nil {
+		t.Fatal(err)
+	}
+	old, err := f.s.CreatePerson(ctx, f.a, PersonInput{GivenNames: "Emil", Surname: "Weber", Birth: &LifeEventInput{Date: "1980"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.s.CreateEvent(ctx, f.a, EventInput{PersonID: &old.ID, Type: "DEAT", Date: "2000", Status: "disproven",
+		StatusReason: "wrong person"}); err != nil {
+		t.Fatal(err)
+	}
 	all, err := f.s.ListPersons(ctx, f.a, "", 50, 0)
 	if err != nil {
 		t.Fatal(err)

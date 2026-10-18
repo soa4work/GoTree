@@ -37,7 +37,7 @@ export function ShareApp() {
   const mainRef = useRef<HTMLElement>(null)
   const firstRender = useRef(true)
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs on purpose after each navigation
+  // Runs on purpose after each navigation.
   useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false

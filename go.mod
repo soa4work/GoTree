@@ -1,6 +1,6 @@
 module github.com/praetorianer777/gotree
 
-go 1.27.1
+go 1.27.2
 
 require (
 	github.com/go-chi/chi/v5 v5.3.2

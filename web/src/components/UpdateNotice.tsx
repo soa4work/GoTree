@@ -1,16 +1,11 @@
-import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useUpdateReady } from '../lib/updateReady'
 import { Button } from './Button'
 
 /** Offers a reload when a new version of GoTree has been installed. */
 export function UpdateNotice() {
   const { t } = useTranslation()
-  const [ready, setReady] = useState(false)
-  useEffect(() => {
-    const onReady = () => setReady(true)
-    window.addEventListener('gotree:update-ready', onReady)
-    return () => window.removeEventListener('gotree:update-ready', onReady)
-  }, [])
+  const ready = useUpdateReady()
 
   return (
     <div role="status" className={ready ? 'fixed inset-x-4 bottom-24 z-40 md:bottom-6 md:left-auto md:max-w-sm print:hidden' : 'sr-only'}>

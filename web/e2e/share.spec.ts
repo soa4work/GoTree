@@ -70,6 +70,51 @@ test('share a branch read-only and withdraw the link', async ({ page, browser })
   await visitor.context().close()
 })
 
+test('give a share link a new address', async ({ page, browser }) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await login(page)
+  const surname = unique('Reissue', page)
+  const hans = await (await page.request.post('/api/persons', { data: { givenNames: 'Hans', surname, sex: 'M' } })).json()
+  await page.request.post('/api/events', { data: { personId: hans.id, type: 'DEAT', date: '1950' } })
+
+  await page.goto('/sharing')
+  await page.getByRole('button', { name: '+ New share link' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New share link' })
+  await dialog.getByLabel(/^Name/).fill(`Lost ${surname}`)
+  // A branch link starts at Hans; a whole-tree link would start at whoever sorts first in the shared e2e database.
+  await dialog.getByLabel('One branch').check()
+  await dialog.getByRole('searchbox', { name: 'Whose branch' }).fill(`Hans ${surname}`)
+  await dialog.getByRole('button', { name: new RegExp(`^Hans ${surname}`) }).click()
+  await dialog.getByRole('button', { name: /Create link/ }).click()
+  const oldUrl = await page.getByLabel('Share link', { exact: true }).inputValue()
+  await page.getByRole('button', { name: 'Done' }).click()
+
+  // The address was never copied: make a new one.
+  const row = page.getByRole('listitem').filter({ hasText: `Lost ${surname}` })
+  await row.getByRole('button', { name: /New address/ }).click()
+  const confirm = page.getByRole('dialog', { name: 'Make a new address?' })
+  await expectAccessible(page)
+  await confirm.getByRole('button', { name: 'New address' }).click()
+  await expect(page.getByRole('heading', { name: `New address for “Lost ${surname}”` })).toBeVisible()
+  const newUrl = await page.getByLabel('Share link', { exact: true }).inputValue()
+  expect(newUrl).toMatch(/\/share\/[A-Za-z0-9_-]{40,}$/)
+  expect(newUrl).not.toBe(oldUrl)
+
+  await page.getByRole('button', { name: 'Copy link' }).click()
+  await expect(page.getByText('Copied.')).toBeVisible()
+  expect(await page.evaluate<string>('navigator.clipboard.readText()')).toBe(newUrl)
+
+  const visitorContext = await browser.newContext({ viewport: page.viewportSize() ?? undefined })
+  await forceEnglish(visitorContext)
+  const visitor = await visitorContext.newPage()
+  await visitor.goto(oldUrl)
+  await expect(visitor.getByRole('heading', { name: 'This link does not work' })).toBeVisible()
+  await visitor.goto(newUrl)
+  await expect(visitor.getByText('Read-only view')).toBeVisible()
+  await expect(visitor.getByRole('link', { name: `Start with Hans ${surname}` })).toBeVisible()
+  await visitorContext.close()
+})
+
 test('subscribe to the birthday calendar', async ({ page, playwright }) => {
   await login(page)
   const surname = unique('Cal', page)

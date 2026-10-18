@@ -128,3 +128,47 @@ describe('person page research', () => {
     )
   })
 })
+
+describe('person page research errors', () => {
+  it('says so when saving a suggested task fails', async () => {
+    mockApi({
+      'GET /api/persons/1': [
+        200,
+        {
+          id: 1,
+          givenNames: 'Anna',
+          surname: 'Weber',
+          namePrefix: '',
+          nameSuffix: '',
+          nickname: '',
+          sex: 'F',
+          isLiving: null,
+          living: false,
+          notes: '',
+          alternateNames: [],
+          citations: [],
+          portrait: null,
+          createdAt: '',
+          updatedAt: '',
+          events: [],
+          parentFamilies: [],
+          partnerFamilies: [],
+        },
+      ],
+      'GET /api/research/suggestions': [
+        200,
+        { suggestions: [{ origin: 'missing:missing_birth:1', kind: 'missing_birth', personId: 1 }], persons: {} },
+      ],
+      'GET /api/research/tasks': [200, []],
+      'GET /api/research/log': [200, []],
+      'GET /api/checks': [200, { findings: [], persons: {}, taskIds: {} }],
+      'GET /api/media': [200, []],
+      'POST /api/research/tasks': [500, { error: 'disk full' }],
+    })
+    renderApp('/people/1')
+
+    const region = await screen.findByRole('region', { name: 'Worth researching' })
+    fireEvent.click(within(region).getByRole('button', { name: /Make a task/ }))
+    expect(await within(region).findByRole('alert')).toHaveTextContent('Could not save')
+  })
+})

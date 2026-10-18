@@ -67,7 +67,7 @@ function Figure({ title, caption, children }: { title: string; caption: string; 
       </h2>
       <figure className="space-y-2">
         <figcaption className="text-slate-700 dark:text-slate-300">{caption}</figcaption>
-        {/* biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable regions must be reachable by keyboard (WCAG 2.1.1) */}
+        {/* Scrollable regions must be reachable by keyboard (WCAG 2.1.1). */}
         {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- same reason */}
         <div className="overflow-x-auto" tabIndex={0} role="group" aria-labelledby={id}>
           {children}
@@ -219,7 +219,7 @@ export function StatsPage() {
             </thead>
             <tbody>
               {histogram.map((n, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: the index is the number of children
+                // The index is the number of children.
                 <tr key={i} className="border-t border-slate-200 dark:border-slate-800">
                   <th scope="row" className={`${td} font-medium`}>
                     {i === s.childrenHistogram.length - 1 ? t('stats.childCountMore', { count: i }) : i}

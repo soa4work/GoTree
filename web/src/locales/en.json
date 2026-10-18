@@ -5,6 +5,7 @@
     "mainNavigation": "Main navigation",
     "loading": "Loading…",
     "logOut": "Log out",
+    "logOutFailed": "Could not log out. Try again.",
     "signedInAs": "Signed in as {{name}}",
     "updateReady": "A new version of GoTree is ready.",
     "reload": "Reload now",
@@ -842,7 +843,7 @@
     "expiresOn": "Works until (optional)",
     "expiresOnHint": "The link stops working after this day. Leave empty to keep it until you withdraw it.",
     "createdTitle": "Share link “{{label}}” is ready",
-    "createdHint": "Copy the link now and send it to your relatives. For safety GoTree keeps only a fingerprint of it, so it cannot be shown again later.",
+    "createdHint": "Copy the link now and send it to your relatives. For safety GoTree keeps only a fingerprint of it, so it cannot be shown again; if it gets lost, make a new address (the old one then stops working).",
     "linkLabel": "Share link",
     "copy": "Copy link",
     "copied": "Copied.",
@@ -855,7 +856,12 @@
     "expires": "works until {{date}}",
     "noExpiry": "no end date",
     "lastUsed": "last used {{date}}",
-    "neverUsed": "not used yet"
+    "neverUsed": "not used yet",
+    "reissue": "New address",
+    "reissueTitle": "Make a new address?",
+    "reissueConfirm": "The current address of “{{label}}” will stop working. Send the new one to everyone who should keep access.",
+    "reissuedTitle": "New address for “{{label}}”",
+    "copyFailed": "Could not copy. Select the address and copy it by hand."
   },
   "share": {
     "readOnly": "Read-only view",
@@ -891,7 +897,8 @@
     "langHint": "Calendar entries will be in the interface language (lang={{lang}}). To get another language, switch it and copy the address again.",
     "subscribe": "Open in calendar app",
     "revokeTitle": "Withdraw calendar address",
-    "revokeConfirm": "Withdraw “{{label}}”? Calendars subscribed to it stop getting the dates."
+    "revokeConfirm": "Withdraw “{{label}}”? Calendars subscribed to it stop getting the dates.",
+    "copyFailed": "Could not copy. Select the address and copy it by hand."
   },
   "research": {
     "intro": "Keep track of what you still want to find out, and of every search — including the ones that found nothing, so you do not search the same register twice.",
@@ -1314,6 +1321,12 @@
     "too_many_logins": "Too many failed logins, try again later.",
     "setup_done": "GoTree has already been set up.",
     "admin_only_backup": "Only administrators can download a backup.",
+    "admin_only": "Only administrators can do this.",
+    "last_admin": "The last administrator cannot be deleted or made a regular user.",
+    "last_owner": "A tree needs at least one owner. Make someone else an owner first.",
+    "cannot_delete_self": "You cannot delete your own account.",
+    "reset_own_password": "Change your own password on your account page.",
+    "export_living_editors": "Only owners and editors can export living people. Choose an export without living people.",
     "share_read_only": "Share links are read-only.",
     "share_gone": "This link does not exist, has expired or was withdrawn.",
     "expected_multipart": "Expected a file upload.",
@@ -1352,6 +1365,8 @@
       "out_of_range": "must be between {{min}} and {{max}}",
       "too_many": "too many entries",
       "duplicate": "contains a duplicate",
+      "taken": "is already taken",
+      "not_addable": "cannot be added",
       "invalid_url": "must start with http:// or https://",
       "self_reference": "a person or place cannot refer to itself",
       "cycle": "this would make a person their own ancestor",
@@ -1397,6 +1412,11 @@
       "too_many_rows_other": "a record can have at most {{count}} rows"
     },
     "option": {
+      "owner": "owner",
+      "editor": "editor",
+      "viewer": "viewer",
+      "admin": "admin",
+      "user": "user",
       "all": "all",
       "exclude-living": "exclude-living",
       "name-only": "name-only",

@@ -36,6 +36,14 @@ const (
 	CodeSetupDone       = "setup_done"
 	CodeAdminOnlyBackup = "admin_only_backup"
 
+	// Accounts, trees and members (#59).
+	CodeAdminOnly           = "admin_only"
+	CodeLastAdmin           = "last_admin"
+	CodeLastOwner           = "last_owner"
+	CodeDeleteSelf          = "cannot_delete_self"
+	CodeResetOwnPassword    = "reset_own_password"
+	CodeExportLivingEditors = "export_living_editors"
+
 	// Sharing.
 	CodeShareReadOnly = "share_read_only"
 	CodeShareGone     = "share_gone"
@@ -86,6 +94,8 @@ const (
 	FieldTooMany        = "too_many"
 	FieldTooManyRows    = "too_many_rows"
 	FieldDuplicate      = "duplicate"
+	FieldTaken          = "taken"
+	FieldNotAddable     = "not_addable"
 	FieldInvalidURL     = "invalid_url"
 	FieldSelfReference  = "self_reference"
 	FieldCycle          = "cycle"
@@ -130,6 +140,8 @@ type FieldError struct {
 // exactFields maps messages that have no variable part to their code.
 var exactFields = map[string]string{
 	"is required":                    FieldRequired,
+	"is already taken":               FieldTaken,
+	"cannot be added":                FieldNotAddable,
 	"must be a date":                 FieldInvalidDate,
 	"is not your current password":   FieldWrongPassword,
 	"must not be in the past":        FieldDateInPast,

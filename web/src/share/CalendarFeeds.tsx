@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createCalendarFeed, listCalendarFeeds, revokeCalendarFeed } from '../api/endpoints'
 import type { CalendarFeed } from '../api/types'
@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Dialog } from '../components/Dialog'
 import { Form } from '../components/Form'
 import { TextField } from '../components/TextField'
+import { useCopy } from '../hooks/useCopy'
 import { formatDay } from '../lib/dates'
 import { errorText, fieldErrors } from '../lib/errors'
 
@@ -101,7 +102,11 @@ export function CalendarFeeds() {
 function CreatedFeed({ feed, onDone }: { feed: CalendarFeed; onDone: () => void }) {
   const { t, i18n } = useTranslation()
   const id = useId()
-  const [copied, setCopied] = useState(false)
+  const { state, copy } = useCopy()
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (state === 'failed') inputRef.current?.select()
+  }, [state])
   const lang = feedLang(i18n.resolvedLanguage ?? i18n.language)
   const url = feedUrl(feed.token!, lang)
   const webcal = url.replace(/^https?:/, 'webcal:')
@@ -114,6 +119,7 @@ function CreatedFeed({ feed, onDone }: { feed: CalendarFeed; onDone: () => void 
       </label>
       <input
         id={id}
+        ref={inputRef}
         readOnly
         value={url}
         onFocus={(e) => e.target.select()}
@@ -121,9 +127,7 @@ function CreatedFeed({ feed, onDone }: { feed: CalendarFeed; onDone: () => void 
       />
       <p className="text-sm text-slate-600 dark:text-slate-400">{t('calendar.langHint', { lang })}</p>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => void navigator.clipboard?.writeText(url).then(() => setCopied(true))}>
-          {t('sharing.copy')}
-        </Button>
+        <Button onClick={() => void copy(url)}>{t('sharing.copy')}</Button>
         <a
           href={webcal}
           className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-4 font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-900"
@@ -135,8 +139,13 @@ function CreatedFeed({ feed, onDone }: { feed: CalendarFeed; onDone: () => void 
         </Button>
       </div>
       <p role="status" className="text-sm font-medium text-green-800 dark:text-green-300">
-        {copied ? t('sharing.copied') : ''}
+        {state === 'copied' ? t('sharing.copied') : ''}
       </p>
+      {state === 'failed' && (
+        <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-400">
+          {t('calendar.copyFailed')}
+        </p>
+      )}
     </div>
   )
 }

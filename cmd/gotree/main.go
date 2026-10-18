@@ -38,6 +38,9 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	if cfg.HealthCheck {
+		return healthcheck(context.Background(), cfg.ListenAddr)
+	}
 	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
 		return fmt.Errorf("create data dir: %w", err)
 	}
@@ -172,4 +175,47 @@ func bootstrapAdmin(ctx context.Context, st *store.Store, cfg config.Config, log
 	}
 	log.Info("created admin account from the environment", "user", cfg.AdminUser)
 	return nil
+}
+
+// healthcheck asks the server listening on addr for /api/health and fails
+// unless it answers 200. The distroless image has no shell or curl, so the
+// Docker HEALTHCHECK runs the binary itself.
+func healthcheck(ctx context.Context, addr string) error {
+	url, err := healthURL(addr)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	// No proxy: a proxy variable in the container must not redirect the check.
+	client := &http.Client{Transport: &http.Transport{Proxy: nil}}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("healthcheck: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("healthcheck: %s answered %s", url, resp.Status)
+	}
+	return nil
+}
+
+// healthURL turns a listen address into the URL of the health endpoint. A
+// wildcard host (":8080", "0.0.0.0:8080", "[::]:8080") is reached on loopback.
+func healthURL(addr string) (string, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", fmt.Errorf("healthcheck: listen address %q: %w", addr, err)
+	}
+	switch host {
+	case "", "0.0.0.0":
+		host = "127.0.0.1"
+	case "::":
+		host = "::1"
+	}
+	return "http://" + net.JoinHostPort(host, port) + "/api/health", nil
 }

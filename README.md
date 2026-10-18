@@ -56,6 +56,9 @@ or download a binary from the releases page and run `./gotree`. Open http://loca
 | First admin account (only used while there is none) | | `GOTREE_ADMIN_USER`, `GOTREE_ADMIN_PASSWORD` | `admin`, unset |
 | Largest upload (MB) | | `GOTREE_MAX_UPLOAD_MB` | `100` |
 
+`gotree -healthcheck` asks the running server on the listen address for `/api/health` and exits 0
+when it is healthy; the Docker image uses it as its HEALTHCHECK.
+
 On first start GoTree asks you in the browser to create the admin account and name your tree.
 For unattended installs, set `GOTREE_ADMIN_PASSWORD` instead.
 

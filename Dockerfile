@@ -36,4 +36,7 @@ ENV GOTREE_DATA_DIR=/data GOTREE_LISTEN_ADDR=:8080
 VOLUME /data
 EXPOSE 8080
 USER nonroot
+# There is no shell or curl in the image: the binary checks itself, against
+# the same GOTREE_LISTEN_ADDR the server listens on.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 CMD ["/gotree", "-healthcheck"]
 ENTRYPOINT ["/gotree"]

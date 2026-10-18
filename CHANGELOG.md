@@ -9,6 +9,9 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Health check: `gotree -healthcheck` asks the running server whether it is healthy, and the
+  Docker image uses it as its HEALTHCHECK (#62)
+
 - The relationship calculator also names in-laws through two marriages and step-siblings (#43)
 
 - Error messages from the server are shown in the interface language (#24)

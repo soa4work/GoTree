@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { Media } from '../api/types'
@@ -94,6 +94,25 @@ describe('media page', () => {
     // The portrait is the cropped face tag.
     const portrait = document.querySelector('img[src*="region=9"]')
     expect(portrait).not.toBeNull()
+  })
+})
+
+describe('all media gallery', () => {
+  it('loads the next page on demand', async () => {
+    const tile = (id: number) => ({ id, kind: 'image', mime: 'image/jpeg', title: `Photo ${id}`, width: 10, height: 10 })
+    const user = userEvent.setup()
+    mockApi({
+      'GET /api/media': (_body, url) =>
+        url.searchParams.get('offset') === '120'
+          ? [200, Array.from({ length: 5 }, (_, i) => tile(120 + i))]
+          : [200, Array.from({ length: 120 }, (_, i) => tile(i))],
+    })
+    renderApp('/media')
+    await screen.findByRole('link', { name: 'Photo 0' })
+    expect(screen.getAllByRole('link', { name: /^Photo \d+$/ })).toHaveLength(120)
+    await user.click(screen.getByRole('button', { name: 'Show more' }))
+    await waitFor(() => expect(screen.getAllByRole('link', { name: /^Photo \d+$/ })).toHaveLength(125))
+    expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument()
   })
 })
 

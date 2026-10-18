@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import i18n from '../i18n'
@@ -101,6 +101,8 @@ describe('members page', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Remove from tree' }))
     await screen.findByText('Bob Weber')
     expect(called(fetchMock, 'DELETE /api/trees/1/members/2')).toBe(true)
+    // The row and its button are gone, so the focus moves to the list.
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Members' })).toHaveFocus())
   })
 
   it('renames the tree', async () => {

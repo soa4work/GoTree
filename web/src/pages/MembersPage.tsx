@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useId, useState, type FormEvent } from 'react'
+import { useId, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getAuthState, type TreeRole } from '../api/client'
 import { addMember, listMembers, removeMember, renameTree, setMemberRole, type Member } from '../api/endpoints'
@@ -103,6 +103,7 @@ function MemberList({ treeId, selfId }: { treeId: number; selfId: number }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [removing, setRemoving] = useState<Member | null>(null)
+  const listRef = useRef<HTMLElement>(null)
   const members = useQuery({ queryKey: ['members', treeId], queryFn: ({ signal }) => listMembers(treeId, signal) })
   const changed = (userId: number) => {
     void queryClient.invalidateQueries({ queryKey: ['members', treeId] })
@@ -121,12 +122,15 @@ function MemberList({ treeId, selfId }: { treeId: number; selfId: number }) {
     onSuccess: (_r, userId) => {
       setRemoving(null)
       changed(userId)
+      // The removed row took the button that opened the dialog with it, so
+      // the dialog cannot return the focus there. Wait for it to close first.
+      setTimeout(() => listRef.current?.focus())
     },
   })
   const list = members.data ?? []
 
   return (
-    <section aria-label={t('nav.members')} className="space-y-3">
+    <section ref={listRef} tabIndex={-1} aria-label={t('nav.members')} className="space-y-3 focus:outline-none">
       {(members.isPending || members.isError) && (
         <p role={members.isError ? 'alert' : 'status'} className="text-sm text-slate-600 dark:text-slate-400">
           {members.isPending ? t('app.loading') : t('common.loadFailed')}

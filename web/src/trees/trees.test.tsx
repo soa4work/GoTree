@@ -176,6 +176,10 @@ describe('stale membership', () => {
       </QueryClientProvider>,
     )
     await screen.findByRole('button', { name: /Weber family/ })
-    await waitFor(() => expect(calls(fetchMock, 'GET /api/auth/state').length).toBeGreaterThanOrEqual(2))
+    await waitFor(() => expect(calls(fetchMock, 'GET /api/auth/state')).toHaveLength(2))
+    // The unchanged auth state must not start the failing request (and the re-check) again.
+    await new Promise((r) => setTimeout(r, 200))
+    expect(calls(fetchMock, 'GET /api/auth/state')).toHaveLength(2)
+    expect(calls(fetchMock, 'GET /api/stats')).toHaveLength(1)
   })
 })

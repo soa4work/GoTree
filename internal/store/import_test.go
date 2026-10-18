@@ -451,7 +451,7 @@ func TestImportRolePhrase(t *testing.T) {
 		}
 	}
 	want := map[string]rc{
-		"Bert": {"informant", ""}, "Clara": {"other", "Lodger"}, "Dora": {"other", ""}, "Emil": {"witness", ""},
+		"Bert": {"informant", ""}, "Clara": {"other", "Lodger"}, "Dora": {"other", ""}, "Emil": {"witness", "chief witness"},
 	}
 	for name, w := range want {
 		if got[name] != w {
@@ -540,5 +540,111 @@ func TestImportNameNotesAndSources(t *testing.T) {
 	}
 	if _, ok := dropped["INDI._MARNM.FOO"]; !ok {
 		t.Errorf("_MARNM.FOO not reported: %+v", dropped)
+	}
+}
+
+func TestImportAssoVariants(t *testing.T) {
+	src := strings.Join([]string{
+		"0 HEAD", "1 GEDC", "2 VERS 7.0",
+		"0 @I1@ INDI", "1 NAME Anna /Weber/",
+		"1 BIRT",
+		"2 ASSO @I2@", "3 ROLE OTHER", "4 PHRASE informant: Hebamme", "3 NOTE midwife",
+		"2 ASSO @I3@", "3 ROLE WITN", "4 PHRASE Trauzeuge",
+		"2 ASSO VOID", "3 PHRASE a neighbour",
+		"0 @I2@ INDI", "1 NAME Bert /Weber/",
+		"0 @I3@ INDI", "1 NAME Clara /Weber/",
+		"0 TRLR", "",
+	}, "\n")
+	s := newStore(t)
+	a := setup(t, s)
+	doc, err := gedcom.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := s.ImportGEDCOM(ctx, a, doc, ImportIntoEmpty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.BrokenReferences) != 0 {
+		t.Errorf("a VOID association is not a broken reference: %v", report.BrokenReferences)
+	}
+	got := map[string]Participant{}
+	for _, e := range findPerson(t, s, a, "anna").Events {
+		for _, p := range e.Participants {
+			got[p.Person.GivenNames] = p
+		}
+	}
+	if p := got["Bert"]; p.Role != "informant" || p.CustomRole != "Hebamme" || p.Notes != "midwife" {
+		t.Errorf("Bert: %+v", p)
+	}
+	if p := got["Clara"]; p.Role != "witness" || p.CustomRole != "Trauzeuge" {
+		t.Errorf("Clara: %+v", p)
+	}
+	if len(got) != 2 {
+		t.Errorf("participants: %+v", got)
+	}
+	keptVoid := false
+	for _, tg := range report.Tags {
+		keptVoid = keptVoid || (tg.Path == "INDI.BIRT.ASSO" && tg.Outcome == TagKept)
+	}
+	if !keptVoid {
+		t.Errorf("the VOID association was not kept: %+v", report.Tags)
+	}
+	if text := exportText(t, s, a, ExportOptions{Version7: true}); !strings.Contains(text, "ASSO VOID") {
+		t.Errorf("the VOID association was lost:\n%s", text)
+	}
+
+	src551 := strings.Join([]string{
+		"0 HEAD", "1 GEDC", "2 VERS 5.5.1", "2 FORM LINEAGE-LINKED", "1 CHAR UTF-8",
+		"0 @I1@ INDI", "1 NAME Anna /Weber/", "1 FAMS @F1@",
+		"1 BAPM", "2 ASSO @I2@", "3 RELA Witness",
+		"1 ASSO @I2@", "2 RELA witness (MARR F99)",
+		"1 ASSO @I2@", "2 RELA friend (BAPM 3)",
+		"1 CHR", "2 ASSO @I2@", "3 RELA Godfather",
+		"1 ASSO @I2@", "2 RELA Godfather",
+		"1 ASSO @I2@", "2 RELA witness",
+		"0 @I2@ INDI", "1 NAME Bert /Weber/",
+		"0 @F1@ FAM", "1 HUSB @I1@",
+		"0 TRLR", "",
+	}, "\n")
+	s2 := newStore(t)
+	a2 := setup(t, s2)
+	doc, err = gedcom.Parse([]byte(src551))
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err = s2.ImportGEDCOM(ctx, a2, doc, ImportIntoEmpty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bapm, chr []Participant
+	for _, e := range findPerson(t, s2, a2, "anna").Events {
+		switch e.Type {
+		case "BAPM":
+			bapm = e.Participants
+		case "CHR":
+			chr = e.Participants
+		}
+	}
+	if len(chr) != 1 || chr[0].Role != "other" || chr[0].CustomRole != "Godfather" {
+		t.Errorf("an event-level RELA Godfather: %+v", chr)
+	}
+	if len(bapm) != 1 || bapm[0].Role != "witness" || bapm[0].CustomRole != "" {
+		t.Errorf("an event-level RELA Witness: %+v", bapm)
+	}
+	var broken []string
+	for _, w := range report.BrokenReferences {
+		broken = append(broken, w.Message)
+	}
+	if joined := strings.Join(broken, "\n"); !strings.Contains(joined, "the family event @F99@") || len(report.BrokenReferences) != 1 {
+		t.Errorf("an unknown family event: %v", report.BrokenReferences)
+	}
+	// "friend (BAPM 3)" has no third BAPM: it is kept verbatim on the person.
+	// Person-level associations of other programs are kept verbatim too.
+	text := exportText(t, s2, a2, ExportOptions{})
+	for _, want := range []string{"RELA friend (BAPM 3)", "2 RELA Godfather", "2 RELA witness\n"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the unplaceable association %q was lost:\n%s", want, text)
+		}
 	}
 }

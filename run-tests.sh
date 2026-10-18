@@ -53,7 +53,8 @@ if [[ -f go.mod ]]; then
       exit 1
     fi
     echo "🧪 Go tests (race detector)"
-    CGO_ENABLED=1 go test -race "${go_pkgs[@]}"
+    # The store tests alone run close to go test's default 10 minutes under -race.
+    CGO_ENABLED=1 go test -race -timeout 30m "${go_pkgs[@]}"
   else
     echo "🧪 Go tests"
     go test "${go_pkgs[@]}"

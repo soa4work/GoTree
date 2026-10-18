@@ -532,6 +532,15 @@ func TestVerifyExport(t *testing.T) {
 	if _, err := s.ImportGEDCOM(ctx, a, parseFixture(t, "ancestry-551.ged"), ImportIntoEmpty); err != nil {
 		t.Fatal(err)
 	}
+	pa, pb, pw := mustPerson(t, s, a, "Anna", "Verify"), mustPerson(t, s, a, "Hans", "Verify"), mustPerson(t, s, a, "Karl", "Verify")
+	fam, err := s.CreateFamily(ctx, a, FamilyInput{Partner1ID: &pa.ID, Partner2ID: &pb.ID, UnionType: "married"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{FamilyID: &fam.ID, Type: "MARR", Date: "1880",
+		Participants: []ParticipantInput{{PersonID: pw.ID, Role: "witness", Notes: "best man"}}}); err != nil {
+		t.Fatal(err)
+	}
 	for _, v7 := range []bool{false, true} {
 		r, err := s.VerifyExport(ctx, a, v7, "test")
 		if err != nil {
@@ -692,9 +701,8 @@ func TestExportParticipantRolesRoundTrip(t *testing.T) {
 			t.Errorf("5.5.1: %s came back as %q, want %q", r.given, got551[r.given].Role, r.role)
 		}
 	}
-	// Known limit: the 5.5.1 RELA form has no room for a custom role.
-	if got551["Fritz"].CustomRole != "" {
-		t.Errorf("5.5.1 kept a custom role: %+v", got551["Fritz"])
+	if got551["Fritz"].CustomRole != "lodger" {
+		t.Errorf("5.5.1 lost the custom role: %+v", got551["Fritz"])
 	}
 
 	t7 := exportText(t, s, a, ExportOptions{Version7: true})
@@ -844,5 +852,161 @@ func TestExportNamesRoundTrip(t *testing.T) {
 				t.Errorf("name-only export:\n%s", text)
 			}
 		})
+	}
+}
+
+// participantSet lists a tree's participants as "event type|person|role|custom|notes".
+func participantSet(t *testing.T, s *Store, a Actor) []string {
+	t.Helper()
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT e.type, p.given_names, x.role, x.custom_role, x.notes
+		FROM event_participants x JOIN events e ON e.id = x.event_id JOIN persons p ON p.id = x.person_id
+		WHERE e.tree_id = ?`, a.TreeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var typ, given, role, custom, notes string
+		if err := rows.Scan(&typ, &given, &role, &custom, &notes); err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, strings.Join([]string{typ, given, role, custom, notes}, "|"))
+	}
+	sort.Strings(out)
+	return out
+}
+
+func TestExportParticipantsRoundTrip(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	anna := mustPerson(t, s, a, "Anna", "Weber")
+	hans := mustPerson(t, s, a, "Hans", "Weber")
+	person := func(given string) int64 { return mustPerson(t, s, a, given, "Weber").ID }
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &anna.ID, Type: "BAPM", Date: "1850", Participants: []ParticipantInput{
+		{PersonID: person("Greta"), Role: "godparent", CustomRole: "Taufpate", Notes: "uncle"},
+		{PersonID: person("Fritz"), Role: "other", CustomRole: "Trauzeuge"},
+		{PersonID: person("Bert"), Role: "head"},
+		{PersonID: person("Clara"), Role: "sibling", CustomRole: "twin"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	for i, w := range []string{"Ida", "Jonas"} {
+		if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &anna.ID, Type: "RESI", Date: fmt.Sprintf("%d", 1860+i*10),
+			Participants: []ParticipantInput{{PersonID: person(w), Role: "witness"}}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fam, err := s.CreateFamily(ctx, a, FamilyInput{Partner1ID: &anna.ID, Partner2ID: &hans.ID, UnionType: "married"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{FamilyID: &fam.ID, Type: "MARR", Date: "1880", Participants: []ParticipantInput{
+		{PersonID: person("Karl"), Role: "witness", Notes: "best man"},
+		{PersonID: person("Lena"), Role: "witness"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{FamilyID: &fam.ID, Type: "MARR", Date: "1881", Participants: []ParticipantInput{
+		{PersonID: person("Max"), Role: "officiant"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	want := participantSet(t, s, a)
+
+	for _, v7 := range []bool{false, true} {
+		text := exportText(t, s, a, ExportOptions{Version7: v7})
+		var must []string
+		if v7 {
+			must = []string{"3 ROLE GODP\n4 PHRASE Taufpate", "3 NOTE uncle", "3 ROLE OTHER\n4 PHRASE Trauzeuge", "4 PHRASE sibling: twin"}
+		} else {
+			must = []string{
+				"RELA godparent: Taufpate (BAPM)", "2 NOTE uncle", "RELA other: Trauzeuge (BAPM)", "RELA witness (RESI 2)",
+				fmt.Sprintf("RELA witness (MARR F%d)", fam.ID), fmt.Sprintf("RELA officiant (MARR F%d 2)", fam.ID), "RELA sibling: twin (BAPM)",
+			}
+		}
+		for _, m := range must {
+			if !strings.Contains(text, m) {
+				t.Errorf("v7=%v: export lacks %q:\n%s", v7, m, text)
+			}
+		}
+		s2, a2 := reimport(t, text)
+		if got := participantSet(t, s2, a2); strings.Join(got, "\n") != strings.Join(want, "\n") {
+			t.Errorf("v7=%v: participants after the round trip:\n%s\nwant:\n%s", v7, strings.Join(got, "\n"), strings.Join(want, "\n"))
+		}
+	}
+}
+
+func TestExportFamilyWitnessesOnFirstPartner(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	anna := mustPerson(t, s, a, "Anna", "Weber")
+	hans := mustPerson(t, s, a, "Hans", "Weber")
+	karl := mustPerson(t, s, a, "Karl", "Weber")
+	fam, err := s.CreateFamily(ctx, a, FamilyInput{Partner1ID: &anna.ID, Partner2ID: &hans.ID, UnionType: "married"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{FamilyID: &fam.ID, Type: "MARR", Date: "1880",
+		Participants: []ParticipantInput{{PersonID: karl.ID, Role: "witness"}}}); err != nil {
+		t.Fatal(err)
+	}
+	text := exportText(t, s, a, ExportOptions{})
+	if strings.Count(text, "1 ASSO") != 1 || strings.Count(indiBlock(t, text, anna.ID), "1 ASSO") != 1 || strings.Contains(indiBlock(t, text, hans.ID), "ASSO") {
+		t.Errorf("the witness belongs on the first partner only:\n%s", text)
+	}
+}
+
+func TestExportFamilyWitnessesPrivacy(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	born := func(given string) Person {
+		p := mustPerson(t, s, a, given, "Weber")
+		if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &p.ID, Type: "BIRT", Date: "1850"}); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	anna, karl := born("Anna"), born("Karl")
+	hans := mustPerson(t, s, a, "Hans", "Weber") // no dates: living
+	lena := mustPerson(t, s, a, "Lena", "Weber") // living
+	fam, err := s.CreateFamily(ctx, a, FamilyInput{Partner1ID: &anna.ID, Partner2ID: &hans.ID, UnionType: "married"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{FamilyID: &fam.ID, Type: "MARR", Date: "1880",
+		Participants: []ParticipantInput{{PersonID: karl.ID, Role: "witness", Notes: "best man"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &anna.ID, Type: "BAPM", Date: "1850",
+		Participants: []ParticipantInput{{PersonID: lena.ID, Role: "godparent", Notes: "lena secret"}}}); err != nil {
+		t.Fatal(err)
+	}
+	marr := fmt.Sprintf("(MARR F%d)", fam.ID)
+	for _, v7 := range []bool{false, true} {
+		if text := exportText(t, s, a, ExportOptions{Privacy: PrivacyAll, Version7: v7}); !strings.Contains(text, "lena secret") {
+			t.Errorf("v7=%v: full export lacks the participant note", v7)
+		}
+		if text := exportText(t, s, a, ExportOptions{Privacy: PrivacyLivingNameOnly, Version7: v7}); strings.Contains(text, "lena secret") {
+			t.Errorf("v7=%v: name-only export leaked the participant note:\n%s", v7, text)
+		}
+	}
+	if text := exportText(t, s, a, ExportOptions{Privacy: PrivacyAll}); !strings.Contains(indiBlock(t, text, anna.ID), marr) {
+		t.Errorf("full export lacks the family witness:\n%s", text)
+	}
+	for _, mode := range []string{PrivacyExcludeLiving, PrivacyLivingNameOnly} {
+		text := exportText(t, s, a, ExportOptions{Privacy: mode})
+		// The living partner takes the family's events, and so their witnesses.
+		if strings.Contains(text, marr) || strings.Contains(text, "best man") {
+			t.Errorf("%s: the witness of a hidden family event leaked:\n%s", mode, text)
+		}
+		if mode == PrivacyLivingNameOnly && strings.Contains(text, "lena secret") {
+			t.Errorf("%s: the note of a name-only participant leaked:\n%s", mode, text)
+		}
+		lenaRef := fmt.Sprintf("ASSO @I%d@", lena.ID)
+		if mode == PrivacyExcludeLiving && strings.Contains(text, lenaRef) {
+			t.Errorf("%s: an association with an excluded person:\n%s", mode, text)
+		}
 	}
 }

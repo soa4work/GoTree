@@ -53,6 +53,7 @@ interface ParticipantRow {
   person: PersonRef
   role: string
   customRole: string
+  notes: string
 }
 
 function EventForm({ owner, event, defaultType, defaultDate, defaultDescription, onClose }: Omit<Props, 'open'>) {
@@ -70,7 +71,7 @@ function EventForm({ owner, event, defaultType, defaultDate, defaultDescription,
   const [status, setStatus] = useState<FactStatus>(event?.status ?? 'accepted')
   const [statusReason, setStatusReason] = useState(event?.statusReason ?? '')
   const [participants, setParticipants] = useState<ParticipantRow[]>(
-    event?.participants.map((p) => ({ person: p.person, role: p.role, customRole: p.customRole })) ?? [],
+    event?.participants.map((p) => ({ person: p.person, role: p.role, customRole: p.customRole, notes: p.notes })) ?? [],
   )
   const [newParticipant, setNewParticipant] = useState<PersonRef | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -96,7 +97,7 @@ function EventForm({ owner, event, defaultType, defaultDate, defaultDescription,
         status,
         statusReason: status === 'accepted' ? '' : statusReason,
         sortOrder: event?.sortOrder ?? 0,
-        participants: participants.map((p) => ({ personId: p.person.id, role: p.role, customRole: p.customRole, notes: '' })),
+        participants: participants.map((p) => ({ personId: p.person.id, role: p.role, customRole: p.customRole, notes: p.notes })),
         addCitations: addCitations.map(({ sourceId, page, quality, text }) => ({ sourceId, page, quality, text })),
         removeCitations,
       }
@@ -194,7 +195,7 @@ function EventForm({ owner, event, defaultType, defaultDate, defaultDescription,
             value={newParticipant}
             exclude={excluded}
             onChange={(p) => {
-              if (p) setParticipants([...participants, { person: p, role: 'witness', customRole: '' }])
+              if (p) setParticipants([...participants, { person: p, role: 'witness', customRole: '', notes: '' }])
               setNewParticipant(null)
             }}
           />

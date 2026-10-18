@@ -137,6 +137,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- GEDCOM export keeps who took part in an event: a participant's own role name and notes are
+  written in 5.5.1 and 7.0 and read back, and witnesses of marriages and other family events are no
+  longer left out of 5.5.1 files; editing an event no longer clears its participants' notes (#54)
+
 - The interface no longer falls back to English in Russian and Kazakh: tree and map zoom buttons,
   network and proxy errors, GEDCOM import warnings, dropped-tag reasons and broken references,
   transcription row errors, the calendar's "Unknown", the default tree name, the page language

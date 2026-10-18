@@ -82,3 +82,36 @@ written in parentheses: `(spring 1850)`. A dual year or an interpreted date is w
 ## _to
 
 `_HEIRLOOM._CUST._TO` — until when, in the same form.
+
+## Participants (ASSO)
+
+This is a convention, not a tag. GoTree keeps the people who took part in an event (a godparent at a
+baptism, the witnesses of a marriage) with a role, an optional name of their own for the role, and
+a note.
+
+**GEDCOM 7.0.** The `ASSO` sits on the event, as the standard says: `ASSO @I7@` with `ROLE`, an
+optional `PHRASE` under it, and an optional `NOTE`. A role 7.0 knows keeps its tag (`ROLE GODP`) and
+its own name goes in the `PHRASE` (`4 PHRASE Taufpate`). The role `other` is `ROLE OTHER` with the
+name in the `PHRASE`. The roles 7.0 lacks (`head`, `sibling`, `relative`, `informant`) are
+`ROLE OTHER` with the role in the `PHRASE`, followed by `: <name>` when there is a name of its own
+(`4 PHRASE informant: Hebamme`).
+
+**GEDCOM 5.5.1.** `ASSO` is allowed only on a person, so it is written on the person whose event
+it is, with the event in the `RELA`:
+
+```
+1 ASSO @I7@
+2 RELA <role>[: <name>] (<TAG>[ <family>][ <n>])
+2 NOTE <note>
+```
+
+`<TAG>` is the event type. `<n>` is written only for the second and later event of the same type of
+that person (or family), counted in the order the events are written: `witness (RESI 2)`. The
+participants of a family event (`MARR`, `DIV`, ...) are written on the family's first partner, with
+the family in the `RELA`: `witness (MARR F3)`, `officiant (MARR F3 2)`. When the family's events are
+left out of an export (a partner is excluded or reduced to a name), so are their participants.
+
+Examples: `godparent (BAPM)`, `other: Trauzeuge (BAPM)`, `witness (RESI 2)`.
+
+GoTree reads both forms back. An `ASSO` it cannot place (no such event, `VOID`) is kept as it is. A
+source under an `ASSO` is not kept.

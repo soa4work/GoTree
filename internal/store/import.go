@@ -167,6 +167,7 @@ const (
 	DropMediaFileMissing    = "media_file_not_imported"
 	DropMediaCrop           = "media_crop"
 	DropMediaLinkField      = "media_link_field"
+	DropAssoSources         = "asso_sources"
 )
 
 // dropReasonText is the English reason of each drop code; TagStat.Reason is
@@ -203,6 +204,7 @@ var dropReasonText = map[string]string{
 	DropMediaFileMissing:    "the media file was not imported",
 	DropMediaCrop:           "cropping a linked photo is not kept",
 	DropMediaLinkField:      "not kept on a media link",
+	DropAssoSources:         "sources of a participant are not kept",
 }
 
 // DropReasonCodes lists every drop code.
@@ -210,7 +212,7 @@ var DropReasonCodes = []string{
 	DropOwnHistory, DropOldRecordNumber, DropFollowsFromFamilies, DropOwnSubmitter, DropMediaRecords,
 	DropUnknownRecord, DropPlaceForm, DropHeirloomDatePhrase, DropHeirloomCustody, DropHeirloomField,
 	DropStatusOnlyReason, DropNameStatus,
-	DropWebLink, DropFileNotInUpload, DropFileNotInZip, DropFileTooLarge, DropZipTooLarge, DropFileType, DropImagePixels, DropFileUnreadable, DropMediaNoFile, DropMarriedNameField, DropNameEmpty, DropHeirloomMedia, DropMediaFileField, DropBlob, DropMediaRecordSkipped, DropMediaNoObject, DropMediaFileMissing, DropMediaCrop, DropMediaLinkField,
+	DropWebLink, DropFileNotInUpload, DropFileNotInZip, DropFileTooLarge, DropZipTooLarge, DropFileType, DropImagePixels, DropFileUnreadable, DropMediaNoFile, DropMarriedNameField, DropNameEmpty, DropHeirloomMedia, DropMediaFileField, DropBlob, DropMediaRecordSkipped, DropMediaNoObject, DropMediaFileMissing, DropMediaCrop, DropMediaLinkField, DropAssoSources,
 }
 
 // What a broken reference points at: the keys of broken's "what" param
@@ -224,6 +226,7 @@ const (
 	RefPartner          = "partner"
 	RefChild            = "child"
 	RefHolder           = "holder"
+	RefFamilyEvent      = "familyEvent"
 )
 
 var refKindText = map[string]string{
@@ -235,10 +238,11 @@ var refKindText = map[string]string{
 	RefPartner:          "the partner",
 	RefChild:            "the child",
 	RefHolder:           "the holder",
+	RefFamilyEvent:      "the family event",
 }
 
 // RefKinds lists every key broken accepts.
-var RefKinds = []string{RefAssociatedPerson, RefNote, RefRepository, RefSource, RefFamily, RefPartner, RefChild, RefHolder}
+var RefKinds = []string{RefAssociatedPerson, RefNote, RefRepository, RefSource, RefFamily, RefPartner, RefChild, RefHolder, RefFamilyEvent}
 
 type importer struct {
 	s      *Store
@@ -258,6 +262,9 @@ type importer struct {
 	// pedigree[child][family] is the FAMC.PEDI relation of a child.
 	pedigree map[string]map[string]string
 	deferred []deferredParticipant
+	// familyEvents[famXref][tag] are the ids of a family's events of one
+	// type, in file order, for 5.5.1 ASSO lines that name a family event.
+	familyEvents map[string]map[string][]int64
 	// famcLinks are the children's own FAMC lines, applied after all
 	// families are imported.
 	famcLinks []famcLink
@@ -283,7 +290,13 @@ type deferredParticipant struct {
 	xref    string
 	role    string
 	custom  string
+	notes   string
 	line    int
+	// famXref, tag and ordinal name a family event (eventID is 0 until the
+	// family's events are all imported).
+	famXref string
+	tag     string
+	ordinal int
 }
 
 // famcLink is a child's own INDI.FAMC line; families that do not list
@@ -385,7 +398,7 @@ func (s *Store) ImportGEDCOMFiles(ctx context.Context, a Actor, doc *gedcom.Docu
 			persons: map[string]int64{}, families: map[string]int64{}, sources: map[string]int64{},
 			repos: map[string]int64{}, notes: map[string]string{}, places: map[string]int64{},
 			pedigree: map[string]map[string]string{},
-			chilSeen: map[string]bool{}, familyPartners: map[string][2]sql.NullInt64{},
+			chilSeen: map[string]bool{}, familyEvents: map[string]map[string][]int64{}, familyPartners: map[string][2]sql.NullInt64{},
 			files: files, mediaByXref: map[string][]int64{}, mediaInfo: map[int64]importedMedia{},
 			eventNodes: map[*gedcom.Node]int64{}, heirlooms: map[string]int64{},
 		}
@@ -526,13 +539,21 @@ func (im *importer) run(ctx context.Context) error {
 		return err
 	}
 	for _, p := range im.deferred {
+		if p.famXref != "" {
+			ids := im.familyEvents[p.famXref][p.tag]
+			if p.ordinal < 1 || p.ordinal > len(ids) {
+				im.broken(&gedcom.Node{Line: p.line, Pointer: p.famXref}, RefFamilyEvent)
+				continue
+			}
+			p.eventID = ids[p.ordinal-1]
+		}
 		pid, ok := im.persons[p.xref]
 		if !ok {
 			im.broken(&gedcom.Node{Line: p.line, Pointer: p.xref}, RefAssociatedPerson)
 			continue
 		}
 		if _, err := im.tx.ExecContext(ctx, `
-			INSERT OR IGNORE INTO event_participants (event_id, person_id, role, custom_role) VALUES (?, ?, ?, ?)`, p.eventID, pid, p.role, p.custom); err != nil {
+			INSERT OR IGNORE INTO event_participants (event_id, person_id, role, custom_role, notes) VALUES (?, ?, ?, ?, ?)`, p.eventID, pid, p.role, p.custom, p.notes); err != nil {
 			return err
 		}
 	}
@@ -1081,37 +1102,113 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 			return err
 		}
 	}
-	eventIDs := map[string]int64{}
+	eventIDs := map[string][]int64{}
 	for i, e := range events {
 		id, err := im.event(ctx, "INDI", e, sql.NullInt64{Int64: pid, Valid: true}, sql.NullInt64{}, i)
 		if err != nil {
 			return err
 		}
-		if _, seen := eventIDs[e.Tag]; !seen {
-			eventIDs[e.Tag] = id
-		}
+		eventIDs[e.Tag] = append(eventIDs[e.Tag], id)
 	}
 	// GoTree writes shared-event participants in 5.5.1 as
-	// "ASSO @I2@ / RELA godparent (BAPM)" on the principal.
+	// "ASSO @I2@ / RELA godparent (BAPM)" on the principal, and those of a
+	// family event as "RELA witness (MARR F3)" on a partner.
+	keptAsso := false
 	for _, asso := range assos {
 		m := sharedEventRela.FindStringSubmatch(asso.Text("RELA"))
-		eid, ok := eventIDs[m[2]]
-		if !ok {
+		role, custom, tag, famXref := m[1], m[2], m[3], m[4]
+		ordinal := 1
+		if m[5] != "" {
+			ordinal, _ = strconv.Atoi(m[5])
+		}
+		if asso.Pointer == "" || asso.Pointer == "VOID" {
 			im.keep("INDI", asso, &kept)
+			keptAsso = true
 			continue
 		}
-		im.deferred = append(im.deferred, deferredParticipant{eventID: eid, xref: asso.Pointer, role: m[1], line: asso.Line})
+		var notes []string
+		for _, c := range asso.Children {
+			switch c.Tag {
+			case "NOTE", "SNOTE":
+				notes = append(notes, im.noteText(c))
+				im.mapped("INDI.ASSO." + c.Tag)
+			case "SOUR":
+				im.tag("INDI.ASSO.SOUR", TagDropped, DropAssoSources)
+			}
+		}
+		d := deferredParticipant{xref: asso.Pointer, role: role, custom: collapse(custom), notes: joinNotes(notes), line: asso.Line}
+		if famXref != "" {
+			d.famXref, d.tag, d.ordinal = famXref, tag, ordinal
+		} else {
+			ids := eventIDs[tag]
+			if ordinal < 1 || ordinal > len(ids) {
+				im.keep("INDI", asso, &kept)
+				keptAsso = true
+				continue
+			}
+			d.eventID = ids[ordinal-1]
+		}
+		im.deferred = append(im.deferred, d)
 		im.mapped("INDI.ASSO")
+	}
+	if keptAsso {
+		// The lines kept above came after the person was inserted.
+		if _, err := im.tx.ExecContext(ctx, `UPDATE persons SET extra_json = ? WHERE id = ?`, extraJSON(kept), pid); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-var sharedEventRela = regexp.MustCompile(`^(head|spouse|child|parent|sibling|relative|witness|godparent|informant|officiant|clergy|friend|neighbor|other) \(([A-Z_][A-Z0-9_]*)\)$`)
+var sharedEventRela = regexp.MustCompile(`^(head|spouse|child|parent|sibling|relative|witness|godparent|informant|officiant|clergy|friend|neighbor|other)(?:: (.*?))? \(([A-Z_][A-Z0-9_]*)(?: ([A-Za-z][A-Za-z0-9_]*))?(?: ([0-9]+))?\)$`)
 
 var assoRoles = map[string]string{
 	"CHIL": "child", "CLERGY": "clergy", "FATH": "parent", "FRIEND": "friend", "GODP": "godparent", "HUSB": "spouse",
 	"MOTH": "parent", "NGHBR": "neighbor", "OFFICIATOR": "officiant", "PARENT": "parent", "SPOU": "spouse",
 	"WIFE": "spouse", "WITN": "witness", "OTHER": "other",
+}
+
+// assoRole reads the role of a 7.0 ASSO. 7.0 has no head, sibling, relative
+// or informant, so GoTree writes them as ROLE OTHER with the role in a
+// PHRASE, followed by ": custom" when the participant has a name of their
+// own. A ROLE 7.0 knows keeps its PHRASE as the custom name. Without a ROLE
+// (some 5.5.1 writers put the role in RELA) the RELA is used.
+func (im *importer) assoRole(path string, a *gedcom.Node) (role, custom string) {
+	rn := a.First("ROLE")
+	if rn == nil {
+		rela := collapse(a.Text("RELA"))
+		if rela == "" {
+			return "other", ""
+		}
+		im.mapped(path + ".ASSO.RELA")
+		if r := strings.ToLower(rela); oneOf(r, participantRoles...) {
+			return r, ""
+		}
+		return "other", rela
+	}
+	phrase := collapse(rn.Text("PHRASE"))
+	if phrase != "" {
+		im.mapped(path + ".ASSO.ROLE.PHRASE")
+	}
+	return rolePhrase(assoRoles[strings.ToUpper(strings.TrimSpace(rn.Value))], phrase)
+}
+
+// rolePhrase turns a 7.0 ROLE (already mapped to a GoTree role, "" when
+// unknown) and its PHRASE into a role and a custom name.
+func rolePhrase(role, phrase string) (string, string) {
+	if role != "" && role != "other" {
+		return role, phrase
+	}
+	if phrase == "" {
+		return "other", ""
+	}
+	head, rest, _ := strings.Cut(phrase, ": ")
+	if r := strings.ToLower(strings.TrimSpace(head)); oneOf(r, participantRoles...) {
+		if rest = strings.TrimSpace(rest); rest != "" || !strings.Contains(phrase, ": ") {
+			return r, rest
+		}
+	}
+	return "other", phrase
 }
 
 func (im *importer) event(ctx context.Context, owner string, e *gedcom.Node, personID, familyID sql.NullInt64, order int) (int64, error) {
@@ -1183,6 +1280,12 @@ func (im *importer) event(ctx context.Context, owner string, e *gedcom.Node, per
 		case "SOUR":
 			citations = append(citations, c)
 		case "ASSO":
+			if c.Pointer == "" || c.Pointer == "VOID" {
+				// Nobody to point at: keep the line instead of reporting a
+				// broken reference.
+				im.keep(path, c, &kept)
+				break
+			}
 			assos = append(assos, c)
 		default:
 			im.other(path, c, &kept)
@@ -1218,24 +1321,18 @@ func (im *importer) event(ctx context.Context, owner string, e *gedcom.Node, per
 		}
 	}
 	for _, a := range assos {
-		role := assoRoles[strings.ToUpper(strings.TrimSpace(a.Text("ROLE")))]
-		custom := ""
-		if role == "" || role == "other" {
-			// 7.0 has no head, sibling, relative or informant: GoTree writes
-			// them as ROLE OTHER with the role in a PHRASE.
-			role = "other"
-			if rn := a.First("ROLE"); rn != nil {
-				if ph := collapse(rn.Text("PHRASE")); ph != "" {
-					if r := strings.ToLower(ph); oneOf(r, participantRoles...) {
-						role = r
-					} else {
-						custom = ph
-					}
-					im.mapped(path + ".ASSO.ROLE.PHRASE")
-				}
+		role, custom := im.assoRole(path, a)
+		var notes []string
+		for _, c := range a.Children {
+			switch c.Tag {
+			case "NOTE", "SNOTE":
+				notes = append(notes, im.noteText(c))
+				im.mapped(path + ".ASSO." + c.Tag)
+			case "SOUR":
+				im.tag(path+".ASSO.SOUR", TagDropped, DropAssoSources)
 			}
 		}
-		im.deferred = append(im.deferred, deferredParticipant{eventID: eid, xref: a.Pointer, role: role, custom: custom, line: a.Line})
+		im.deferred = append(im.deferred, deferredParticipant{eventID: eid, xref: a.Pointer, role: role, custom: custom, notes: joinNotes(notes), line: a.Line})
 		im.mapped(path + ".ASSO")
 	}
 	return eid, nil
@@ -1426,9 +1523,14 @@ func (im *importer) family(ctx context.Context, r *gedcom.Node) error {
 		}
 	}
 	for i, e := range events {
-		if _, err := im.event(ctx, "FAM", e, sql.NullInt64{}, sql.NullInt64{Int64: fid, Valid: true}, i); err != nil {
+		id, err := im.event(ctx, "FAM", e, sql.NullInt64{}, sql.NullInt64{Int64: fid, Valid: true}, i)
+		if err != nil {
 			return err
 		}
+		if im.familyEvents[r.Xref] == nil {
+			im.familyEvents[r.Xref] = map[string][]int64{}
+		}
+		im.familyEvents[r.Xref][e.Tag] = append(im.familyEvents[r.Xref][e.Tag], id)
 	}
 	return nil
 }

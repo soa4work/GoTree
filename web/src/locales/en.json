@@ -634,7 +634,8 @@
       "family": "the family",
       "partner": "the partner",
       "child": "the child",
-      "holder": "the holder"
+      "holder": "the holder",
+      "familyEvent": "the family event"
     },
     "dropReason": {
       "own_history": "GoTree keeps its own change history",
@@ -667,7 +668,8 @@
       "media_no_object": "it points to no media object",
       "media_file_not_imported": "the media file was not imported",
       "media_crop": "cropping a linked photo is not kept",
-      "media_link_field": "not kept on a media link"
+      "media_link_field": "not kept on a media link",
+      "asso_sources": "sources of a participant are not kept"
     },
     "backupAllTrees": "The backup holds every tree and every account on this server. To give someone a copy of one tree, export it as GEDCOM.",
     "viewerPrivacy": "As a viewer you can export the tree without living people."

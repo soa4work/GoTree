@@ -338,6 +338,32 @@ describe('person page', () => {
     expect(label).toHaveAccessibleDescription('is required for custom events')
   })
 
+  it('sends the notes of participants back when an event is edited', async () => {
+    const baptism = event(90, 'BAPM', '1 MAY 1890', {
+      participants: [{ person: ref(5, 'Greta'), role: 'godparent', customRole: 'Taufpate', notes: "the bride's aunt" }],
+    })
+    const withBaptism: PersonDetail = { ...paul, events: [baptism] }
+    const bodies: unknown[] = []
+    mockApi({
+      'GET /api/persons/1': [200, withBaptism],
+      'PUT /api/events/90': (body) => {
+        bodies.push(body)
+        return [200, baptism]
+      },
+    })
+    const user = userEvent.setup()
+    renderApp('/people/1')
+    await screen.findByRole('heading', { level: 1, name: 'Paul Weber' })
+
+    await user.click(screen.getAllByRole('button', { name: /^Edit: Baptism/ })[0] as HTMLElement)
+    const dialog = await screen.findByRole('dialog', { name: 'Edit life event' })
+    await user.click(within(dialog).getByRole('button', { name: /^Save/ }))
+    await waitFor(() => expect(bodies).toHaveLength(1))
+    expect(bodies[0]).toMatchObject({
+      participants: [{ personId: 5, role: 'godparent', customRole: 'Taufpate', notes: "the bride's aunt" }],
+    })
+  })
+
   it('shows not found for a missing person', async () => {
     mockApi({})
     renderApp('/people/99')

@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"sort"
 	"strings"
+
+	"github.com/praetorianer777/gotree/internal/gendate"
 )
 
 // DecadeLifespan is the age at death of people born in one decade.
@@ -75,15 +77,25 @@ const (
 // ageBetween is whole years from one YYYYMMDD key to a later one; an
 // unknown month or day counts as not yet reached.
 func ageBetween(from, to int) int {
-	y := to/10000 - from/10000
-	fm, fd, tm, td := from/100%100, from%100, to/100%100, to%100
+	fy, fm, fd := gendate.SplitKey(from)
+	ty, tm, td := gendate.SplitKey(to)
+	y := ty - fy
 	if tm < fm || (tm == fm && td < fd) {
 		y--
 	}
 	return y
 }
 
-func decadeOf(key int) int { return key / 10000 / 10 * 10 }
+// decadeOf is the decade of a key's year, rounded down, so 1855 is 1850
+// and 51 B.C. (-51) is -60.
+func decadeOf(key int) int {
+	y := gendate.KeyYear(key)
+	d := y / 10 * 10
+	if y < 0 && y%10 != 0 {
+		d -= 10
+	}
+	return d
+}
 
 // Stats computes the statistics of the tree. Disproven facts and dates
 // that are only bounded (BEF, AFT) are left out.

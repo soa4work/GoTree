@@ -119,6 +119,8 @@ func storedDate(s string) string {
 	return s
 }
 
+// parseDate computes the derived date columns of an event; keep in sync
+// with db.refreshDateKeys, which recomputes them for stored rows.
 func parseDate(raw string) (date string, sortKey, sortEnd sql.NullInt64, qualifier string) {
 	d, err := gendate.Parse(raw)
 	if err != nil {

@@ -48,6 +48,8 @@ type SimpleDate struct {
 	Calendar Calendar
 	Year     int
 	// DualYear is the second year of 5.5.1 dual dating ("1750/51"), or 0.
+	// It is the year the date falls in by today's reckoning; validation and
+	// sort keys use it.
 	DualYear int
 	Month    int
 	Day      int
@@ -308,8 +310,8 @@ func (sd SimpleDate) validate() error {
 		if sd.Month == 0 {
 			return errors.New("day without month")
 		}
-		if sd.Day < 1 || sd.Day > daysIn(sd.Calendar, sd.Year, sd.Month) {
-			return fmt.Errorf("day %d does not exist in %s %d", sd.Day, months[sd.Month-1], sd.Year)
+		if sd.Day < 1 || sd.Day > daysIn(sd.Calendar, sd.leapYear(), sd.Month) {
+			return fmt.Errorf("day %d does not exist in %s %d", sd.Day, months[sd.Month-1], sd.year())
 		}
 	}
 	return nil
@@ -406,21 +408,119 @@ func (d Date) SortKeyEnd() (key int, ok bool) {
 	return d.SortKey()
 }
 
-func (sd SimpleDate) compareKey() int {
-	y, m, day := sd.Year, sd.Month, sd.Day
-	if sd.Calendar == Julian && day != 0 {
-		y, m, day = julianToGregorian(y, m, day)
+// year is the historical year: the second year of a dual date
+// ("FEB 1750/51" happened in 1751), else Year.
+func (sd SimpleDate) year() int {
+	if sd.DualYear != 0 {
+		return sd.DualYear
 	}
-	if sd.BC {
-		y = -y
-	}
-	return y*10000 + m*100 + day
+	return sd.Year
 }
 
-// julianToGregorian converts via the Julian Day Number.
-func julianToGregorian(y, m, d int) (int, int, int) {
+// leapYear is the astronomical year that decides whether February has a
+// 29th: 1 B.C. is year 0, so 1, 5, 9 B.C. are leap years, not 4 B.C.
+func (sd SimpleDate) leapYear() int {
+	if sd.BC {
+		return 1 - sd.year()
+	}
+	return sd.year()
+}
+
+func (sd SimpleDate) compareKey() int {
+	y, m, d := sd.year(), sd.Month, sd.Day
+	if sd.Calendar != Julian {
+		return key(y, m, d, sd.BC)
+	}
+	// A partial date is converted at its middle, so a month or year stays
+	// what it is in the Gregorian calendar unless the shift moves it.
+	cm, cd := m, d
+	switch {
+	case m == 0:
+		cm, cd = 7, 1
+	case d == 0:
+		cd = 15
+	}
+	gy, gm, gd, bc := julianToGregorian(y, cm, cd, sd.BC)
+	if m == 0 {
+		gm = 0
+	}
+	if d == 0 {
+		gd = 0
+	}
+	return key(gy, gm, gd, bc)
+}
+
+// Bounds returns the sort keys of the first and the last day the date can
+// mean, converted to the Gregorian calendar: "@#DJULIAN@ FEB 1700" gives
+// 17000211 and 17000311. Both keys have a month and a day.
+func (sd SimpleDate) Bounds() (first, last int) {
+	y := sd.year()
+	fm, fd := sd.Month, sd.Day
+	if fm == 0 {
+		fm = 1
+	}
+	if fd == 0 {
+		fd = 1
+	}
+	lm, ld := sd.Month, sd.Day
+	if lm == 0 {
+		lm = 12
+	}
+	if ld == 0 {
+		ld = daysIn(sd.Calendar, sd.leapYear(), lm)
+	}
+	if sd.Calendar != Julian {
+		return key(y, fm, fd, sd.BC), key(y, lm, ld, sd.BC)
+	}
+	fy, fmo, fday, fbc := julianToGregorian(y, fm, fd, sd.BC)
+	ly, lmo, lday, lbc := julianToGregorian(y, lm, ld, sd.BC)
+	return key(fy, fmo, fday, fbc), key(ly, lmo, lday, lbc)
+}
+
+func key(y, m, d int, bc bool) int {
+	if bc {
+		y = -y
+	}
+	return y*10000 + m*100 + d
+}
+
+// SplitKey is the inverse of a sort key: year (negative for B.C.), month
+// and day, 0 when unknown. It divides with rounding down, so the key
+// -499685 of "15 MAR 50 B.C." gives -50, 3, 15.
+func SplitKey(key int) (year, month, day int) {
+	year = floorDiv(key, 10000)
+	rest := key - year*10000
+	return year, rest / 100, rest % 100
+}
+
+// KeyYear is the year of a sort key, negative for B.C.
+func KeyYear(key int) int {
+	y, _, _ := SplitKey(key)
+	return y
+}
+
+func floorDiv(a, b int) int {
+	q := a / b
+	if a%b != 0 && (a < 0) != (b < 0) {
+		q--
+	}
+	return q
+}
+
+// julianToGregorian converts via the Julian Day Number. bc says y is a
+// B.C. year (1 B.C. is the astronomical year 0).
+func julianToGregorian(y, m, d int, bc bool) (year, month, day int, isBC bool) {
+	ay := y
+	if bc {
+		ay = 1 - y
+	}
+	// The algorithm needs astronomical years above -4800; GoTree's four
+	// digit years can reach 9999 B.C., which is left as it is.
+	if ay <= -4800 {
+		return y, m, d, bc
+	}
 	a := (14 - m) / 12
-	yy := y + 4800 - a
+	yy := ay + 4800 - a
 	mm := m + 12*a - 3
 	jdn := d + (153*mm+2)/5 + 365*yy + yy/4 - 32083
 
@@ -430,15 +530,20 @@ func julianToGregorian(y, m, d int) (int, int, int) {
 	dd := (4*c + 3) / 1461
 	e := c - 1461*dd/4
 	mo := (5*e + 2) / 153
-	day := e - (153*mo+2)/5 + 1
-	month := mo + 3 - 12*(mo/10)
-	year := 100*b + dd - 4800 + mo/10
-	return year, month, day
+	day = e - (153*mo+2)/5 + 1
+	month = mo + 3 - 12*(mo/10)
+	year = 100*b + dd - 4800 + mo/10
+	if year <= 0 {
+		return 1 - year, month, day, true
+	}
+	return year, month, day, false
 }
 
 // GEDCOM7 renders the date for GEDCOM 7, which spells calendars as
 // keywords ("JULIAN 4 OCT 1582"), writes "BCE" and has neither INT nor
-// dual years. What 7.0 cannot express goes into phrase, to be written as a
+// dual years. The value of a dual date carries its later year, as in the 7.0
+// specification's own example ("30 JAN 1650" with the phrase
+// "30 JAN 1649/50"), and the phrase the 5.5.1 form. What 7.0 cannot express goes into phrase, to be written as a
 // DATE.PHRASE substructure; value may then be empty.
 //
 // A Date has one phrase, so two known limits apply: an INT date with a dual
@@ -447,13 +552,13 @@ func julianToGregorian(y, m, d int) (int, int, int) {
 // ends keeps only the last end's.
 func (d Date) GEDCOM7() (value, phrase string) {
 	simple := func(sd *SimpleDate) string {
-		s := strings.Replace(sd.String(), "@#DJULIAN@ ", "JULIAN ", 1)
-		s = strings.Replace(s, " B.C.", " BCE", 1)
-		if sd.DualYear != 0 {
-			s = strings.Replace(s, fmt.Sprintf("/%02d", sd.DualYear%100), "", 1)
+		c := *sd
+		if c.DualYear != 0 {
 			phrase = sd.String()
+			c.Year, c.DualYear = c.DualYear, 0
 		}
-		return s
+		s := strings.Replace(c.String(), "@#DJULIAN@ ", "JULIAN ", 1)
+		return strings.Replace(s, " B.C.", " BCE", 1)
 	}
 	switch d.Qualifier {
 	case QualifierPhrase:
@@ -476,3 +581,8 @@ func (d Date) GEDCOM7() (value, phrase string) {
 	}
 	return value, phrase
 }
+
+// KeyVersion changes whenever Parse, String or the sort keys change for
+// text that was already accepted or rejected, so stored keys can be
+// recomputed (see db.Open). 2: dual years and Julian dates without a day (#55).
+const KeyVersion = "2"

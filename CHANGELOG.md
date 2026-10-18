@@ -9,6 +9,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Russian relationship names (#24): the relationship page names kin in correct Russian with gender,
+  half-blood (единокровный/единоутробный), step and in-law terms (свёкор, тёща, деверь, золовка,
+  шурин, невестка…) by the spouse's side, and cousins of any degree (двоюродный, троюродный…)
+
 - Calendar feeds in Russian or Kazakh (#24)
 
 - Dates typed in Russian or Kazakh are understood (#24)

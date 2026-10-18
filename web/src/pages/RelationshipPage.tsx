@@ -144,7 +144,7 @@ function Details({ rep }: { rep: RelationshipReport }) {
             {rep.others.map((k) => (
               <li key={`${k.up}-${k.down}-${k.ancestors.join()}`}>
                 {t('relationship.otherLine', {
-                  relation: kinshipName(t, k, rep.persons[rep.b]?.sex),
+                  relation: kinshipName(t, k, rep.persons[rep.b]?.sex, rep.persons),
                   names: k.ancestors.map(name).join(' & '),
                 })}
               </li>

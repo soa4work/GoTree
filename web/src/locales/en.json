@@ -803,6 +803,7 @@
     "createdTitle": "Calendar address “{{label}}” is ready",
     "createdHint": "Add it to your calendar app as a subscription. For safety GoTree keeps only a fingerprint of it, so it cannot be shown again later.",
     "urlLabel": "Calendar address",
+    "langHint": "Calendar entries will be in the interface language (lang={{lang}}). To get another language, switch it and copy the address again.",
     "subscribe": "Open in calendar app",
     "revokeTitle": "Withdraw calendar address",
     "revokeConfirm": "Withdraw “{{label}}”? Calendars subscribed to it stop getting the dates."

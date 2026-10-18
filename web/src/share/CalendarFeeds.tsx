@@ -11,7 +11,9 @@ import { Form } from '../components/Form'
 import { TextField } from '../components/TextField'
 import { formatDay } from '../lib/dates'
 
-const feedUrl = (token: string) => `${window.location.origin}/ical/${token}.ics`
+/** The feed language follows the interface; the server falls back to English for anything else. */
+const feedLang = (lang: string) => (lang === 'ru' || lang === 'kk' ? lang : 'en')
+const feedUrl = (token: string, lang: string) => `${window.location.origin}/ical/${token}.ics?lang=${encodeURIComponent(lang)}`
 
 /** Secret calendar subscriptions for birthdays and anniversaries. */
 export function CalendarFeeds() {
@@ -97,10 +99,11 @@ export function CalendarFeeds() {
 }
 
 function CreatedFeed({ feed, onDone }: { feed: CalendarFeed; onDone: () => void }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const id = useId()
   const [copied, setCopied] = useState(false)
-  const url = feedUrl(feed.token!)
+  const lang = feedLang(i18n.resolvedLanguage ?? i18n.language)
+  const url = feedUrl(feed.token!, lang)
   const webcal = url.replace(/^https?:/, 'webcal:')
   return (
     <div className="space-y-3 rounded-xl border-2 border-brand-500 p-4">
@@ -116,6 +119,7 @@ function CreatedFeed({ feed, onDone }: { feed: CalendarFeed; onDone: () => void 
         onFocus={(e) => e.target.select()}
         className="block min-h-11 w-full rounded-lg border border-slate-400 bg-white px-3 font-mono text-sm dark:border-slate-600 dark:bg-slate-900"
       />
+      <p className="text-sm text-slate-600 dark:text-slate-400">{t('calendar.langHint', { lang })}</p>
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => void navigator.clipboard?.writeText(url).then(() => setCopied(true))}>
           {t('sharing.copy')}

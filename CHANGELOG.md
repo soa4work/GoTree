@@ -9,6 +9,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Language switcher (Russian and Kazakh) next to the theme switch: the choice is saved in the
+  browser, the first visit follows the browser language and falls back to Russian, the page
+  language and dates follow it; the translations themselves come in later changes (#24)
+
 - Migration map: when a GEDCOM import brought no coordinates, the map says so, lists the places
   used by dated events that lack them and lets you enter latitude and longitude right there, or
   look a place up on OpenStreetMap (Nominatim) with one click and pick a match (#12)

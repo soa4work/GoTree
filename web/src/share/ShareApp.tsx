@@ -7,6 +7,7 @@ import { ApiError } from '../api/client'
 import { shareApi } from '../api/endpoints'
 import type { Family, PersonRef, ShareInfo } from '../api/types'
 import { SelectField } from '../components/Field'
+import { LanguageSwitch } from '../components/LanguageSwitch'
 import { PageHeading } from '../components/PageHeading'
 import { ThemeSwitch } from '../components/ThemeSwitch'
 import { useDebounced } from '../hooks/useDebounced'
@@ -91,7 +92,8 @@ export function ShareApp() {
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
               {t('share.readOnly')}
             </span>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              <LanguageSwitch />
               <ThemeSwitch />
             </div>
           </div>

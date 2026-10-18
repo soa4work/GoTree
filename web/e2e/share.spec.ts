@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { expectAccessible, login, unique } from './helpers'
+import { expectAccessible, forceEnglish, login, unique } from './helpers'
 
 const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 
@@ -34,7 +34,9 @@ test('share a branch read-only and withdraw the link', async ({ page, browser })
   await expectAccessible(page)
 
   // A relative without an account.
-  const visitor = await (await browser.newContext({ viewport: page.viewportSize() ?? undefined })).newPage()
+  const visitorContext = await browser.newContext({ viewport: page.viewportSize() ?? undefined })
+  await forceEnglish(visitorContext)
+  const visitor = await visitorContext.newPage()
   await visitor.goto(url)
   await expect(visitor.getByText('Read-only view')).toBeVisible()
   await expect(visitor.getByText('Living people are shown by name only.')).toBeVisible()

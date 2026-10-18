@@ -1,5 +1,10 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, type Page } from '@playwright/test'
+import { expect, type BrowserContext, type Page } from '@playwright/test'
+
+/** Saves the hidden 'en' language choice for a context made by hand; contexts from the config already have it. */
+export async function forceEnglish(context: BrowserContext) {
+  await context.addInitScript(() => localStorage.setItem('gotree-lang', 'en'))
+}
 
 export async function login(page: Page) {
   await page.goto('/')

@@ -29,6 +29,13 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${port}`,
     launchOptions: { executablePath },
     trace: 'retain-on-failure',
+    // The app defaults to Russian; the specs read the English source strings, so
+    // every context starts with the hidden 'en' choice saved. Contexts made by
+    // hand (browser.newContext) must call forceEnglish() from e2e/helpers.ts.
+    storageState: {
+      cookies: [],
+      origins: [{ origin: `http://127.0.0.1:${port}`, localStorage: [{ name: 'gotree-lang', value: 'en' }] }],
+    },
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },

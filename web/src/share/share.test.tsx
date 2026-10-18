@@ -1,5 +1,6 @@
-import { fireEvent, screen, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import i18n from '../i18n'
 import type { PersonRef, ShareLink } from '../api/types'
 import { axeViolations } from '../test/axe'
 import { mockApi, renderApp } from '../test/render'
@@ -81,10 +82,34 @@ describe('calendar feeds', () => {
     fireEvent.click(within(dialog).getByLabelText('Include living people'))
     fireEvent.click(within(dialog).getByRole('button', { name: /Create address/ }))
 
-    expect(await screen.findByLabelText('Calendar address')).toHaveValue(`${window.location.origin}/ical/cal1.ics`)
-    expect(screen.getByRole('link', { name: 'Open in calendar app' }).getAttribute('href')).toMatch(/^webcal:\/\/.*\/ical\/cal1\.ics$/)
+    expect(await screen.findByLabelText('Calendar address')).toHaveValue(`${window.location.origin}/ical/cal1.ics?lang=en`)
+    expect(screen.getByRole('link', { name: 'Open in calendar app' }).getAttribute('href')).toMatch(/^webcal:\/\/.*\/ical\/cal1\.ics\?lang=en$/)
     expect(sent).toEqual({ label: 'My phone', includeLiving: true })
     expect(await axeViolations(container)).toEqual([])
+  })
+
+  it.each(['ru', 'kk'])('puts the interface language %s into the calendar address', async (lang) => {
+    await i18n.changeLanguage(lang)
+    try {
+      mockApi({
+        'GET /api/share-links': [200, []],
+        'GET /api/calendar-feeds': [200, []],
+        'POST /api/calendar-feeds': () => [
+          201,
+          { id: 1, label: 'Phone', includeLiving: false, revokedAt: null, lastUsedAt: null, createdAt: '', token: 'cal1' },
+        ],
+      })
+      renderApp('/sharing')
+      fireEvent.click(await screen.findByRole('button', { name: `+ ${i18n.t('calendar.new')}` }))
+      const dialog = screen.getByRole('dialog')
+      fireEvent.change(within(dialog).getAllByRole('textbox').at(0)!, { target: { value: 'Phone' } })
+      fireEvent.click(dialog.querySelector('button[type="submit"]')!)
+      await waitFor(() => expect(document.querySelector('input[readonly]')).not.toBeNull())
+      expect(document.querySelector('input[readonly]')).toHaveValue(`${window.location.origin}/ical/cal1.ics?lang=${lang}`)
+      expect(screen.getByText(new RegExp(`lang=${lang}`))).toBeInTheDocument()
+    } finally {
+      await i18n.changeLanguage('en')
+    }
   })
 })
 

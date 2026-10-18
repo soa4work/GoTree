@@ -38,7 +38,8 @@ func (s *Server) revokeCalendarFeed(w http.ResponseWriter, r *http.Request) {
 }
 
 // icalFeed serves /ical/{token}.ics. Calendar apps cannot log in, so the
-// token in the URL is the credential.
+// token in the URL is the credential. The optional lang query parameter
+// (en, ru, kk) picks the language of the event texts.
 func (s *Server) icalFeed(w http.ResponseWriter, r *http.Request) {
 	token, ok := strings.CutSuffix(chi.URLParam(r, "file"), ".ics")
 	if !ok {
@@ -56,18 +57,10 @@ func (s *Server) icalFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := ical.Calendar{Name: cal.TreeName}
-	from := fmt.Sprintf("From the family tree “%s” in GoTree.", cal.TreeName)
+	texts := calendarTextsFor(r.URL.Query().Get("lang"))
+	from := fmt.Sprintf(texts.from, cal.TreeName)
 	for _, e := range cal.Entries {
-		names := strings.Join(e.Names, " & ")
-		var summary string
-		switch e.Kind {
-		case "BIRT":
-			summary = fmt.Sprintf("Birthday: %s (born %d)", names, e.Year)
-		case "MARR":
-			summary = fmt.Sprintf("Wedding anniversary: %s (%d)", names, e.Year)
-		default:
-			summary = fmt.Sprintf("Remembrance: %s (died %d)", names, e.Year)
-		}
+		summary := texts.summary(e.Kind, strings.Join(e.Names, " & "), e.Year)
 		out.Events = append(out.Events, ical.Event{UID: e.UID, Summary: summary, Description: from, Year: e.Year, Month: e.Month, Day: e.Day})
 	}
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")

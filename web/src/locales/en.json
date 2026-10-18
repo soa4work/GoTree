@@ -1261,7 +1261,7 @@
       "too_many": "too many entries",
       "duplicate": "contains a duplicate",
       "taken": "is already taken",
-      "already_member": "is already a member of this tree",
+      "not_addable": "cannot be added",
       "invalid_url": "must start with http:// or https://",
       "self_reference": "a person or place cannot refer to itself",
       "cycle": "this would make a person their own ancestor",

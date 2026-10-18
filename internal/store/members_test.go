@@ -133,7 +133,7 @@ func TestAddMember(t *testing.T) {
 	_, err := s.AddMember(ctx, f.owner.ID, f.tree, MemberInput{Username: "nobody", Role: RoleViewer})
 	validationField(t, err, "username")
 	var ve *ValidationError
-	if errors.As(err, &ve) && ve.Fields["username"] != "an account with this username does not exist" {
+	if errors.As(err, &ve) && ve.Fields["username"] != "cannot be added" {
 		t.Errorf("message %q", ve.Fields["username"])
 	}
 	_, err = s.AddMember(ctx, f.owner.ID, f.tree, MemberInput{Username: "  ", Role: RoleViewer})
@@ -145,7 +145,7 @@ func TestAddMember(t *testing.T) {
 	}
 	_, err = s.AddMember(ctx, f.owner.ID, f.tree, MemberInput{Username: "Carol", Role: RoleViewer})
 	validationField(t, err, "username")
-	if errors.As(err, &ve) && ve.Fields["username"] != "is already a member of this tree" {
+	if errors.As(err, &ve) && ve.Fields["username"] != "cannot be added" {
 		t.Errorf("message %q", ve.Fields["username"])
 	}
 	_, err = s.AddMember(ctx, f.owner.ID, f.tree, MemberInput{Username: "outsider", Role: "admin"})

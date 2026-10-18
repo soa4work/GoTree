@@ -200,11 +200,11 @@ func TestMembersAPIPermissions(t *testing.T) {
 
 	admin.call("POST", members, map[string]string{"username": "bob", "role": "viewer"}, http.StatusCreated, nil)
 	e := callError(t, admin, "POST", members, map[string]string{"username": "bob", "role": "viewer"}, http.StatusUnprocessableEntity)
-	if e.FieldCodes["username"].Code != FieldAlreadyMember {
+	if e.FieldCodes["username"].Code != FieldNotAddable {
 		t.Errorf("second add: %+v", e.FieldCodes)
 	}
 	e = callError(t, admin, "POST", members, map[string]string{"username": "ghost", "role": "viewer"}, http.StatusUnprocessableEntity)
-	if e.FieldCodes["username"].Code != FieldNotFound {
+	if e.FieldCodes["username"].Code != FieldNotAddable {
 		t.Errorf("unknown username: %+v", e.FieldCodes)
 	}
 

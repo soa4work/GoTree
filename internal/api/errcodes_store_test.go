@@ -107,7 +107,6 @@ func storeMessages(t *testing.T) map[string]bool {
 // English text.
 var pinned = map[string]string{
 	"a citation is not attached here":                                      "citation_not_attached",
-	"an account with this username does not exist":                         "not_found",
 	"a cited {} does not exist":                                            "not_found",
 	"a custom role needs a name":                                           "name_required",
 	"a date is too long":                                                   "too_long",
@@ -140,7 +139,7 @@ var pinned = map[string]string{
 	"give the link a name of at most 120 characters":                       "name_length",
 	"give the object a name of at most 200 characters":                     "name_length",
 	"give the template a name of at most 120 characters":                   "name_length",
-	"is already a member of this tree":                                     "already_member",
+	"cannot be added":                                                      "not_addable",
 	"is already taken":                                                     "taken",
 	"is not a face tag on this photo":                                      "not_face_tag",
 	"is not a suggestion":                                                  "not_suggestion",

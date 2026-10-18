@@ -92,7 +92,7 @@ const (
 	FieldTooManyRows    = "too_many_rows"
 	FieldDuplicate      = "duplicate"
 	FieldTaken          = "taken"
-	FieldAlreadyMember  = "already_member"
+	FieldNotAddable     = "not_addable"
 	FieldInvalidURL     = "invalid_url"
 	FieldSelfReference  = "self_reference"
 	FieldCycle          = "cycle"
@@ -136,13 +136,13 @@ type FieldError struct {
 
 // exactFields maps messages that have no variable part to their code.
 var exactFields = map[string]string{
-	"is required":                      FieldRequired,
-	"is already taken":                 FieldTaken,
-	"is already a member of this tree": FieldAlreadyMember,
-	"must be a date":                   FieldInvalidDate,
-	"is not your current password":     FieldWrongPassword,
-	"must not be in the past":          FieldDateInPast,
-	"month and day are out of range":   FieldDateOutOfRange,
+	"is required":                    FieldRequired,
+	"is already taken":               FieldTaken,
+	"cannot be added":                FieldNotAddable,
+	"must be a date":                 FieldInvalidDate,
+	"is not your current password":   FieldWrongPassword,
+	"must not be in the past":        FieldDateInPast,
+	"month and day are out of range": FieldDateOutOfRange,
 	"use 2–64 letters, digits, dots, dashes or underscores":               FieldUsernameFormat,
 	"latitude and longitude must be given together":                       FieldCoordsTogether,
 	"must start with http:// or https://":                                 FieldInvalidURL,

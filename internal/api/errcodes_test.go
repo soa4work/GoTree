@@ -180,7 +180,7 @@ func TestClassifyField(t *testing.T) {
 		"must be between -90 and 90":                {Code: FieldOutOfRange, Params: map[string]any{"min": -90, "max": 90}},
 		"must be M, F, U or X":                      {Code: FieldInvalidChoice, Params: map[string]any{"options": "M, F, U, X"}},
 		"is already taken":                          {Code: FieldTaken},
-		"is already a member of this tree":          {Code: FieldAlreadyMember},
+		"cannot be added":                           {Code: FieldNotAddable},
 		"must be owner, editor or viewer":           {Code: FieldInvalidChoice, Params: map[string]any{"options": "owner, editor, viewer"}},
 		"unknown role chief":                        {Code: FieldUnknownValue, Params: map[string]any{"value": "chief"}},
 		"say why the fact is disputed or disproven": {Code: FieldReasonRequired},

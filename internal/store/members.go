@@ -212,13 +212,13 @@ func (s *Store) AddMember(ctx context.Context, userID, treeID int64, in MemberIn
 		var target int64
 		err = tx.QueryRowContext(ctx, `SELECT id FROM users WHERE username = ?`, in.Username).Scan(&target)
 		if errors.Is(err, sql.ErrNoRows) {
-			return &ValidationError{Fields: map[string]string{"username": "an account with this username does not exist"}}
+			return &ValidationError{Fields: map[string]string{"username": "cannot be added"}}
 		}
 		if err != nil {
 			return err
 		}
 		if _, err := treeRole(ctx, tx, treeID, target); err == nil {
-			return &ValidationError{Fields: map[string]string{"username": "is already a member of this tree"}}
+			return &ValidationError{Fields: map[string]string{"username": "cannot be added"}}
 		} else if !errors.Is(err, ErrNotFound) {
 			return err
 		}

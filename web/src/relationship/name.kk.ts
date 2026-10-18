@@ -27,22 +27,29 @@ import type { Kinship, PersonRef, RelationshipReport, Sex } from '../api/types'
  *  - elder: аға, әпке; younger: іні, and қарындас (ego male) or сіңлі (ego
  *    female). Unknown age: бауыр, a sister қыз бауыр.
  * Collateral
- *  - Father's elder brother көке, younger "әкесінің інісі" (unknown age
+ *  - Father's elder brother көке («үлкен әке» is the more standard variant, көке
+ *    is kept as the shorter one), younger "әкесінің інісі" (unknown age
  *    "әкесінің бауыры"), father's sister тәте; mother's brother нағашы аға,
  *    mother's sister нағашы апа. Parent's sibling through an unknown parent:
  *    "ата-анасының ағасы" and so on. A grandparent's sibling is ата or әже.
  *  - Sister's child: жиен; brother's child: "ағасының ұлы" (by his age against
  *    ego), "інісінің қызы", "бауырының баласы" when it is unknown.
- *  - First cousins: "немере" + the sibling term (немере аға, немере сіңлі).
- *  - Anything else: "N-ші буындағы туыс" with N = up + down.
- * Half-blood and adoptive marks are added to the term, adoptive direct kin and
- * siblings take the prefix асыранды.
+ *  - First cousins by the parents' sexes: through the father's brother "немере"
+ *    + the sibling term (немере аға, немере сіңлі); through the mother's
+ *    sister бөле; through the mother's brother "нағашы" + the sibling term
+ *    (нағашы аға, нағашы сіңлі); through the father's sister жиен. With an
+ *    unknown parent sex, "немере" + the sibling term.
+ *  - Anything else: "N-ші буындағы туыс" with N = up + down; ordinals take
+ *    -ші or -шы by the vowel harmony of the numeral (6-шы, 9-шы, 10-шы).
+ * Half-blood marks: "(әкесі бір)" (same father), "(анасы бір)" (same mother).
+ * Adoptive parents are "асырап алған әке/шеше", adoptive children and siblings
+ * take the prefix асыранды.
  *
  * In-laws (by the side the link goes through)
  *  - spouse's parents: қайын ата, қайын ене; step-parent: өгей әке, өгей шеше;
  *    step-child: өгей ұл, өгей қыз, өгей бала.
  *  - spouse's siblings: қайын аға, қайын іні, қайын апа, қайын сіңлі by age,
- *    балдыз for a wife's younger sister (said by a man), қайын бауыр when age
+ *    балдыз for a wife's younger sibling of either sex (said by a man), қайын бауыр when age
  *    is unknown.
  *  - sister's husband: жезде (elder or unknown age), күйеу бала (younger);
  *    daughter's husband: күйеу бала. Brother's wife: жеңге (elder or unknown
@@ -77,6 +84,8 @@ const possessive: Record<string, string> = {
   қарындас: 'қарындасы',
   сіңлі: 'сіңлісі',
   бауыр: 'бауыры',
+  бөле: 'бөлесі',
+  туыс: 'туысы',
   әке: 'әкесі',
   ана: 'анасы',
   'ата-ана': 'ата-анасы',
@@ -142,8 +151,13 @@ const withTail = (term: Term, tail: string): Term => term.map((a) => ({ ...a, ma
 function rankOf(b: PersonRef | undefined, a: PersonRef | undefined): Rank {
   const x = b?.birthSort
   const y = a?.birthSort
-  if (!x || !y || x === y) return undefined
-  return x < y ? 'elder' : 'younger'
+  if (!x || !y) return undefined
+  // A date with a 00 month or day is partial: compare only what both state.
+  const precision = (v: number) => (Math.floor(v / 10000) === 0 ? 0 : Math.floor(v / 100) % 100 === 0 ? 4 : v % 100 === 0 ? 6 : 8)
+  const digits = Math.min(precision(x), precision(y))
+  const cut = (v: number) => Math.floor(v / 10 ** (8 - digits))
+  if (cut(x) === cut(y)) return undefined
+  return cut(x) < cut(y) ? 'elder' : 'younger'
 }
 
 /** The sibling term of someone of sex g by rank against ego of sex `ego`. */
@@ -161,7 +175,16 @@ function bySex(g: Gender, male: () => Term, female: () => Term): Term {
   return g === 'M' ? male() : g === 'F' ? female() : [...female(), ...male()]
 }
 
-const ordinal = (n: number) => `${n}-ші`
+/** The written ordinal: the suffix is -шы after a numeral ending in a back vowel (алтыншы, тоғызыншы, оныншы), else -ші. */
+function ordinal(n: number): string {
+  const unit = n % 10
+  const tens = (n % 100) - unit
+  let back: boolean
+  if (unit) back = unit === 6 || unit === 9
+  else if (tens) back = [10, 20, 30, 40, 60, 90].includes(tens)
+  else back = n % 1000 === 0
+  return `${n}-${back ? 'шы' : 'ші'}`
+}
 
 interface Context {
   /** The ego: the person the term is said from. */
@@ -207,9 +230,20 @@ function bloodTerm(k: KinshipPart, g: Gender, c: Context): Term {
   if (down === 1 && up === 3) return bySex(g, () => one('ата'), () => one('әже'))
   if (up === 1 && down === 2) return childOfSibling(g, c)
   if (up === 2 && down === 2) {
-    return sibling(g, rankOf(c.at(k.path ? k.path.length - 1 : -1), c.ego), egoG).map((a) => simple(`немере ${a.nom}`))
+    return firstCousin(g, rankOf(c.at(k.path ? k.path.length - 1 : -1), c.ego), egoG, c)
   }
-  return [phrase(`${ordinal(up + down)} буындағы туыс`)]
+  return [simple(`${ordinal(up + down)} буындағы туыс`)]
+}
+
+/** First cousin; path is A, parent, grandparent, B's parent, B. */
+function firstCousin(g: Gender, rank: Rank, ego: Gender, c: Context): Term {
+  const a = c.at(1)?.sex
+  const b = c.at(3)?.sex
+  const sib = sibling(g, rank, ego)
+  if (a === 'F' && b === 'F') return one('бөле')
+  if (a === 'F' && b === 'M') return sib.map((x) => simple(`нағашы ${x.nom}`))
+  if (a === 'M' && b === 'F') return one('жиен')
+  return sib.map((x) => simple(`немере ${x.nom}`))
 }
 
 /** Brother or sister of a parent; path is A, parent, grandparent, B. */
@@ -227,7 +261,7 @@ function parentSibling(g: Gender, c: Context): Term {
   if (side === 'F') return bySex(g, () => one('нағашы аға'), () => one('нағашы апа'))
   // The parent is unknown or of unknown sex: say it through "parent's".
   const name = (m: boolean) =>
-    rank === 'elder' ? (m ? 'ағасы' : 'әпкесі') : rank === 'younger' ? (m ? 'інісі' : 'қарындасы') : 'бауыры'
+    rank === 'elder' ? (m ? 'ағасы' : 'әпкесі') : rank === 'younger' ? (m ? 'інісі' : 'қарындасы немесе сіңлісі') : 'бауыры'
   return bySex(
     g,
     () => [phrase(`ата-анасының ${name(true)}`)],
@@ -249,11 +283,13 @@ function childOfSibling(g: Gender, c: Context): Term {
 function modify(term: Term, k: KinshipPart, halfSex: Sex | undefined): Term {
   const lineal = (k.up === 1 && k.down === 0) || (k.up === 0 && k.down === 1)
   const isSibling = k.up === 1 && k.down === 1
-  if (k.adoptive) return lineal || isSibling ? withPrefix(term, 'асыранды') : withTail(term, ' (асырап алу арқылы)')
+  if (k.adoptive) {
+    if (k.up === 1 && k.down === 0) return withPrefix(term, 'асырап алған')
+    return lineal || isSibling ? withPrefix(term, 'асыранды') : withTail(term, ' (асырап алу арқылы)')
+  }
   if (k.half) {
-    // Same father: the mother differs, and the other way round.
-    if (isSibling) return withTail(term, halfSex === 'M' ? ' (шешесі бөлек)' : halfSex === 'F' ? ' (әкесі бөлек)' : ' (жартылай)')
-    return withTail(term, halfSex === 'M' ? ' (әке жағынан)' : halfSex === 'F' ? ' (шеше жағынан)' : ' (жартылай)')
+    // The shared parent: the same father or the same mother.
+    return withTail(term, halfSex === 'M' ? ' (әкесі бір)' : halfSex === 'F' ? ' (анасы бір)' : ' (жартылай)')
   }
   return term
 }
@@ -324,7 +360,7 @@ export function relationshipName(t: TFunction, rep: RelationshipReport): string 
       if (is(k, 1, 1) && !k.half) {
         const rank = rankOf(b, via)
         // A wife's younger sister, as a man says it.
-        if (g === 'F' && rank === 'younger' && viaG === 'F' && gender(ego?.sex) === 'M') return 'балдыз'
+        if (rank === 'younger' && viaG === 'F' && gender(ego?.sex) === 'M') return 'балдыз'
         if (rank === undefined) return 'қайын бауыр'
         const elder = rank === 'elder'
         return pick(t, g, elder ? 'қайын аға' : 'қайын іні', elder ? 'қайын апа' : 'қайын сіңлі')

@@ -73,8 +73,8 @@ describe('kk: siblings by seniority and ego sex', () => {
   it('marks half-siblings by the parent they lack', () => {
     const people = [p(1, 'M', MID), p(10, 'M'), p(2, 'M', OLD), p(20, 'M'), p(21, 'F')]
     const half = (ancestor: number) => kinshipName(t, kin(1, 1, [1, 10, 2], { half: true, ancestors: [ancestor] }), 'M', byId(people))
-    expect(half(20)).toBe('аға (шешесі бөлек)')
-    expect(half(21)).toBe('аға (әкесі бөлек)')
+    expect(half(20)).toBe('аға (әкесі бір)')
+    expect(half(21)).toBe('аға (анасы бір)')
     expect(half(-3)).toBe('аға (жартылай)')
   })
 })
@@ -118,7 +118,7 @@ describe('kk: descendants', () => {
     ['great-grandchild', 3, [p(1, 'M'), p(10, 'F'), p(11, 'M'), p(2, 'M')], 'шөбере'],
     ['great-great-grandchild', 4, [p(1, 'M'), p(2, 'M')], 'шөпшек'],
     ['next generation', 5, [p(1, 'M'), p(2, 'F')], 'немене'],
-    ['6th generation', 6, [p(1, 'M'), p(2, 'F')], '6-ші буын ұрпағы'],
+    ['6th generation', 6, [p(1, 'M'), p(2, 'F')], '6-шы буын ұрпағы'],
   ])('%s', (_, down, people, want) => {
     expect(blood(0, down, people)).toBe(want)
   })
@@ -139,7 +139,7 @@ describe('kk: uncles, aunts, nephews and cousins', () => {
     ['mother’s younger brother', [p(1, 'M', YOUNG), mother, gp, p(2, 'M', YOUNG)], 'нағашы аға'],
     ['mother’s sister', [p(1, 'F', YOUNG), mother, gp, p(2, 'F', OLD)], 'нағашы апа'],
     ['unknown parent’s elder brother', [p(1, 'M', YOUNG), p(10, 'U', MID), gp, p(2, 'M', OLD)], 'ата-анасының ағасы'],
-    ['unknown parent’s younger sister', [p(1, 'M', YOUNG), p(10, 'U', MID), gp, p(2, 'F', YOUNG)], 'ата-анасының қарындасы'],
+    ['unknown parent’s younger sister', [p(1, 'M', YOUNG), p(10, 'U', MID), gp, p(2, 'F', YOUNG)], 'ата-анасының қарындасы немесе сіңлісі'],
     ['unknown parent’s sibling, age unknown', [p(1, 'M'), p(10, 'U'), gp, p(2, 'F')], 'ата-анасының бауыры'],
   ])('%s', (_, people, want) => {
     expect(blood(2, 1, people)).toBe(want)
@@ -164,7 +164,7 @@ describe('kk: uncles, aunts, nephews and cousins', () => {
 
   it.each<[string, PersonRef[], string]>([
     ['cousin, elder man', [p(1, 'M', MID), father, gp, p(13, 'M'), p(2, 'M', OLD)], 'немере аға'],
-    ['cousin, elder woman', [p(1, 'M', MID), father, gp, p(13, 'F'), p(2, 'F', OLD)], 'немере әпке'],
+    ['cousin, elder woman', [p(1, 'M', MID), father, gp, p(13, 'M'), p(2, 'F', OLD)], 'немере әпке'],
     ['cousin, younger man', [p(1, 'F', MID), father, gp, p(13, 'M'), p(2, 'M', YOUNG)], 'немере іні'],
     ['cousin, younger woman, ego man', [p(1, 'M', MID), father, gp, p(13, 'M'), p(2, 'F', YOUNG)], 'немере қарындас'],
     ['cousin, younger woman, ego woman', [p(1, 'F', MID), father, gp, p(13, 'M'), p(2, 'F', YOUNG)], 'немере сіңлі'],
@@ -173,8 +173,34 @@ describe('kk: uncles, aunts, nephews and cousins', () => {
     expect(blood(2, 2, people)).toBe(want)
   })
 
+  it.each<[string, PersonRef[], string]>([
+    ['father’s brother’s child', [p(1, 'M', MID), father, gp, p(13, 'M'), p(2, 'M', OLD)], 'немере аға'],
+    ['mother’s sister’s child', [p(1, 'M', MID), mother, gp, p(13, 'F'), p(2, 'M', OLD)], 'бөле'],
+    ['mother’s sister’s daughter', [p(1, 'F', MID), mother, gp, p(13, 'F'), p(2, 'F', YOUNG)], 'бөле'],
+    ['mother’s brother’s elder son', [p(1, 'M', MID), mother, gp, p(13, 'M'), p(2, 'M', OLD)], 'нағашы аға'],
+    ['mother’s brother’s elder daughter', [p(1, 'M', MID), mother, gp, p(13, 'M'), p(2, 'F', OLD)], 'нағашы әпке'],
+    ['mother’s brother’s younger son', [p(1, 'M', MID), mother, gp, p(13, 'M'), p(2, 'M', YOUNG)], 'нағашы іні'],
+    ['mother’s brother’s younger daughter, ego woman', [p(1, 'F', MID), mother, gp, p(13, 'M'), p(2, 'F', YOUNG)], 'нағашы сіңлі'],
+    ['father’s sister’s child', [p(1, 'M', MID), father, gp, p(13, 'F'), p(2, 'F', OLD)], 'жиен'],
+    ['father’s sister’s son', [p(1, 'F', MID), father, gp, p(13, 'F'), p(2, 'M', YOUNG)], 'жиен'],
+  ])('first cousin by the parents’ sexes: %s', (_, people, want) => {
+    expect(blood(2, 2, people)).toBe(want)
+  })
+
   it.each<[number, number, string]>([
-    [3, 3, '6-ші буындағы туыс'],
+    [3, 3, '6-шы буындағы туыс'],
+    [4, 5, '9-шы буындағы туыс'],
+    [5, 5, '10-шы буындағы туыс'],
+    [7, 3, '10-шы буындағы туыс'],
+    [10, 10, '20-шы буындағы туыс'],
+    [15, 15, '30-шы буындағы туыс'],
+    [20, 20, '40-шы буындағы туыс'],
+    [25, 25, '50-ші буындағы туыс'],
+    [30, 30, '60-шы буындағы туыс'],
+    [35, 35, '70-ші буындағы туыс'],
+    [40, 40, '80-ші буындағы туыс'],
+    [45, 45, '90-шы буындағы туыс'],
+    [3, 4, '7-ші буындағы туыс'],
     [2, 3, '5-ші буындағы туыс'],
     [4, 1, '5-ші буындағы туыс'],
     [1, 4, '5-ші буындағы туыс'],
@@ -184,8 +210,21 @@ describe('kk: uncles, aunts, nephews and cousins', () => {
 })
 
 describe('kk: half and adoptive', () => {
+  it('uses a possessive form of the fallback term in a chain', () => {
+    const rep = report('spouse_of_relative', 3, 3, [[1, 'M'], [10, 'M'], [11, 'M'], [12, 'M'], [13, 'M'], [14, 'M'], [3, 'M'], [2, 'F']], 3)
+    expect(relationshipName(t, rep)).toBe('6-шы буындағы туысының әйелі')
+  })
+
+  it('ignores a birth that is only partly dated against one in the same year', () => {
+    // 1980 with no month against 1980-05-01: nothing says who is older.
+    expect(blood(1, 1, [p(1, 'M', 19800000), p(10, 'M'), p(2, 'M', 19800501)])).toBe('бауыр')
+    expect(blood(1, 1, [p(1, 'M', 19800500), p(10, 'M'), p(2, 'M', 19800501)])).toBe('бауыр')
+    expect(blood(1, 1, [p(1, 'M', 19800000), p(10, 'M'), p(2, 'M', 19790501)])).toBe('аға')
+  })
+
   it('marks adoptive direct kin and siblings with a prefix and others with a note', () => {
-    expect(blood(1, 0, [p(1, 'M'), p(2, 'M')], { adoptive: true })).toBe('асыранды әке')
+    expect(blood(1, 0, [p(1, 'M'), p(2, 'M')], { adoptive: true })).toBe('асырап алған әке')
+    expect(blood(1, 0, [p(1, 'M'), p(2, 'F')], { adoptive: true })).toBe('асырап алған ана')
     expect(blood(0, 1, [p(1, 'M'), p(2, 'F')], { adoptive: true })).toBe('асыранды қыз')
     expect(blood(1, 1, [p(1, 'M', MID), p(10, 'M'), p(2, 'M', OLD)], { adoptive: true })).toBe('асыранды аға')
     expect(blood(2, 1, [p(1, 'M'), p(10, 'M'), p(12, 'M'), p(2, 'F')], { adoptive: true })).toBe('тәте (асырап алу арқылы)')
@@ -194,8 +233,8 @@ describe('kk: half and adoptive', () => {
   it('marks a half uncle by the shared parent', () => {
     const people = [p(1, 'M'), p(10, 'M'), p(12, 'M'), p(2, 'F'), p(20, 'M'), p(21, 'F')]
     const path = [1, 10, 12, 2]
-    expect(kinshipName(t, kin(2, 1, path, { half: true, ancestors: [20] }), 'F', byId(people))).toBe('тәте (әке жағынан)')
-    expect(kinshipName(t, kin(2, 1, path, { half: true, ancestors: [21] }), 'F', byId(people))).toBe('тәте (шеше жағынан)')
+    expect(kinshipName(t, kin(2, 1, path, { half: true, ancestors: [20] }), 'F', byId(people))).toBe('тәте (әкесі бір)')
+    expect(kinshipName(t, kin(2, 1, path, { half: true, ancestors: [21] }), 'F', byId(people))).toBe('тәте (анасы бір)')
   })
 })
 
@@ -260,6 +299,8 @@ describe('kk: in-laws', () => {
     ['husband’s younger sister', report('relative_of_spouse', 1, 1, [a('F'), [3, 'M', MID], [10, 'M'], [2, 'F', YOUNG]], 3), 'қайын сіңлі'],
     ['wife’s younger sister, said by a man', report('relative_of_spouse', 1, 1, [a('M'), [3, 'F', MID], [10, 'M'], [2, 'F', YOUNG]], 3), 'балдыз'],
     ['wife’s younger sister, ego sex unknown', report('relative_of_spouse', 1, 1, [a('U'), [3, 'F', MID], [10, 'M'], [2, 'F', YOUNG]], 3), 'қайын сіңлі'],
+    ['wife’s younger brother, said by a man', report('relative_of_spouse', 1, 1, [a('M'), [3, 'F', MID], [10, 'M'], [2, 'M', YOUNG]], 3), 'балдыз'],
+    ['husband’s younger brother, said by a woman', report('relative_of_spouse', 1, 1, [a('F'), [3, 'M', MID], [10, 'M'], [2, 'M', YOUNG]], 3), 'қайын іні'],
     ['spouse’s sibling, age unknown', report('relative_of_spouse', 1, 1, [a(), [3, 'F'], [10, 'M'], [2, 'M']], 3), 'қайын бауыр'],
     ['spouse’s younger sibling of unknown sex', report('relative_of_spouse', 1, 1, [a(), [3, 'M', MID], [10, 'M'], [2, 'U', YOUNG]], 3), 'қайын сіңлі немесе қайын іні'],
     ['wife’s grandmother', report('relative_of_spouse', 2, 0, [a(), [3, 'F'], [10, 'M'], [2, 'F']], 3), 'әйелінің әжесі'],

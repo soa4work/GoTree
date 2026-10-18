@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 )
@@ -176,11 +177,13 @@ func orU(sex string) string {
 func rowError(i int, err error) error {
 	var ve *ValidationError
 	if errors.As(err, &ve) {
-		fields := map[string]string{}
-		for k, msg := range ve.Fields {
-			fields[fmt.Sprintf("rows.%d", i)] = k + ": " + msg
+		// One message per row: the first column in name order. The API
+		// classifies the "<column>: <message>" form (classifyField).
+		keys := slices.Sorted(maps.Keys(ve.Fields))
+		if len(keys) == 0 {
+			return err
 		}
-		return &ValidationError{Fields: fields}
+		return &ValidationError{Fields: map[string]string{fmt.Sprintf("rows.%d", i): keys[0] + ": " + ve.Fields[keys[0]]}}
 	}
 	return err
 }
@@ -384,10 +387,7 @@ func (ap *applier) place(ctx context.Context, full string) (int64, error) {
 			parent = sql.NullInt64{Int64: id, Valid: true}
 			continue
 		}
-		var id int64
-		err := ap.tx.QueryRowContext(ctx, `
-			SELECT id FROM places WHERE tree_id = ? AND name = ? COLLATE NOCASE AND parent_id IS ? ORDER BY id LIMIT 1`,
-			ap.a.TreeID, name, parent).Scan(&id)
+		id, err := ap.findPlace(ctx, name, parent)
 		if errors.Is(err, sql.ErrNoRows) {
 			p, cerr := ap.s.createPlaceTx(ctx, ap.tx, ap.a, PlaceInput{Name: name, ParentID: ptrID(parent)})
 			id, err = p.ID, cerr
@@ -402,6 +402,34 @@ func (ap *applier) place(ctx context.Context, full string) (int64, error) {
 		return 0, &ValidationError{Fields: map[string]string{"rows": "a place is empty"}}
 	}
 	return parent.Int64, nil
+}
+
+// findPlace returns the oldest place under parent whose name equals name
+// ignoring case. SQLite's NOCASE and lower() fold ASCII only, so the
+// comparison is done with Unicode folding here; accents still differ
+// (Müller is not Muller). It returns sql.ErrNoRows when there is none.
+func (ap *applier) findPlace(ctx context.Context, name string, parent sql.NullInt64) (int64, error) {
+	rows, err := ap.tx.QueryContext(ctx, `
+		SELECT id, name FROM places WHERE tree_id = ? AND parent_id IS ? ORDER BY id`,
+		ap.a.TreeID, parent)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var n string
+		if err := rows.Scan(&id, &n); err != nil {
+			return 0, err
+		}
+		if strings.EqualFold(n, name) {
+			return id, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	return 0, sql.ErrNoRows
 }
 
 func (ap *applier) rowText(r TranscriptionRow) string {

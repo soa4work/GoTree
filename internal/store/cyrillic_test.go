@@ -10,7 +10,7 @@ func TestPersonsSortCyrillicAndKazakh(t *testing.T) {
 	a := setup(t, s)
 	for _, surname := range []string{
 		"яковлев", "Яков", "Zimmer", "Үлкен", "Уваров", "Абай", "Әлиев", "Алиев", "Ғабитов", "Гоголь",
-		"Қасымов", "Кузнецов", "Нұров", "Ңұров", "Орлов", "Өтегенов", "Хан", "Һашимов", "Müller", "muller", "Meyer",
+		"Қасымов", "Кузнецов", "Йодин", "Ұлан", "Ыбырай", "Нұров", "Ңұров", "Орлов", "Өтегенов", "Хан", "Һашимов", "Müller", "muller", "Meyer",
 		"Иванов", "Іле", "иванов", "Елкин", "Ермаков",
 	} {
 		mustPerson(t, s, a, "Имя", surname)
@@ -23,13 +23,13 @@ func TestPersonsSortCyrillicAndKazakh(t *testing.T) {
 	for _, p := range list.Items {
 		got = append(got, p.Surname)
 	}
-	// Latin first, then Cyrillic; Kazakh letters follow their base letters
-	// and case does not split a letter in two.
+	// Latin first, then Cyrillic in alphabet order (й after и, ұ before ү,
+	// і after ы); case does not split a letter in two.
 	want := []string{
 		"Meyer", "Müller", "muller", "Zimmer",
 		"Абай", "Алиев", "Әлиев", "Гоголь", "Ғабитов", "Елкин", "Ермаков",
-		"Иванов", "иванов", "Іле", "Кузнецов", "Қасымов", "Нұров", "Ңұров", "Орлов", "Өтегенов",
-		"Уваров", "Үлкен", "Хан", "Һашимов", "Яков", "яковлев",
+		"Иванов", "иванов", "Йодин", "Кузнецов", "Қасымов", "Нұров", "Ңұров", "Орлов", "Өтегенов",
+		"Уваров", "Ұлан", "Үлкен", "Хан", "Һашимов", "Ыбырай", "Іле", "Яков", "яковлев",
 	}
 	// Names equal ignoring case and accents keep their insertion order.
 	if !reflect.DeepEqual(got, want) {

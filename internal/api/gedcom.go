@@ -74,7 +74,7 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			writeErrorP(w, http.StatusUnprocessableEntity, CodeGedcomInvalid, err.Error(), map[string]any{"detail": err.Error()})
+			writeGedcomInvalid(w, err)
 			return
 		}
 		data = inner
@@ -86,7 +86,7 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 	}
 	doc, err := gedcom.Parse(data)
 	if err != nil {
-		writeErrorP(w, http.StatusUnprocessableEntity, CodeGedcomInvalid, err.Error(), map[string]any{"detail": err.Error()})
+		writeGedcomInvalid(w, err)
 		return
 	}
 	report, err := s.Store.ImportGEDCOM(r.Context(), actorFrom(r), doc, mode)
@@ -100,6 +100,33 @@ func (s *Server) importGEDCOM(w http.ResponseWriter, r *http.Request) {
 	}
 	s.Log.Info("gedcom imported", "file", name, "persons", report.Counts["persons"], "ms", report.DurationMS)
 	writeJSON(w, http.StatusOK, report)
+}
+
+var (
+	errZipUnreadable = errors.New("the zip file cannot be read")
+	errZipNoGed      = errors.New("the zip file contains no .ged file")
+	errZipSeveralGed = errors.New("the zip file contains several .ged files; upload the one you want")
+)
+
+// writeGedcomInvalid answers a file that cannot be read with the code of the
+// reason (and its params, e.g. the line); the English detail stays in the
+// message and the "detail" param for clients that do not know the code.
+func writeGedcomInvalid(w http.ResponseWriter, err error) {
+	code, params := CodeGedcomInvalid, map[string]any{"detail": err.Error()}
+	var pe *gedcom.ParseError
+	switch {
+	case errors.As(err, &pe) && pe.Kind == gedcom.ErrNotGedcom:
+		code, params["line"] = CodeGedcomNotGedcom, pe.Line
+	case errors.As(err, &pe) && pe.Kind == gedcom.ErrEmpty:
+		code = CodeGedcomEmpty
+	case errors.Is(err, errZipUnreadable):
+		code = CodeGedcomZipBad
+	case errors.Is(err, errZipNoGed):
+		code = CodeGedcomZipNoFile
+	case errors.Is(err, errZipSeveralGed):
+		code = CodeGedcomZipSeveral
+	}
+	writeErrorP(w, http.StatusUnprocessableEntity, code, err.Error(), params)
 }
 
 // errGedcomTooLarge is returned when a GEDCOM file exceeds the size limit.
@@ -120,7 +147,7 @@ func (s *Server) maxGedcom() int64 {
 func gedcomFromZip(data []byte, limit int64) ([]byte, error) {
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
-		return nil, fmt.Errorf("the zip file cannot be read: %w", err)
+		return nil, fmt.Errorf("%w: %v", errZipUnreadable, err)
 	}
 	var found []*zip.File
 	for _, f := range zr.File {
@@ -134,10 +161,10 @@ func gedcomFromZip(data []byte, limit int64) ([]byte, error) {
 	}
 	switch len(found) {
 	case 0:
-		return nil, errors.New("the zip file contains no .ged file")
+		return nil, errZipNoGed
 	case 1:
 	default:
-		return nil, errors.New("the zip file contains several .ged files; upload the one you want")
+		return nil, errZipSeveralGed
 	}
 	// The declared size can lie, so the bounded read below is the real check;
 	// this refuses an honest oversized entry without reading it.

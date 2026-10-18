@@ -1263,7 +1263,7 @@
     "legendTrail": "Перемещения до сих пор; более старые бледнеют"
   },
   "apiError": {
-    "invalid_json": "Запрос не является корректным JSON: {{detail}}",
+    "invalid_json": "Запрос не является корректным JSON.",
     "trailing_data": "После JSON в запросе есть лишние данные.",
     "invalid_input": "Некоторые поля заполнены неверно.",
     "not_found": "Не найдено.",
@@ -1298,7 +1298,12 @@
     "thumbnail_failed": "Не удалось создать миниатюру.",
     "replace_owner_only": "Заменить древо может только его владелец; редакторы могут импортировать в пустое древо.",
     "gedcom_too_large": "Файл GEDCOM слишком большой (больше {{limitMB}} МБ).",
-    "gedcom_invalid": "Не удалось прочитать файл GEDCOM: {{detail}}",
+    "gedcom_invalid": "Не удалось прочитать файл GEDCOM.",
+    "gedcom_not_gedcom": "Это не похоже на файл GEDCOM (строка {{line}}).",
+    "gedcom_empty": "Файл пуст.",
+    "gedcom_zip_unreadable": "Не удалось прочитать zip-архив.",
+    "gedcom_zip_no_ged": "В zip-архиве нет файла .ged.",
+    "gedcom_zip_several_ged": "В zip-архиве несколько файлов .ged; загрузите нужный.",
     "tree_not_empty": "Древо не пустое.",
     "field": {
       "required": "обязательно",

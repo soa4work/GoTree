@@ -1171,7 +1171,7 @@
     "legendTrail": "Осы кезге дейінгі көшулер; ескілері солғындайды"
   },
   "apiError": {
-    "invalid_json": "Сұраныс жарамды JSON емес: {{detail}}",
+    "invalid_json": "Сұраныс жарамды JSON емес.",
     "trailing_data": "Сұраныста JSON-нан кейін артық деректер бар.",
     "invalid_input": "Кейбір өрістер дұрыс толтырылмаған.",
     "not_found": "Табылмады.",
@@ -1206,7 +1206,12 @@
     "thumbnail_failed": "Нобай жасау мүмкін болмады.",
     "replace_owner_only": "Ағашты тек оның иесі ауыстыра алады; редакторлар бос ағашқа импорттай алады.",
     "gedcom_too_large": "GEDCOM файлы тым үлкен ({{limitMB}} МБ-тан асады).",
-    "gedcom_invalid": "GEDCOM файлын оқу мүмкін болмады: {{detail}}",
+    "gedcom_invalid": "GEDCOM файлын оқу мүмкін болмады.",
+    "gedcom_not_gedcom": "Бұл GEDCOM файлына ұқсамайды ({{line}}-жол).",
+    "gedcom_empty": "Файл бос.",
+    "gedcom_zip_unreadable": "Zip мұрағатын оқу мүмкін болмады.",
+    "gedcom_zip_no_ged": "Zip мұрағатында .ged файлы жоқ.",
+    "gedcom_zip_several_ged": "Zip мұрағатында бірнеше .ged файлы бар; керегін жүктеңіз.",
     "tree_not_empty": "Ағаш бос емес.",
     "field": {
       "required": "міндетті",

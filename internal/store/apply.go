@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 )
@@ -176,11 +177,13 @@ func orU(sex string) string {
 func rowError(i int, err error) error {
 	var ve *ValidationError
 	if errors.As(err, &ve) {
-		fields := map[string]string{}
-		for k, msg := range ve.Fields {
-			fields[fmt.Sprintf("rows.%d", i)] = k + ": " + msg
+		// One message per row: the first column in name order. The API
+		// classifies the "<column>: <message>" form (classifyField).
+		keys := slices.Sorted(maps.Keys(ve.Fields))
+		if len(keys) == 0 {
+			return err
 		}
-		return &ValidationError{Fields: fields}
+		return &ValidationError{Fields: map[string]string{fmt.Sprintf("rows.%d", i): keys[0] + ": " + ve.Fields[keys[0]]}}
 	}
 	return err
 }

@@ -34,10 +34,13 @@ export function errorText(err: unknown, t: TFunction): string {
 export function fieldErrors(error: unknown, t: TFunction): Record<string, string> {
   if (!(error instanceof ApiError)) return {}
   return Object.fromEntries(
-    Object.entries(error.fields).map(([field, message]) => [
-      field,
-      translate(t, 'apiError.field', error.fieldCodes[field] ?? {}, message),
-    ]),
+    Object.entries(error.fields).map(([field, message]) => {
+      const detail = error.fieldCodes[field] ?? {}
+      const text = translate(t, 'apiError.field', detail, message)
+      // A row of a transcription names its column: "givenNames: is required".
+      const column = detail.code ? detail.params?.field : undefined
+      return [field, typeof column === 'string' ? `${column}: ${text}` : text]
+    }),
   )
 }
 

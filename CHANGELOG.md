@@ -106,6 +106,12 @@ and the versioning [Semantic Versioning](https://semver.org/).
   such as a maiden name; only their given names and surname are searched, and such links list
   matches in name order, since relevance also weighed the hidden names (#58)
 
+- GEDCOM export and import no longer lose data on a round trip (#51): heirloom custody dates
+  are written as GEDCOM dates (`12 MAR 1850` instead of `12.3.1850`), disputed and disproven
+  events and names keep their status and reason, GEDCOM 7 participant roles (head, sibling,
+  relative, informant and custom roles) and religious names come back as written, and an
+  interpreted date with a dual year (`INT 1750/51`) keeps its second year in GEDCOM 7
+
 - Searching places, sources, repositories and heirlooms ignores the case of Russian and Kazakh
   letters and treats ё as е, so «москва» finds «Москва» (#52)
 

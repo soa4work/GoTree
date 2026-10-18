@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -39,9 +40,71 @@ func TestNamesCollation(t *testing.T) {
 		}
 		got = append(got, s)
 	}
-	want := []string{"abc", "Abd", "Muller", "Müller", "Zed", "алматы", "Әлия", "Гоголь", "Ғани", "Ион", "Іле", "Уфа", "Үй", "Ұлан", "яков", "Яков"}
+	want := []string{"abc", "Abd", "Muller", "Müller", "Zed", "алматы", "Әлия", "Гоголь", "Ғани", "Ион", "Уфа", "Ұлан", "Үй", "Іле", "яков", "Яков"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got  %v\nwant %v", got, want)
+	}
+}
+
+func TestNamesCollationAlphabetOrder(t *testing.T) {
+	ctx := context.Background()
+	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, `CREATE TABLE n (id INTEGER PRIMARY KEY, name TEXT)`); err != nil {
+		t.Fatal(err)
+	}
+	// One letter per row, inserted in reverse order.
+	alphabet := []string{"а", "ә", "б", "в", "г", "ғ", "д", "е", "ж", "з", "и", "й", "к", "қ", "л", "м", "н", "ң", "о", "ө", "п", "р", "с", "т", "у", "ұ", "ү", "ф", "х", "һ", "ц", "ч", "ш", "щ", "ъ", "ы", "і", "ь", "э", "ю", "я"}
+	for i := len(alphabet) - 1; i >= 0; i-- {
+		if _, err := conn.ExecContext(ctx, `INSERT INTO n (name) VALUES (?)`, strings.ToUpper(alphabet[i])+"-"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rows, err := conn.QueryContext(ctx, `SELECT name FROM n ORDER BY name COLLATE NAMES, id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var got []string
+	for rows.Next() {
+		var s string
+		if err := rows.Scan(&s); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, strings.ToLower(strings.TrimSuffix(s, "-")))
+	}
+	want := alphabet
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got  %v\nwant %v", got, want)
+	}
+}
+
+func TestNamesCollationCompare(t *testing.T) {
+	ctx := context.Background()
+	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	for _, c := range []struct {
+		a, b string
+		want int
+	}{
+		{"Иванов", "Йодин", -1}, {"Йодин", "Кузнецов", -1}, {"иван", "йван", -1},
+		{"Ұлан", "Үй", -1}, {"Ыс", "Іле", -1}, {"Іле", "Ьё", -1},
+		{"Ёлка", "елка", 0}, {"Ии\u0306", "Ий", 0}, {"Müller", "Muller", 0}, {"MÜLLER", "muller", 0}, {"Zed", "Иван", -1},
+	} {
+		var got int
+		err := conn.QueryRowContext(ctx, `SELECT CASE WHEN ?1 = ?2 COLLATE NAMES THEN 0 WHEN ?1 < ?2 COLLATE NAMES THEN -1 ELSE 1 END`, c.a, c.b).Scan(&got)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != c.want {
+			t.Errorf("compare(%q, %q) = %d, want %d", c.a, c.b, got, c.want)
+		}
 	}
 }
 

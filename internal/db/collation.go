@@ -1,10 +1,13 @@
 package db
 
 import (
+	"strings"
 	"sync"
+	"unicode"
 
 	"golang.org/x/text/collate"
 	"golang.org/x/text/language"
+	"golang.org/x/text/unicode/norm"
 	"modernc.org/sqlite"
 )
 
@@ -21,11 +24,47 @@ import (
 // Latin names, accents ("Muller" sorts with "Müller"). Lists are paged
 // (at most a few hundred rows) or sorted once, so the callback cost is fine.
 //
-// Known limitations of the root collation: й is a diacritic form of и and
-// ignored with the accents (иван and йван tie, then fall back to id), ё and
-// е tie likewise, and ү sorts before ұ (the Kazakh alphabet has ұ first) and
-// і right after и instead of after һ.
+// The root collation orders Cyrillic wrongly for Russian and Kazakh (й is
+// folded into и with the accents, ү sorts before ұ, і right after и), so
+// Cyrillic letters are first replaced by private-use runes whose code points
+// follow the Russian/Kazakh alphabet (see cyrillicWeights) and the collator
+// sorts those after every Latin letter. ё deliberately shares the weight of
+// е (conventional). Cyrillic letters outside the alphabet (ў, ґ, ...) keep
+// their root order, before the mapped ones.
 const NamesCollation = "NAMES"
+
+// cyrillicAlphabet is the Kazakh Cyrillic alphabet, which contains the Russian
+// one in its usual order (й right after и).
+const cyrillicAlphabet = "аәбвгғдеёжзийкқлмнңоөпрстуұүфхһцчшщъыіьэюя"
+
+// cyrillicWeights maps a lower-case letter of cyrillicAlphabet to a
+// private-use rune ordered like the alphabet.
+var cyrillicWeights = func() map[rune]rune {
+	m := map[rune]rune{}
+	w := rune(0xE000)
+	for _, r := range cyrillicAlphabet {
+		if r == 'ё' {
+			m[r] = m['е']
+			continue
+		}
+		m[r] = w
+		w++
+	}
+	return m
+}()
+
+// sortKeyText lower-cases s, composes it (so й is one rune) and replaces the
+// Cyrillic alphabet letters by their sort weights.
+func sortKeyText(s string) string {
+	s = norm.NFC.String(s)
+	return strings.Map(func(r rune) rune {
+		r = unicode.ToLower(r)
+		if w, ok := cyrillicWeights[r]; ok {
+			return w
+		}
+		return r
+	}, s)
+}
 
 func init() {
 	// A Collator keeps scratch buffers and is not safe for concurrent use,
@@ -36,6 +75,6 @@ func init() {
 	sqlite.MustRegisterCollationUtf8(NamesCollation, func(a, b string) int {
 		c := pool.Get().(*collate.Collator)
 		defer pool.Put(c)
-		return c.CompareString(a, b)
+		return c.CompareString(sortKeyText(a), sortKeyText(b))
 	})
 }

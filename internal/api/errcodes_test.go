@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -99,9 +100,9 @@ func TestErrorResponsesCarryCodes(t *testing.T) {
 	})
 }
 
-// Every code the server can send must have an English translation key, so a
-// new code cannot ship without text in the interface.
-func TestEveryCodeHasATranslation(t *testing.T) {
+// The codes the server defines and the apiError keys in en.json must be the
+// same set: a new code cannot ship without text, and a stale text is removed.
+func TestCodesMatchTranslations(t *testing.T) {
 	raw, err := os.ReadFile("../../web/src/locales/en.json")
 	if err != nil {
 		t.Fatal(err)
@@ -117,11 +118,24 @@ func TestEveryCodeHasATranslation(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	haveRequest, haveField := map[string]bool{}, map[string]bool{}
+	for k := range locale.APIError {
+		if k != "field" && k != "option" {
+			haveRequest[k] = true
+		}
+	}
+	for k := range field {
+		for _, suffix := range []string{"_one", "_other"} {
+			k = strings.TrimSuffix(k, suffix)
+		}
+		haveField[k] = true
+	}
+
 	file, err := parser.ParseFile(token.NewFileSet(), "errcodes.go", nil, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var requestCodes, fieldCodes int
+	wantRequest, wantField := map[string]bool{}, map[string]bool{}
 	for _, decl := range file.Decls {
 		gd, ok := decl.(*ast.GenDecl)
 		if !ok || gd.Tok != token.CONST {
@@ -132,24 +146,28 @@ func TestEveryCodeHasATranslation(t *testing.T) {
 			code, _ := strconv.Unquote(vs.Values[0].(*ast.BasicLit).Value)
 			switch {
 			case strings.HasPrefix(vs.Names[0].Name, "Code"):
-				requestCodes++
-				if _, ok := locale.APIError[code]; !ok {
-					t.Errorf("apiError.%s is missing in en.json", code)
-				}
-			case strings.HasPrefix(vs.Names[0].Name, "Field"):
-				fieldCodes++
-				_, plain := field[code]
-				_, plural := field[code+"_other"]
-				// "invalid" is the catch-all: the client shows the server's message.
-				if code != FieldInvalid && !plain && !plural {
-					t.Errorf("apiError.field.%s is missing in en.json", code)
-				}
+				wantRequest[code] = true
+			case strings.HasPrefix(vs.Names[0].Name, "Field") && code != FieldInvalid:
+				// FieldInvalid is the catch-all: the client shows the server's message.
+				wantField[code] = true
 			}
 		}
 	}
-	if requestCodes < 30 || fieldCodes < 15 {
-		t.Errorf("found only %d request and %d field codes", requestCodes, fieldCodes)
+	if !reflect.DeepEqual(wantRequest, haveRequest) {
+		t.Errorf("request codes and apiError keys differ:\n codes: %v\n keys:  %v", sortedKeys(wantRequest), sortedKeys(haveRequest))
 	}
+	if !reflect.DeepEqual(wantField, haveField) {
+		t.Errorf("field codes and apiError.field keys differ:\n codes: %v\n keys:  %v", sortedKeys(wantField), sortedKeys(haveField))
+	}
+}
+
+func sortedKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func TestClassifyField(t *testing.T) {

@@ -58,6 +58,11 @@ describe('translated server errors in the interface', () => {
     expect(await screen.findByText('Не удалось выполнить импорт: Файл GEDCOM слишком большой (больше 400 МБ).')).toBeInTheDocument()
   })
 
+  it('translates the option words of a choice error', () => {
+    const err = new ApiError(422, 'x', { priority: 'x' }, { fieldCodes: { priority: { code: 'invalid_choice', params: { options: 'low, normal, high' } } } })
+    expect(fieldErrors(err, t).priority).toBe('должно быть одним из: низкий, обычный, высокий')
+  })
+
   it('uses Russian plural forms', () => {
     const field = (count: number) =>
       fieldErrors(new ApiError(422, 'x', { password: 'x' }, { fieldCodes: { password: { code: 'password_too_short', params: { count } } } }), t).password

@@ -6,9 +6,17 @@ type LooseT = (key: string, options?: Record<string, unknown>) => string
 
 function translate(t: TFunction, prefix: string, detail: ErrorDetail, fallback: string): string {
   if (!detail.code) return fallback
-  const params = detail.params ?? {}
+  const loose = t as unknown as LooseT
+  const params = { ...detail.params }
+  // Enum words in "must be one of" lists have their own translations (apiError.option.<word>).
+  if (typeof params.options === 'string') {
+    params.options = params.options
+      .split(', ')
+      .map((word) => loose(`apiError.option.${word}`, { defaultValue: word }))
+      .join(', ')
+  }
   // A numeric "count" param selects the plural form (_one/_few/_many/_other).
-  return (t as unknown as LooseT)(`${prefix}.${detail.code}`, { ...params, defaultValue: fallback })
+  return loose(`${prefix}.${detail.code}`, { ...params, defaultValue: fallback })
 }
 
 /**

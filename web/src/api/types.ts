@@ -483,6 +483,8 @@ export interface RelationshipReport {
   via?: number
   others: Kinship[]
   persons: Record<number, PersonRef>
+  /** Birth date as YYYYMMDD per person with a known one; for older/younger terms. */
+  birthSort?: Record<number, number>
 }
 
 export type ShareScope = 'tree' | 'descendants'

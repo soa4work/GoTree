@@ -325,6 +325,10 @@ type RelationshipReport struct {
 	B int64 `json:"b"`
 	graph.Relationship
 	Persons map[int64]PersonRef `json:"persons"`
+	// BirthSort maps a person to the birth date as YYYYMMDD (missing parts
+	// filled in) for those with a known date. Terms that tell older from
+	// younger siblings compare these.
+	BirthSort map[int64]int64 `json:"birthSort"`
 }
 
 // Relationship finds how b is related to a.
@@ -348,7 +352,48 @@ func (s *Store) Relationship(ctx context.Context, a Actor, aID, bID int64) (Rela
 		ids = append(ids, k.Ancestors...)
 	}
 	persons, err := s.personRefsChunked(ctx, a, ids)
-	return RelationshipReport{A: aID, B: bID, Relationship: rel, Persons: persons}, err
+	if err != nil {
+		return RelationshipReport{}, err
+	}
+	births, err := s.birthSorts(ctx, a, ids)
+	return RelationshipReport{A: aID, B: bID, Relationship: rel, Persons: persons, BirthSort: births}, err
+}
+
+// birthSorts finds the birth sort keys of the people, taking the same
+// birth event as personRefs does.
+func (s *Store) birthSorts(ctx context.Context, a Actor, ids []int64) (map[int64]int64, error) {
+	slices.Sort(ids)
+	ids = slices.Compact(ids)
+	out := map[int64]int64{}
+	for chunk := range slices.Chunk(ids, 500) {
+		args := append([]any{a.TreeID}, int64Args(chunk)...)
+		rows, err := s.DB.QueryContext(ctx, `
+			SELECT p.id, (SELECT e.date_sort FROM events e
+				WHERE e.person_id = p.id AND e.type IN ('BIRT', 'CHR', 'BAPM') AND e.status <> 'disproven' AND e.date_sort IS NOT NULL
+				ORDER BY e.type <> 'BIRT', e.date_sort LIMIT 1)
+			FROM persons p
+			WHERE p.tree_id = ? AND p.id IN (`+placeholders(len(chunk))+`)`, args...)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var id int64
+			var sort sql.NullInt64
+			if err := rows.Scan(&id, &sort); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			if sort.Valid {
+				out[id] = sort.Int64
+			}
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 func deref(k *graph.Kinship) graph.Kinship {

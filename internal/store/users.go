@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -28,8 +29,14 @@ const UserRoleAdmin = "admin"
 
 // Session is an authenticated browser session.
 type Session struct {
-	User   User
-	TreeID int64
+	// ID names the session without revealing its token.
+	ID int64
+	// CookieMaxAge is set when this use extended the session: the cookie
+	// should be sent again with this lifetime, which never reaches past
+	// SessionMaxAge after login.
+	CookieMaxAge time.Duration
+	User         User
+	TreeID       int64
 	// TreeRole is the user's role in TreeID.
 	TreeRole string
 }
@@ -41,6 +48,10 @@ func (s Session) Actor() Actor {
 
 // SessionTTL is how long a session stays valid without being used.
 const SessionTTL = 30 * 24 * time.Hour
+
+// SessionMaxAge is how long a session lasts at most after logging in,
+// however often it is used, so a stolen cookie does not work forever.
+const SessionMaxAge = 90 * 24 * time.Hour
 
 // MinPasswordLength is the shortest accepted password.
 const MinPasswordLength = 10
@@ -77,8 +88,7 @@ func (s *Store) Setup(ctx context.Context, in SetupInput) (User, error) {
 	}
 	var v validator
 	v.check(validUsername(in.Username), "username", "use 2–64 letters, digits, dots, dashes or underscores")
-	v.check(utf8.RuneCountInString(in.Password) >= MinPasswordLength, "password", "must be at least 10 characters")
-	v.check(len(in.Password) <= 72, "password", "must be at most 72 bytes")
+	checkPassword(&v, "password", in.Password)
 	v.check(utf8.RuneCountInString(in.TreeName) <= 200, "treeName", "is too long")
 	if err := v.err(); err != nil {
 		return User{}, err
@@ -120,6 +130,12 @@ func (s *Store) Setup(ctx context.Context, in SetupInput) (User, error) {
 		return nil
 	})
 	return u, err
+}
+
+// checkPassword applies the password rules to field.
+func checkPassword(v *validator, field, pw string) {
+	v.check(utf8.RuneCountInString(pw) >= MinPasswordLength, field, "must be at least 10 characters")
+	v.check(len(pw) <= 72, field, "must be at most 72 bytes")
 }
 
 func validUsername(s string) bool {
@@ -190,7 +206,8 @@ func (s *Store) CreateSession(ctx context.Context, userID int64, userAgent strin
 }
 
 // SessionByToken resolves a cookie token. Expired and unknown tokens give
-// ErrNotFound. Using a session extends it, at most once a minute.
+// ErrNotFound. Using a session extends it, at most once a minute and never
+// past SessionMaxAge after it was created.
 func (s *Store) SessionByToken(ctx context.Context, token string) (Session, error) {
 	if token == "" {
 		return Session{}, ErrNotFound
@@ -201,14 +218,14 @@ func (s *Store) SessionByToken(ctx context.Context, token string) (Session, erro
 	var sess Session
 	var treeID sql.NullInt64
 	var treeRole sql.NullString
-	var lastSeen, expires string
+	var lastSeen, expires, createdAt string
 	err := s.DB.QueryRowContext(ctx, `
-		SELECT u.id, u.username, u.display_name, u.role, s.tree_id, m.role, s.last_seen_at, s.expires_at
+		SELECT s.id, s.created_at, u.id, u.username, u.display_name, u.role, s.tree_id, m.role, s.last_seen_at, s.expires_at
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		LEFT JOIN tree_members m ON m.tree_id = s.tree_id AND m.user_id = s.user_id
 		WHERE s.token_hash = ?`, h).Scan(
-		&sess.User.ID, &sess.User.Username, &sess.User.DisplayName, &sess.User.Role,
+		&sess.ID, &createdAt, &sess.User.ID, &sess.User.Username, &sess.User.DisplayName, &sess.User.Role,
 		&treeID, &treeRole, &lastSeen, &expires)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Session{}, ErrNotFound
@@ -217,7 +234,8 @@ func (s *Store) SessionByToken(ctx context.Context, token string) (Session, erro
 		return Session{}, err
 	}
 	exp, err := time.Parse(time.RFC3339Nano, expires)
-	if err != nil || !now.Before(exp) {
+	created, cerr := time.Parse(time.RFC3339Nano, createdAt)
+	if err != nil || cerr != nil || !now.Before(exp) || !now.Before(created.Add(SessionMaxAge)) {
 		_, _ = s.DB.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, h)
 		return Session{}, ErrNotFound
 	}
@@ -227,8 +245,13 @@ func (s *Store) SessionByToken(ctx context.Context, token string) (Session, erro
 	}
 
 	if seen, err := time.Parse(time.RFC3339Nano, lastSeen); err == nil && now.Sub(seen) > time.Minute {
+		next := now.Add(SessionTTL)
+		if limit := created.Add(SessionMaxAge); next.After(limit) {
+			next = limit
+		}
 		_, _ = s.DB.ExecContext(ctx, `UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE token_hash = ?`,
-			now.Format(time.RFC3339Nano), now.Add(SessionTTL).Format(time.RFC3339Nano), h)
+			now.Format(time.RFC3339Nano), next.Format(time.RFC3339Nano), h)
+		sess.CookieMaxAge = next.Sub(now)
 	}
 	return sess, nil
 }
@@ -239,10 +262,125 @@ func (s *Store) DeleteSession(ctx context.Context, token string) error {
 	return err
 }
 
-// PruneSessions removes expired sessions.
+// PruneSessions removes sessions that expired or outlived SessionMaxAge.
+// julianday compares the times as times: RFC 3339 strings with and without
+// fractional seconds do not sort correctly as text.
 func (s *Store) PruneSessions(ctx context.Context) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at <= ?`, s.now())
+	now := s.Now().UTC()
+	_, err := s.DB.ExecContext(ctx, `
+		DELETE FROM sessions WHERE julianday(expires_at) <= julianday(?) OR julianday(created_at) <= julianday(?)`,
+		now.Format(time.RFC3339Nano), now.Add(-SessionMaxAge).Format(time.RFC3339Nano))
 	return err
+}
+
+// SessionInfo describes one of a user's sessions for the account page.
+type SessionInfo struct {
+	ID         int64  `json:"id"`
+	CreatedAt  string `json:"createdAt"`
+	LastSeenAt string `json:"lastSeenAt"`
+	ExpiresAt  string `json:"expiresAt"`
+	UserAgent  string `json:"userAgent"`
+	Current    bool   `json:"current"`
+}
+
+// ListSessions returns the user's unexpired sessions, the most recently used
+// first; currentID marks the one making the request.
+func (s *Store) ListSessions(ctx context.Context, userID, currentID int64) ([]SessionInfo, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT id, created_at, last_seen_at, expires_at, user_agent FROM sessions WHERE user_id = ?`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	now := s.Now().UTC()
+	type listed struct {
+		info SessionInfo
+		seen time.Time
+	}
+	var found []listed
+	for rows.Next() {
+		var si SessionInfo
+		if err := rows.Scan(&si.ID, &si.CreatedAt, &si.LastSeenAt, &si.ExpiresAt, &si.UserAgent); err != nil {
+			return nil, err
+		}
+		created, err1 := time.Parse(time.RFC3339Nano, si.CreatedAt)
+		exp, err2 := time.Parse(time.RFC3339Nano, si.ExpiresAt)
+		seen, _ := time.Parse(time.RFC3339Nano, si.LastSeenAt)
+		if err1 != nil || err2 != nil {
+			continue
+		}
+		limit := created.Add(SessionMaxAge)
+		if !now.Before(exp) || !now.Before(limit) {
+			continue
+		}
+		if limit.Before(exp) {
+			exp = limit
+		}
+		si.ExpiresAt = exp.UTC().Format(time.RFC3339Nano)
+		si.Current = si.ID == currentID
+		found = append(found, listed{si, seen})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	sort.SliceStable(found, func(i, j int) bool { return found[i].seen.After(found[j].seen) })
+	out := []SessionInfo{}
+	for _, f := range found {
+		out = append(out, f.info)
+	}
+	return out, nil
+}
+
+// DeleteUserSession ends one of the user's sessions; a session of another
+// user or an unknown id gives ErrNotFound.
+func (s *Store) DeleteUserSession(ctx context.Context, userID, id int64) error {
+	res, err := s.DB.ExecContext(ctx, `DELETE FROM sessions WHERE id = ? AND user_id = ?`, id, userID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeleteUserSessions ends all of the user's sessions except exceptID (0: all).
+func (s *Store) DeleteUserSessions(ctx context.Context, userID, exceptID int64) error {
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ? AND id <> ?`, userID, exceptID)
+	return err
+}
+
+// ChangePassword sets a new password after checking the current one and
+// ends the user's other sessions (all but keepSessionID), so a stolen
+// cookie stops working once the password is changed.
+func (s *Store) ChangePassword(ctx context.Context, userID, keepSessionID int64, current, next string) error {
+	var v validator
+	checkPassword(&v, "newPassword", next)
+	if err := v.err(); err != nil {
+		return err
+	}
+	var hash string
+	err := s.DB.QueryRowContext(ctx, `SELECT password_hash FROM users WHERE id = ?`, userID).Scan(&hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(current)) != nil {
+		return &ValidationError{Fields: map[string]string{"currentPassword": "is not your current password"}}
+	}
+	newHash, err := bcrypt.GenerateFromPassword([]byte(next), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	return s.tx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`, string(newHash), s.now(), userID); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ? AND id <> ?`, userID, keepSessionID)
+		return err
+	})
 }
 
 // TreeName returns the name of a tree.

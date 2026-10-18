@@ -64,6 +64,13 @@ export const TransferIcon = () => (
   </Icon>
 )
 
+export const AccountIcon = () => (
+  <Icon>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21c1-4 4.5-6 8-6s7 2 8 6" />
+  </Icon>
+)
+
 export const CheckIcon = () => (
   <Icon>
     <path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6l-8-3Z" />

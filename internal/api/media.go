@@ -68,6 +68,19 @@ func writeSlowUpload(w http.ResponseWriter, err error) bool {
 	return true
 }
 
+// writeUploadReadError answers an upload that could not be read: 408 for
+// the read deadline, 413 when the body is over the limit, else 400.
+func (s *Server) writeUploadReadError(w http.ResponseWriter, err error) {
+	var tooBig *http.MaxBytesError
+	switch {
+	case writeSlowUpload(w, err):
+	case errors.As(err, &tooBig):
+		writeErrorP(w, http.StatusRequestEntityTooLarge, CodeFileTooLarge, fmt.Sprintf("the file is larger than %d MB", s.MaxUpload>>20), map[string]any{"limitMB": s.MaxUpload >> 20})
+	default:
+		writeError(w, http.StatusBadRequest, CodeInvalidUpload, "invalid upload")
+	}
+}
+
 // limitUpload caps the request body at MaxUpload plus the multipart framing
 // and sets a read deadline sized to it (a minute plus the time to send the
 // cap at minUploadRate), so a client trickling a body cannot hold the
@@ -109,9 +122,7 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			if !writeSlowUpload(w, err) {
-				writeError(w, http.StatusBadRequest, CodeInvalidUpload, "invalid upload")
-			}
+			s.writeUploadReadError(w, err)
 			return
 		}
 		if part.FormName() == "file" {
@@ -148,6 +159,11 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if writeSlowUpload(w, err) {
+		return
+	}
+	var tooBig *http.MaxBytesError
+	if errors.As(err, &tooBig) {
+		s.writeUploadReadError(w, err)
 		return
 	}
 	if err != nil {

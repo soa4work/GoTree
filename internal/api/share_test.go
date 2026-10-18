@@ -55,8 +55,24 @@ func TestShareEndpoints(t *testing.T) {
 		t.Errorf("links: %+v", links)
 	}
 	c.call("GET", "/api/onthisday?month=3&day=1", nil, http.StatusOK, &day)
+	var rotated store.ShareLink
+	c.call("POST", fmt.Sprintf("/api/share-links/%d/token", link.ID), nil, http.StatusOK, &rotated)
+	if rotated.Token == "" || rotated.Token == link.Token {
+		t.Fatalf("rotated: %+v", rotated)
+	}
+	var gone errorBody
+	visitor.call("GET", base, nil, http.StatusNotFound, &gone)
+	if gone.Code != CodeShareGone {
+		t.Errorf("old address: %+v", gone)
+	}
+	visitor.call("GET", "/api/share/"+rotated.Token, nil, http.StatusOK, nil)
 	c.call("DELETE", fmt.Sprintf("/api/share-links/%d", link.ID), nil, http.StatusNoContent, nil)
-	visitor.call("GET", base, nil, http.StatusNotFound, nil)
+	visitor.call("GET", "/api/share/"+rotated.Token, nil, http.StatusNotFound, nil)
+	var missing errorBody
+	c.call("POST", fmt.Sprintf("/api/share-links/%d/token", link.ID), nil, http.StatusNotFound, &missing)
+	if missing.Code != CodeNotFound {
+		t.Errorf("revoked rotate: %+v", missing)
+	}
 
 	srv := testServers[ts]
 	if _, err := srv.Store.DB.Exec(`UPDATE tree_members SET role = 'editor'`); err != nil {

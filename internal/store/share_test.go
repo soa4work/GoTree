@@ -247,6 +247,55 @@ func TestShareLinkLifecycle(t *testing.T) {
 	}
 }
 
+func TestRotateShareLink(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	link, err := s.CreateShareLink(ctx, a, ShareLinkInput{Label: "Family", Scope: ShareScopeTree, Privacy: SharePrivacyLivingNames, ExpiresOn: "2026-10-05"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rotated, err := s.RotateShareLink(ctx, a, link.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rotated.Token == "" || rotated.Token == link.Token {
+		t.Fatalf("new token: %q (old %q)", rotated.Token, link.Token)
+	}
+	if rotated.ID != link.ID || rotated.Label != "Family" || rotated.Scope != ShareScopeTree ||
+		rotated.Privacy != SharePrivacyLivingNames || rotated.ExpiresAt == nil || *rotated.ExpiresAt != *link.ExpiresAt {
+		t.Errorf("link changed: %+v vs %+v", rotated, link)
+	}
+	if _, err := s.ShareByToken(ctx, link.Token); !errors.Is(err, ErrNotFound) {
+		t.Errorf("old token: %v", err)
+	}
+	if sh, err := s.ShareByToken(ctx, rotated.Token); err != nil || sh.Link.ID != link.ID {
+		t.Errorf("new token: %v", err)
+	}
+
+	var after string
+	if err := s.DB.QueryRow(`SELECT after_json FROM change_log WHERE entity_type = 'share_link' AND entity_id = ? ORDER BY id DESC LIMIT 1`, link.ID).Scan(&after); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(after, "token") || strings.Contains(after, rotated.Token) {
+		t.Errorf("change log has the token: %s", after)
+	}
+
+	if _, err := s.RotateShareLink(ctx, a, link.ID+100); !errors.Is(err, ErrNotFound) {
+		t.Errorf("missing: %v", err)
+	}
+	editor := a
+	editor.Role = RoleEditor
+	if _, err := s.RotateShareLink(ctx, editor, link.ID); !errors.Is(err, ErrOwnerOnly) {
+		t.Errorf("editor: %v", err)
+	}
+	if err := s.RevokeShareLink(ctx, a, link.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RotateShareLink(ctx, a, link.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("revoked: %v", err)
+	}
+}
+
 func TestOnThisDay(t *testing.T) {
 	s := newStore(t)
 	a := setup(t, s)

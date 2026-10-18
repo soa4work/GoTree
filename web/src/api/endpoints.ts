@@ -133,6 +133,7 @@ export const getRelationship = (a: number, b: number, signal?: AbortSignal) =>
 export const listShareLinks = (signal?: AbortSignal) => getJSON<ShareLink[]>('/share-links', signal)
 export const createShareLink = (input: ShareLinkInput) => postJSON<ShareLink>('/share-links', input)
 export const revokeShareLink = (id: number) => del(`/share-links/${id}`)
+export const reissueShareLink = (id: number) => postJSON<ShareLink>(`/share-links/${id}/token`)
 export const getOnThisDay = (month: number, day: number, signal?: AbortSignal) =>
   getJSON<DayReport>(`/onthisday?${qs({ month, day })}`, signal)
 

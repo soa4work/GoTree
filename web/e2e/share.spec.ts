@@ -81,6 +81,10 @@ test('give a share link a new address', async ({ page, browser }) => {
   await page.getByRole('button', { name: '+ New share link' }).click()
   const dialog = page.getByRole('dialog', { name: 'New share link' })
   await dialog.getByLabel(/^Name/).fill(`Lost ${surname}`)
+  // A branch link starts at Hans; a whole-tree link would start at whoever sorts first in the shared e2e database.
+  await dialog.getByLabel('One branch').check()
+  await dialog.getByRole('searchbox', { name: 'Whose branch' }).fill(`Hans ${surname}`)
+  await dialog.getByRole('button', { name: new RegExp(`^Hans ${surname}`) }).click()
   await dialog.getByRole('button', { name: /Create link/ }).click()
   const oldUrl = await page.getByLabel('Share link', { exact: true }).inputValue()
   await page.getByRole('button', { name: 'Done' }).click()

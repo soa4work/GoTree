@@ -34,6 +34,11 @@ func TestShareEndpoints(t *testing.T) {
 	if list.Total != 1 {
 		t.Errorf("persons: %+v", list)
 	}
+	visitor.call("GET", base+"/persons?q=zzz", nil, http.StatusOK, &list)
+	if list.Total != 0 {
+		t.Errorf("unknown name: %+v", list)
+	}
+	visitor.call("GET", base+"/media/1/file", nil, http.StatusNotFound, nil)
 	visitor.call("GET", fmt.Sprintf("%s/persons/%d", base, anna.ID), nil, http.StatusOK, nil)
 	visitor.call("GET", fmt.Sprintf("%s/tree/%d?up=2", base, anna.ID), nil, http.StatusOK, nil)
 	var day store.DayReport

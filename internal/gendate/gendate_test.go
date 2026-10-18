@@ -149,6 +149,10 @@ func TestGEDCOM7(t *testing.T) {
 		{"INT 1850 (the year of the fire)", "1850", "the year of the fire"},
 		{"(during the war)", "", "during the war"},
 		{"11 FEB 1731/32", "11 FEB 1731", "11 FEB 1731/32"},
+		{"INT 1750/51", "1750", "1750/51"},
+		{"INT 12 FEB 1750/51", "12 FEB 1750", "12 FEB 1750/51"},
+		{"INT 1750/51 (as written)", "1750", "as written"},
+		{"INT 1850", "1850", ""},
 	}
 	for _, tt := range tests {
 		d, err := Parse(tt.in)

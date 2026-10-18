@@ -296,6 +296,103 @@ func TestRotateShareLink(t *testing.T) {
 	}
 }
 
+func TestShareSearchNameOnlyUsesPrimaryName(t *testing.T) {
+	s := newStore(t)
+	a := setup(t, s)
+	person := func(in PersonInput, died bool) Person {
+		t.Helper()
+		p, err := s.CreatePerson(ctx, a, in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if died {
+			if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &p.ID, Type: "DEAT", Date: "1950"}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return p
+	}
+	lisa := person(PersonInput{GivenNames: "Lisa", Surname: "Weber", Nickname: "Lili",
+		AlternateNames: []AlternateNameInput{{Type: "birth", GivenNames: "Lisa", Surname: "Maier"}}}, false)
+	person(PersonInput{GivenNames: "Пётр", Surname: "Иванов", Nickname: "Петя"}, false)
+	anna := person(PersonInput{GivenNames: "Anna", Surname: "Müller", Nickname: "Annerl",
+		AlternateNames: []AlternateNameInput{{Type: "birth", GivenNames: "Anna", Surname: "Schmidt"}}}, true)
+
+	search := func(sh Share, q string) PersonList {
+		t.Helper()
+		list, err := s.SharePersons(ctx, sh, q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if list.Total != len(list.Items) {
+			t.Errorf("%q: total %d, items %d", q, list.Total, len(list.Items))
+		}
+		return list
+	}
+	sh := shareFor(t, s, a, ShareLinkInput{Label: "names", Scope: ShareScopeTree, Privacy: SharePrivacyLivingNames})
+	for _, q := range []string{"Lili", "Maier", "Lisa Maier", "Петя"} {
+		if list := search(sh, q); list.Total != 0 {
+			t.Errorf("%q must not find a living person: %+v", q, list.Items)
+		}
+	}
+	for _, q := range []string{"Lisa", "Lis", "weber", "Lisa Weber", "петр", "иванов", "Пётр"} {
+		if list := search(sh, q); list.Total != 1 {
+			t.Errorf("%q: %+v", q, list.Items)
+		}
+	}
+	for _, q := range []string{"Annerl", "Schmidt", "muller", "Müller"} {
+		if list := search(sh, q); list.Total != 1 || list.Items[0].ID != anna.ID {
+			t.Errorf("%q must find the deceased by any name: %+v", q, list.Items)
+		}
+	}
+
+	owner, err := s.ListPersons(ctx, a, "Maier", 10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if owner.Total != 1 || owner.Items[0].ID != lisa.ID {
+		t.Errorf("members still search every name: %+v", owner.Items)
+	}
+
+	// Accents the index keeps must not be dropped: «і» finds «Їжак» only
+	// through the hidden «Іван».
+	person(PersonInput{GivenNames: "Їжак", Surname: "Коваль", Nickname: "Іван"}, false)
+	for _, q := range []string{"і", "Іван"} {
+		if list := search(sh, q); list.Total != 0 {
+			t.Errorf("%q must not find Їжак: %+v", q, list.Items)
+		}
+	}
+	if list := search(sh, "Їжак"); list.Total != 1 {
+		t.Errorf("Їжак: %+v", list.Items)
+	}
+
+	// Relevance would put the namesake whose hidden names repeat «W» first.
+	plain := person(PersonInput{GivenNames: "Lisa", Surname: "Weber"}, false)
+	if list := search(sh, "W"); len(list.Items) != 2 || list.Items[0].ID != lisa.ID || list.Items[1].ID != plain.ID {
+		t.Errorf("W: name order expected: %+v", list.Items)
+	}
+	if list := search(sh, "We"); len(list.Items) != 2 || list.Items[0].ID != lisa.ID {
+		t.Errorf("We: name order expected: %+v", list.Items)
+	}
+
+	deceased := shareFor(t, s, a, ShareLinkInput{Label: "deceased", Scope: ShareScopeTree, Privacy: SharePrivacyDeceased})
+	if list := search(deceased, "Lisa"); list.Total != 0 {
+		t.Errorf("deceased-only link finds the living: %+v", list.Items)
+	}
+}
+
+func TestSearchWords(t *testing.T) {
+	if got := ftsQuery("O'Brien Пётр"); got != `"OBrien"* "Петр"*` {
+		t.Errorf("ftsQuery: %q", got)
+	}
+	if got := ftsQuery("a b c d e f g h i"); got != `"a"* "b"* "c"* "d"* "e"* "f"* "g"* "h"*` {
+		t.Errorf("more than eight words: %q", got)
+	}
+	if got := ftsQuery(" -- ' "); got != "" {
+		t.Errorf("punctuation only: %q", got)
+	}
+}
+
 func TestOnThisDay(t *testing.T) {
 	s := newStore(t)
 	a := setup(t, s)

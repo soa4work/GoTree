@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/netip"
+	"strings"
 	"sync"
 	"time"
 
@@ -88,19 +90,18 @@ type loginInput struct {
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
-	ip := clientIP(r)
-	if !s.throttle.allow(ip) {
-		w.Header().Set("Retry-After", "900")
-		writeError(w, http.StatusTooManyRequests, CodeTooManyLogins, "too many failed logins, try again later")
-		return
-	}
+	ip := s.clientIP(r)
 	var in loginInput
 	if !decode(w, r, &in) {
 		return
 	}
+	if !s.throttle.allow(ip, in.Username) {
+		writeTooManyLogins(w)
+		return
+	}
 	u, err := s.Store.Authenticate(r.Context(), in.Username, in.Password)
 	if errors.Is(err, store.ErrBadCredentials) {
-		s.throttle.fail(ip)
+		s.throttle.fail(ip, in.Username)
 		s.Log.Warn("failed login", "user", in.Username, "ip", ip)
 		writeError(w, http.StatusUnauthorized, CodeBadCredentials, err.Error())
 		return
@@ -109,10 +110,15 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, s.Log, err)
 		return
 	}
-	s.throttle.reset(ip)
+	s.throttle.succeed(in.Username)
 	if s.startSession(w, r, u.ID) {
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+func writeTooManyLogins(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", "900")
+	writeError(w, http.StatusTooManyRequests, CodeTooManyLogins, "too many failed logins, try again later")
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
@@ -196,60 +202,162 @@ func requireEditor(next http.Handler) http.Handler {
 	})
 }
 
-// clientIP is the TCP peer. X-Forwarded-For is deliberately ignored: it is
-// client-controlled unless a trusted proxy is configured, and trusting it
-// would let anyone dodge the login throttle.
-func clientIP(r *http.Request) string {
+// clientIP is the address of the client. It is the TCP peer unless the peer
+// is a trusted proxy (GOTREE_TRUSTED_PROXIES): then X-Forwarded-For is read
+// from the right, skipping trusted hops, and the first untrusted address is
+// the client. Without trusted proxies X-Forwarded-For is ignored, since any
+// client can send it.
+func (s *Server) clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr
 	}
-	return host
+	peer, err := netip.ParseAddr(host)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	peer = peer.Unmap()
+	if !s.trusted(peer) {
+		return peer.String()
+	}
+	hops := strings.Split(strings.Join(r.Header.Values("X-Forwarded-For"), ","), ",")
+	for i := len(hops) - 1; i >= 0; i-- {
+		addr, err := netip.ParseAddr(strings.TrimSpace(hops[i]))
+		if err != nil {
+			break
+		}
+		peer = addr.Unmap()
+		if !s.trusted(peer) {
+			break
+		}
+	}
+	return peer.String()
 }
 
-// loginThrottle limits failed logins per client address.
+func (s *Server) trusted(a netip.Addr) bool {
+	for _, p := range s.TrustedProxies {
+		if p.Contains(a) {
+			return true
+		}
+	}
+	return false
+}
+
+// loginThrottle limits failed logins per client address and per username,
+// so neither one guessing client nor a botnet guessing one account gets far.
+// It sweeps expired entries at most once a minute, on the calls themselves
+// rather than in a goroutine nothing would own, and holds at most maxKeys
+// keys, so the map cannot grow without bound.
 type loginThrottle struct {
-	mu       sync.Mutex
-	failures map[string][]time.Time
-	max      int
-	window   time.Duration
-	now      func() time.Time
+	mu        sync.Mutex
+	failures  map[string][]time.Time
+	maxIP     int
+	maxUser   int
+	window    time.Duration
+	maxKeys   int
+	lastSweep time.Time
+	now       func() time.Time
 }
 
 func newLoginThrottle() *loginThrottle {
-	return &loginThrottle{failures: map[string][]time.Time{}, max: 10, window: 15 * time.Minute, now: time.Now}
+	return &loginThrottle{failures: map[string][]time.Time{}, maxIP: 20, maxUser: 10,
+		window: 15 * time.Minute, maxKeys: 10_000, now: time.Now}
 }
 
-func (t *loginThrottle) recent(ip string) []time.Time {
+// addrKey names a client address; an IPv6 client usually holds a whole /64,
+// so its addresses share one key.
+func addrKey(addr string) string {
+	a, err := netip.ParseAddr(addr)
+	if err != nil {
+		return addr
+	}
+	a = a.Unmap()
+	if a.Is6() {
+		return netip.PrefixFrom(a, 64).Masked().String()
+	}
+	return a.String()
+}
+
+func ipKey(addr string) string   { return "ip|" + addrKey(addr) }
+func userKey(name string) string { return "user|" + strings.ToLower(strings.TrimSpace(name)) }
+
+func (t *loginThrottle) recent(key string) []time.Time {
 	cutoff := t.now().Add(-t.window)
-	kept := t.failures[ip][:0]
-	for _, at := range t.failures[ip] {
+	kept := t.failures[key][:0]
+	for _, at := range t.failures[key] {
 		if at.After(cutoff) {
 			kept = append(kept, at)
 		}
 	}
 	if len(kept) == 0 {
-		delete(t.failures, ip)
+		delete(t.failures, key)
 		return nil
 	}
-	t.failures[ip] = kept
+	t.failures[key] = kept
 	return kept
 }
 
-func (t *loginThrottle) allow(ip string) bool {
+func (t *loginThrottle) allow(ip, user string) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return len(t.recent(ip)) < t.max
+	t.sweep()
+	return len(t.recent(ipKey(ip))) < t.maxIP && len(t.recent(userKey(user))) < t.maxUser
 }
 
-func (t *loginThrottle) fail(ip string) {
+func (t *loginThrottle) fail(ip, user string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.failures[ip] = append(t.recent(ip), t.now())
+	t.sweep()
+	t.add(ipKey(ip), t.maxIP)
+	t.add(userKey(user), t.maxUser)
 }
 
-func (t *loginThrottle) reset(ip string) {
+// add records a failure under key, keeping only the newest max of them.
+func (t *loginThrottle) add(key string, max int) {
+	if _, ok := t.failures[key]; !ok && len(t.failures) >= t.maxKeys {
+		t.evict()
+	}
+	list := append(t.recent(key), t.now())
+	if len(list) > max {
+		list = list[len(list)-max:]
+	}
+	t.failures[key] = list
+}
+
+// succeed forgets the username's failures. The address count stays, or an
+// attacker could log into their own account between guesses to reset it.
+func (t *loginThrottle) succeed(user string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	delete(t.failures, ip)
+	delete(t.failures, userKey(user))
+}
+
+// sweep drops expired entries, at most once a minute.
+func (t *loginThrottle) sweep() {
+	now := t.now()
+	if now.Sub(t.lastSweep) < time.Minute {
+		return
+	}
+	for k := range t.failures {
+		t.recent(k)
+	}
+	t.lastSweep = now
+}
+
+// evict makes room for a new key: it sweeps, and if the map is still full it
+// drops arbitrary keys (Go's random map order) down to 90% of maxKeys. Under
+// a flood of distinct keys, keeping the server's memory bounded matters more
+// than keeping every counter.
+func (t *loginThrottle) evict() {
+	t.lastSweep = time.Time{}
+	t.sweep()
+	if len(t.failures) < t.maxKeys {
+		return
+	}
+	for k := range t.failures {
+		if len(t.failures) < t.maxKeys*9/10 {
+			return
+		}
+		delete(t.failures, k)
+	}
 }

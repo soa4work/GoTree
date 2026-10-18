@@ -71,11 +71,13 @@ func run(log *slog.Logger) error {
 		Version:   version,
 		Frontend:  web.Dist(),
 		Log:       log,
+
+		TrustedProxies: cfg.TrustedProxies,
 	}).Handler()), baseCtx)
 
 	errc := make(chan error, 1)
 	go func() {
-		log.Info("gotree listening", "addr", cfg.ListenAddr, "version", version, "data", cfg.DataDir)
+		log.Info("gotree listening", "addr", cfg.ListenAddr, "version", version, "data", cfg.DataDir, "trustedProxies", len(cfg.TrustedProxies))
 		errc <- srv.ListenAndServe()
 	}()
 

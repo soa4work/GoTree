@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -25,6 +26,9 @@ type Server struct {
 	// Frontend is the built SPA (web/dist); see web.Dist.
 	Frontend fs.FS
 	Log      *slog.Logger
+	// TrustedProxies are the reverse proxies whose X-Forwarded-For names the
+	// client (GOTREE_TRUSTED_PROXIES). Empty: the TCP peer is the client.
+	TrustedProxies []netip.Prefix
 
 	throttle *loginThrottle
 }

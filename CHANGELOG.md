@@ -9,6 +9,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `GOTREE_TRUSTED_PROXIES` names the reverse proxies whose X-Forwarded-For is trusted, so behind a proxy failed logins are counted per real client (#57)
+
 - The relationship calculator also names in-laws through two marriages and step-siblings (#43)
 
 - Error messages from the server are shown in the interface language (#24)
@@ -101,6 +103,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
   tree (#15)
 
 ### Fixed
+
+- Failed logins are limited per username as well as per address, so a botnet cannot keep guessing one account's password and one client behind a trusted proxy can no longer lock everyone out; the list of failures no longer grows without bound (#57)
 
 - Kazakh and Russian wording proofread (#46)
 

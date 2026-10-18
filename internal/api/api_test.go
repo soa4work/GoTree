@@ -19,6 +19,12 @@ import (
 
 func newServer(t *testing.T, frontend fstest.MapFS) *httptest.Server {
 	t.Helper()
+	return newServerWith(t, frontend, nil)
+}
+
+// newServerWith is newServer with a hook to adjust the Server before it starts.
+func newServerWith(t *testing.T, frontend fstest.MapFS, adjust func(*Server)) *httptest.Server {
+	t.Helper()
 	conn, err := db.Open(context.Background(), filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -31,6 +37,9 @@ func newServer(t *testing.T, frontend fstest.MapFS) *httptest.Server {
 		Version:   "1.2.3",
 		Frontend:  frontend,
 		Log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	if adjust != nil {
+		adjust(s)
 	}
 	ts := httptest.NewServer(s.Handler())
 	testServers[ts] = s

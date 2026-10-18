@@ -27,17 +27,21 @@ export function AuthGate({ children }: { children: ReactNode }) {
       </main>
     )
   }
-  if (auth.data.setupRequired) return (
+  if (auth.data.setupRequired) {
+    return (
       <>
         <SetupPage />
         <UpdateNotice />
       </>
     )
-  if (!auth.data.user) return (
+  }
+  if (!auth.data.user) {
+    return (
       <>
         <LoginPage />
         <UpdateNotice />
       </>
     )
+  }
   return <>{children}</>
 }

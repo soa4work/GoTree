@@ -94,6 +94,26 @@ describe('stale forms', () => {
     expect(sent!.title).toBe('Second')
   })
 
+  it('says so when removing a link of a medium fails', async () => {
+    const linked = { ...media(1, 'First'), links: [{ entityType: 'person' as const, entityId: 7, label: 'Anna Weber', personId: 7 }] }
+    mockApi({
+      'GET /api/media/1': [200, linked],
+      'DELETE /api/media/1/links/person/7': [500, { error: 'boom' }],
+    })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/media/1']}>
+          <Routes>
+            <Route path="media/:id" element={<MediaPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove: Anna Weber' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save')
+  })
+
   it('keeps unsaved transcription rows when the data is refetched', async () => {
     let updatedAt = '2025-01-01T00:00:00Z'
     mockApi({

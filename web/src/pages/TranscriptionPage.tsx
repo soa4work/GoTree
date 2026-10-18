@@ -289,6 +289,11 @@ function Editor({ templates, initial }: { templates: RecordTemplate[]; initial: 
             <p role="status" className="text-sm text-slate-600 dark:text-slate-400">
               {find.isPending ? t('transcribe.matching') : find.isSuccess ? t('transcribe.matchesFound') : ''}
             </p>
+            {find.isError && (
+              <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-400">
+                {t('common.loadFailed')}
+              </p>
+            )}
           </section>
         </fieldset>
 

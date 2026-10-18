@@ -4,7 +4,7 @@ import type { ImportReport, ReportLine, TagStat } from '../api/types'
 import { formatDecimal } from '../lib/collate'
 import { dropReasonText, reportLineText } from './reportText'
 
-const countKeys = ['persons', 'families', 'events', 'places', 'sources', 'repositories', 'citations'] as const
+const countKeys = ['persons', 'families', 'events', 'places', 'sources', 'repositories', 'citations', 'media'] as const
 
 export function ImportReportView({ report }: { report: ImportReport }) {
   const { t } = useTranslation()

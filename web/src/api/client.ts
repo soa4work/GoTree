@@ -109,11 +109,24 @@ export interface User {
   role: 'admin' | 'user'
 }
 
+export type TreeRole = 'owner' | 'editor' | 'viewer'
+
 export interface AuthState {
   setupRequired: boolean
   user: User | null
-  tree: { id: number; name: string; role: 'owner' | 'editor' | 'viewer' } | null
+  tree: { id: number; name: string; role: TreeRole } | null
 }
+
+/** One tree of the signed-in user; `current` marks the one this session works in. */
+export interface TreeSummary {
+  id: number
+  name: string
+  role: TreeRole
+  current: boolean
+}
+
+/** Moves this session to another tree of the user and answers with the new auth state. */
+export const switchTree = (treeId: number) => putJSON<AuthState>('/auth/tree', { treeId })
 
 export const getAuthState = (signal?: AbortSignal) => getJSON<AuthState>('/auth/state', signal)
 

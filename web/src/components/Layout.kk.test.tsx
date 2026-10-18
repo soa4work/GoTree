@@ -27,6 +27,8 @@ describe('Kazakh interface', () => {
     expect(names).toContain('Басты бет')
     expect(names).toContain('Шежіре ағашы')
     expect(names).toContain('Көші-қон картасы')
+    expect(names).toContain('Мүшелер')
+    expect(names).toContain('Тіркелгілер')
     expect(names).toContain('Деректер сапасы')
     expect(document.documentElement.lang).toBe('kk')
   })

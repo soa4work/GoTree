@@ -9,6 +9,20 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Tree switcher in the header and a screen to pick or create a tree; a Members page where owners
+  rename the tree, add accounts by username as owner, editor or viewer, change roles and remove
+  members, and where every member can leave the tree; viewers can export only without living
+  people (#59)
+
+- Accounts page for administrators: create accounts, change their name and role, reset a
+  password and delete an account; the backup section says that it covers every tree and
+  account (#59)
+
+- GEDCOM import reads photos and documents: the files in a GEDZIP or zip become media with their
+  title and description, attached to the people, events, families, sources and heirlooms that point
+  to them, and a primary photo becomes the portrait; an export without media no longer points to
+  media records it does not contain (#54)
+
 - Accounts, trees and members over the API (#59): administrators create and delete accounts,
   change their role and reset passwords (which signs the account out everywhere); owners add
   existing accounts to a tree as owner, editor or viewer, change roles and remove members, and a
@@ -130,6 +144,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
   «умер»/«умерла» by sex; OpenStreetMap lookups keep one request per second across all places
   and return names in the interface language; the pages are checked in Russian and Kazakh at
   phone width (#61)
+
+- GEDCOM import keeps the notes and sources of every name: NAME.NOTE becomes a note on the name,
+  shown and editable on the person, sources of other and married names are attached to those names,
+  and a source of the main name stays on the name through export and import instead of moving to
+  the person (#54)
 
 - Switching between media no longer carries the form over (saving could overwrite the other
   medium), saving a transcription keeps unsaved rows, failed task, repository, photo link, face,

@@ -29,6 +29,7 @@ export interface AlternateName {
   status: FactStatus
   statusReason: string
   sortOrder: number
+  notes: string
   citations: CitationRef[]
 }
 
@@ -43,6 +44,8 @@ export interface Person {
   isLiving: boolean | null
   living: boolean
   notes: string
+  /** Notes on the main name (GEDCOM NAME.NOTE). */
+  nameNotes: string
   alternateNames: AlternateName[]
   citations: CitationRef[]
   portrait: PortraitRef | null
@@ -142,6 +145,7 @@ export interface AlternateNameInput {
   nickname: string
   status: FactStatus
   statusReason: string
+  notes: string
 }
 
 /** Date and place of a birth or death entered together with a new person. */
@@ -159,6 +163,7 @@ export interface PersonInput {
   sex: Sex
   isLiving: boolean | null
   notes: string
+  nameNotes: string
   alternateNames: AlternateNameInput[]
   /** Only used when creating a person. */
   birth?: LifeEventInput

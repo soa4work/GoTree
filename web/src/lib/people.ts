@@ -42,6 +42,7 @@ export const emptyPerson = (): PersonInput => ({
   sex: 'U',
   isLiving: null,
   notes: '',
+  nameNotes: '',
   alternateNames: [],
 })
 

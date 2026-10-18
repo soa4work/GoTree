@@ -37,7 +37,9 @@
       "explore": "Explore",
       "work": "Work",
       "settings": "Settings"
-    }
+    },
+    "members": "Members",
+    "accounts": "Accounts"
   },
   "dashboard": {
     "title": "Welcome to GoTree",
@@ -182,7 +184,10 @@
     "living_M": "living",
     "living_F": "living",
     "deceased_M": "deceased",
-    "deceased_F": "deceased"
+    "deceased_F": "deceased",
+    "nameNotes": "Notes on the name",
+    "nameNote": "Note on this name",
+    "nameNotesShown": "About the name: {{notes}}"
   },
   "sex": {
     "M": "Male",
@@ -513,7 +518,7 @@
     "importTitle": "Import a GEDCOM file",
     "importIntro": "GEDCOM is the exchange format of genealogy programs. Export your tree from Ancestry, MyHeritage, FamilySearch, webtrees, Gramps or RootsMagic and import it here. Nothing is lost: what GoTree does not use is kept and written back on export.",
     "file": "GEDCOM file",
-    "fileHint": "A .ged file, or a .zip / .gdz containing one. GEDCOM 5.5, 5.5.1 and 7.0.",
+    "fileHint": "A .ged file, or a .zip / .gdz containing one; photos and documents in the zip are imported too. GEDCOM 5.5, 5.5.1 and 7.0.",
     "importButton": "Import",
     "replaceButton": "Replace the tree",
     "replaceWarning": "Your tree already has data. Importing replaces its people, families, events, places and sources. Photos stay in the media list.",
@@ -534,7 +539,8 @@
       "places": "Places",
       "sources": "Sources",
       "repositories": "Archives",
-      "citations": "Citations"
+      "citations": "Citations",
+      "media": "Photos and documents"
     },
     "viewPeople": "Go to the people",
     "invalidDates_one": "{{count}} date is not in GEDCOM format",
@@ -643,7 +649,9 @@
       "heirloom_field": "not part of an heirloom in GoTree",
       "status_only_reason": "a status has only a reason",
       "name_status": "the main name has no status in GoTree"
-    }
+    },
+    "backupAllTrees": "The backup holds every tree and every account on this server. To give someone a copy of one tree, export it as GEDCOM.",
+    "viewerPrivacy": "As a viewer you can export the tree without living people."
   },
   "relationship": {
     "intro": "Pick two people to see how the second is related to the first, and the line of people that connects them.",
@@ -1451,5 +1459,80 @@
       "disputed": "disputed",
       "disproven": "disproven"
     }
+  },
+  "roles": {
+    "owner": "Owner",
+    "editor": "Editor",
+    "viewer": "Viewer"
+  },
+  "trees": {
+    "title": "Your trees",
+    "switcherLabel": "Tree: {{name}}. Switch tree",
+    "current": "current",
+    "newName": "Name of the new tree",
+    "create": "Create tree",
+    "switchFailed": "Could not switch: {{message}}",
+    "noTreeTitle": "Choose a tree",
+    "noTreeText": "You are not working in a tree right now. Open one of your trees, create a new one, or ask the owner of a family tree to add you."
+  },
+  "members": {
+    "intro": "People with an account can work in this tree. Owners manage members, editors change the tree, viewers only read it.",
+    "manage": "Manage members",
+    "treeName": "Name of the tree",
+    "count_one": "{{count}} member",
+    "count_other": "{{count}} members",
+    "roleFor": "Role of {{name}}",
+    "username": "Username of the account",
+    "role": "Role",
+    "roleHint": {
+      "owner": "Manages members and sharing, can replace the tree.",
+      "editor": "Adds and changes people, sources and media.",
+      "viewer": "Only reads the tree; exports leave out living people."
+    },
+    "add": "Add member",
+    "added": "{{name}} was added.",
+    "remove": "Remove from tree",
+    "removeTitle": "Remove {{name}}?",
+    "removeMessage": "{{name}} will no longer see or change this tree. Their account stays.",
+    "ownerOnly": "Only the owners of this tree manage its members.",
+    "yourRole": "Your role in this tree: {{role}}.",
+    "leave": "Leave this tree",
+    "leaveTitle": "Leave this tree?",
+    "leaveMessage": "You will no longer see this tree. An owner can add you again."
+  },
+  "accounts": {
+    "intro": "Accounts of everyone who can log in to this server. Only administrators see this page.",
+    "manage": "Manage accounts",
+    "adminOnly": "Only administrators manage accounts.",
+    "count_one": "{{count}} account",
+    "count_other": "{{count}} accounts",
+    "admin": "Administrator",
+    "noTrees": "Not in any tree yet",
+    "lastSeen": "Last active {{date}}",
+    "neverSignedIn": "Has not signed in yet",
+    "new": "New account",
+    "username": "Username",
+    "displayName": "Display name",
+    "role": "Role on this server",
+    "roleHint": {
+      "admin": "Manages accounts and downloads the backup of the whole server.",
+      "user": "Works in the trees they are a member of."
+    },
+    "roles": {
+      "admin": "Administrator",
+      "user": "User"
+    },
+    "create": "Create account",
+    "created": "The account {{name}} was created.",
+    "createdNext": "Add it to a tree on the Members page.",
+    "openMembers": "Members page",
+    "resetPassword": "Reset password",
+    "resetPasswordText": "Sets a new password and signs this account out on all devices. Tell the person the new password in a safe way.",
+    "newPassword": "New password",
+    "passwordReset": "The password of {{name}} was reset.",
+    "editTitle": "Edit {{name}}",
+    "resetTitle": "Reset the password of {{name}}",
+    "deleteTitle": "Delete the account {{name}}?",
+    "deleteMessage": "The person can no longer log in and leaves all trees. What they entered stays in the trees."
   }
 }

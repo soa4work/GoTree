@@ -148,6 +148,25 @@ const (
 	DropHeirloomField       = "heirloom_field"
 	DropStatusOnlyReason    = "status_only_reason"
 	DropNameStatus          = "name_status"
+	DropWebLink             = "web_link"
+	DropFileNotInUpload     = "file_not_in_upload"
+	DropFileNotInZip        = "file_not_in_zip"
+	DropFileTooLarge        = "file_too_large"
+	DropZipTooLarge         = "zip_too_large"
+	DropFileType            = "file_type_unsupported"
+	DropImagePixels         = "image_too_large"
+	DropFileUnreadable      = "file_unreadable"
+	DropMediaNoFile         = "media_no_file"
+	DropMarriedNameField    = "married_name_field"
+	DropNameEmpty           = "name_empty"
+	DropHeirloomMedia       = "heirloom_media"
+	DropMediaFileField      = "media_file_field"
+	DropBlob                = "blob_not_read"
+	DropMediaRecordSkipped  = "media_record_not_imported"
+	DropMediaNoObject       = "media_no_object"
+	DropMediaFileMissing    = "media_file_not_imported"
+	DropMediaCrop           = "media_crop"
+	DropMediaLinkField      = "media_link_field"
 )
 
 // dropReasonText is the English reason of each drop code; TagStat.Reason is
@@ -165,6 +184,25 @@ var dropReasonText = map[string]string{
 	DropHeirloomField:       "not part of an heirloom in GoTree",
 	DropStatusOnlyReason:    "a status has only a reason",
 	DropNameStatus:          "the main name has no status in GoTree",
+	DropWebLink:             "links to files on the web are not imported",
+	DropFileNotInUpload:     "the file is not in the upload; import a GEDZIP or upload the file in GoTree",
+	DropFileNotInZip:        "the file is not in the zip",
+	DropFileTooLarge:        "the file is larger than the upload limit",
+	DropZipTooLarge:         "the zip unpacks to more than the import limit",
+	DropFileType:            "this kind of file is not supported",
+	DropImagePixels:         "the image is larger than the pixel limit",
+	DropFileUnreadable:      "the file in the zip cannot be read",
+	DropMediaNoFile:         "the media object has no file",
+	DropMarriedNameField:    "not kept for a married name",
+	DropNameEmpty:           "the name is empty",
+	DropHeirloomMedia:       "heirlooms have nowhere to keep a media line without a file",
+	DropMediaFileField:      "not kept on a media file",
+	DropBlob:                "embedded BLOB data is not read",
+	DropMediaRecordSkipped:  "the record it belongs to was not imported",
+	DropMediaNoObject:       "it points to no media object",
+	DropMediaFileMissing:    "the media file was not imported",
+	DropMediaCrop:           "cropping a linked photo is not kept",
+	DropMediaLinkField:      "not kept on a media link",
 }
 
 // DropReasonCodes lists every drop code.
@@ -172,6 +210,7 @@ var DropReasonCodes = []string{
 	DropOwnHistory, DropOldRecordNumber, DropFollowsFromFamilies, DropOwnSubmitter, DropMediaRecords,
 	DropUnknownRecord, DropPlaceForm, DropHeirloomDatePhrase, DropHeirloomCustody, DropHeirloomField,
 	DropStatusOnlyReason, DropNameStatus,
+	DropWebLink, DropFileNotInUpload, DropFileNotInZip, DropFileTooLarge, DropZipTooLarge, DropFileType, DropImagePixels, DropFileUnreadable, DropMediaNoFile, DropMarriedNameField, DropNameEmpty, DropHeirloomMedia, DropMediaFileField, DropBlob, DropMediaRecordSkipped, DropMediaNoObject, DropMediaFileMissing, DropMediaCrop, DropMediaLinkField,
 }
 
 // What a broken reference points at: the keys of broken's "what" param
@@ -227,6 +266,15 @@ type importer struct {
 	// familyPartners are the partners of each family by its xref.
 	familyPartners map[string][2]sql.NullInt64
 
+	// Media of the upload (import_media.go): the files found for the FILE
+	// values, the media of each OBJE record by its xref, and the events and
+	// heirlooms by node and xref for the link pass.
+	files       ImportFiles
+	mediaByXref map[string][]int64
+	mediaInfo   map[int64]importedMedia
+	eventNodes  map[*gedcom.Node]int64
+	heirlooms   map[string]int64
+
 	insertPerson, insertEvent, insertName, insertFTS *sql.Stmt
 }
 
@@ -250,8 +298,10 @@ type famcLink struct {
 
 // tag counts one line of the given outcome. A dropped line carries the code
 // of its reason (one of DropReasonCodes); other outcomes pass "".
+// Reasons are part of the key: dropped lines of one kind may have
+// different causes, and the report should name each.
 func (im *importer) tag(path, outcome, reasonCode string) {
-	key := path + "|" + outcome
+	key := path + "|" + outcome + "|" + reasonCode
 	t := im.tags[key]
 	if t == nil {
 		t = &TagStat{Path: path, Outcome: outcome, Reason: dropReasonText[reasonCode], ReasonCode: reasonCode}
@@ -290,8 +340,15 @@ func partnerAndChild(line int, xref, family string) gedcom.Warning {
 }
 
 // ImportGEDCOM loads a parsed GEDCOM file into the actor's tree, in one
-// transaction: either everything is imported or nothing.
+// transaction: either everything is imported or nothing. Media objects are
+// reported as dropped, because the file has no files to go with them.
 func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document, mode string) (ImportReport, error) {
+	return s.ImportGEDCOMFiles(ctx, a, doc, mode, ImportFiles{})
+}
+
+// ImportGEDCOMFiles is ImportGEDCOM for an upload that carries files (a
+// GEDZIP), which the media objects of the file may refer to.
+func (s *Store) ImportGEDCOMFiles(ctx context.Context, a Actor, doc *gedcom.Document, mode string, files ImportFiles) (ImportReport, error) {
 	started := s.Now()
 	report := ImportReport{
 		Version: doc.Version, Encoding: doc.Encoding, Source: doc.Source,
@@ -302,15 +359,8 @@ func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document,
 	if report.Warnings == nil {
 		report.Warnings = []gedcom.Warning{}
 	}
-	if mode != ImportIntoEmpty && mode != ImportReplace {
-		return report, &ValidationError{Fields: map[string]string{"mode": "must be empty or replace"}}
-	}
-	// The API checks this too; the store enforces it for every caller.
-	if !a.CanEdit() {
-		return report, ErrViewOnly
-	}
-	if mode == ImportReplace && a.Role != RoleOwner {
-		return report, ErrOwnerOnly
+	if err := checkImportMode(a, mode); err != nil {
+		return report, err
 	}
 
 	err := s.tx(ctx, func(tx *sql.Tx) error {
@@ -326,16 +376,8 @@ func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document,
 			if err := clearTranscriptionPeople(ctx, tx, a.TreeID); err != nil {
 				return err
 			}
-		} else {
-			var n int
-			if err := tx.QueryRowContext(ctx, `
-				SELECT (SELECT count(*) FROM persons WHERE tree_id = ?) + (SELECT count(*) FROM families WHERE tree_id = ?)
-					+ (SELECT count(*) FROM sources WHERE tree_id = ?)`, a.TreeID, a.TreeID, a.TreeID).Scan(&n); err != nil {
-				return err
-			}
-			if n > 0 {
-				return ErrTreeNotEmpty
-			}
+		} else if err := checkTreeEmpty(ctx, tx, a.TreeID); err != nil {
+			return err
 		}
 
 		im := &importer{
@@ -344,6 +386,8 @@ func (s *Store) ImportGEDCOM(ctx context.Context, a Actor, doc *gedcom.Document,
 			repos: map[string]int64{}, notes: map[string]string{}, places: map[string]int64{},
 			pedigree: map[string]map[string]string{},
 			chilSeen: map[string]bool{}, familyPartners: map[string][2]sql.NullInt64{},
+			files: files, mediaByXref: map[string][]int64{}, mediaInfo: map[int64]importedMedia{},
+			eventNodes: map[*gedcom.Node]int64{}, heirlooms: map[string]int64{},
 		}
 		if err := im.prepare(ctx); err != nil {
 			return err
@@ -395,8 +439,8 @@ func (im *importer) prepare(ctx context.Context) error {
 	var err error
 	if im.insertPerson, err = im.tx.PrepareContext(ctx, `
 		INSERT INTO persons (tree_id, given_names, surname, name_prefix, name_suffix, nickname, sex, notes, gedcom_xref,
-			extra_json, created_at, updated_at, created_by, updated_by, surname_key, given_key)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
+			extra_json, created_at, updated_at, created_by, updated_by, surname_key, given_key, name_notes)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
 		return err
 	}
 	if im.insertEvent, err = im.tx.PrepareContext(ctx, `
@@ -407,8 +451,8 @@ func (im *importer) prepare(ctx context.Context) error {
 		return err
 	}
 	if im.insertName, err = im.tx.PrepareContext(ctx, `
-		INSERT INTO person_names (person_id, type, given_names, surname, name_prefix, name_suffix, nickname, status, status_reason, sort_order)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
+		INSERT INTO person_names (person_id, type, given_names, surname, name_prefix, name_suffix, nickname, status, status_reason, sort_order, notes)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
 		return err
 	}
 	im.insertFTS, err = im.tx.PrepareContext(ctx, `INSERT INTO persons_fts (rowid, names) VALUES (?, ?)`)
@@ -434,6 +478,9 @@ func (im *importer) run(ctx context.Context) error {
 			im.notes[r.Xref] = r.Value
 			im.mapped(r.Tag)
 		}
+	}
+	if err := im.mediaRecords(ctx, byTag["OBJE"]); err != nil {
+		return err
 	}
 	for _, r := range byTag["REPO"] {
 		if err := im.repository(ctx, r); err != nil {
@@ -475,6 +522,9 @@ func (im *importer) run(ctx context.Context) error {
 			return err
 		}
 	}
+	if err := im.linkMedia(ctx); err != nil {
+		return err
+	}
 	for _, p := range im.deferred {
 		pid, ok := im.persons[p.xref]
 		if !ok {
@@ -488,14 +538,10 @@ func (im *importer) run(ctx context.Context) error {
 	}
 	for tag, recs := range byTag {
 		switch tag {
-		case "INDI", "FAM", "SOUR", "REPO", "NOTE", "SNOTE", "_HEIRLOOM":
+		case "INDI", "FAM", "SOUR", "REPO", "NOTE", "SNOTE", "_HEIRLOOM", "OBJE":
 		case "SUBM", "SUBN":
 			for range recs {
 				im.tag(tag, TagDropped, DropOwnSubmitter)
-			}
-		case "OBJE":
-			for range recs {
-				im.tag(tag, TagDropped, DropMediaRecords)
 			}
 		default:
 			for range recs {
@@ -610,6 +656,18 @@ func containsLine(lines []string, s string) bool {
 // other files an unmapped line: known noise is dropped, everything else
 // kept verbatim.
 func (im *importer) other(ctx string, c *gedcom.Node, kept *[]keptNode) {
+	if c.Tag == "OBJE" && objeHandled(ctx) {
+		switch im.objeFate(c) {
+		case objeImported:
+			return // the link pass (linkMedia) reads it
+		case objeInline:
+			im.keep(ctx, im.inlineObje(c), kept)
+			return
+		}
+		// The line is kept as written, but its files are not imported, and
+		// the report says why.
+		im.reportMissingFiles(ctx+".OBJE", c)
+	}
 	if code, ok := droppedTags[c.Tag]; ok {
 		im.tag(ctx+"."+c.Tag, TagDropped, code)
 		return
@@ -716,6 +774,12 @@ func (im *importer) createSource(ctx context.Context, title, author, publ, call,
 
 // citation imports a SOUR line under a person, name, event or family.
 func (im *importer) citation(ctx context.Context, ctxPath string, c *gedcom.Node, entityType string, entityID int64) error {
+	return im.citationField(ctx, ctxPath, c, entityType, entityID, "")
+}
+
+// citationField is citation for a source of one field of the entity, such
+// as the main name of a person (field "name").
+func (im *importer) citationField(ctx context.Context, ctxPath string, c *gedcom.Node, entityType string, entityID int64, field string) error {
 	sourceID, ok := im.sources[c.Pointer]
 	var kept []keptNode
 	if c.Pointer == "" {
@@ -778,7 +842,7 @@ func (im *importer) citation(ctx context.Context, ctxPath string, c *gedcom.Node
 	}
 	cid, _ := res.LastInsertId()
 	if _, err := im.tx.ExecContext(ctx, `
-		INSERT OR IGNORE INTO citation_links (citation_id, entity_type, entity_id) VALUES (?, ?, ?)`, cid, entityType, entityID); err != nil {
+		INSERT OR IGNORE INTO citation_links (citation_id, entity_type, entity_id, field) VALUES (?, ?, ?, ?)`, cid, entityType, entityID, field); err != nil {
 		return err
 	}
 	im.report.Counts["citations"]++
@@ -791,10 +855,17 @@ func (im *importer) citation(ctx context.Context, ctxPath string, c *gedcom.Node
 type parsedName struct {
 	given, surname, prefix, suffix, nickname, nameType string
 	status, statusReason                               string
+	// path is the tag of the name in the report (INDI.NAME or
+	// INDI._MARNM); its notes are reported by person(), which knows
+	// whether the name is kept.
+	path     string
+	notes    []string
+	noteTags []string
+	sources  []*gedcom.Node
 }
 
 func (im *importer) name(n *gedcom.Node, kept *[]keptNode, ctx string, primary bool) parsedName {
-	var p parsedName
+	p := parsedName{path: ctx + ".NAME"}
 	v := n.Value
 	if i := strings.Index(v, "/"); i >= 0 {
 		p.given = strings.TrimSpace(v[:i])
@@ -850,8 +921,12 @@ func (im *importer) name(n *gedcom.Node, kept *[]keptNode, ctx string, primary b
 				im.other(ctx+".NAME", c, kept)
 			}
 			continue
-		case "SOUR", "NOTE", "SNOTE":
-			continue // handled by the caller
+		case "NOTE", "SNOTE":
+			p.notes, p.noteTags = append(p.notes, im.noteText(c)), append(p.noteTags, c.Tag)
+			continue
+		case "SOUR":
+			p.sources = append(p.sources, c) // cited by person()
+			continue
 		default:
 			im.other(ctx+".NAME", c, kept)
 			continue
@@ -890,7 +965,6 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 	var notes []string
 	var primary *parsedName
 	var others []parsedName
-	var primaryNode *gedcom.Node
 	sex := "U"
 	var events, citations, assos, famcs []*gedcom.Node
 
@@ -899,7 +973,7 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 		case c.Tag == "NAME":
 			p := im.name(c, &kept, "INDI", primary == nil)
 			if primary == nil {
-				primary, primaryNode = &p, c
+				primary = &p
 			} else {
 				p.nameType = nameType(p.nameType, c.Tag)
 				others = append(others, p)
@@ -907,7 +981,17 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 			im.mapped("INDI.NAME")
 		case c.Tag == "_MARNM":
 			// Ancestry's married name: "1 _MARNM Schmidt" or "/Schmidt/".
-			p := parsedName{surname: strings.Trim(strings.TrimSpace(c.Value), "/"), nameType: "married"}
+			p := parsedName{surname: strings.Trim(strings.TrimSpace(c.Value), "/"), nameType: "married", path: "INDI._MARNM"}
+			for _, sub := range c.Children {
+				switch sub.Tag {
+				case "SOUR":
+					p.sources = append(p.sources, sub)
+				case "NOTE", "SNOTE":
+					p.notes, p.noteTags = append(p.notes, im.noteText(sub)), append(p.noteTags, sub.Tag)
+				default:
+					im.tag("INDI._MARNM."+sub.Tag, TagDropped, DropMarriedNameField)
+				}
+			}
 			others = append(others, p)
 			im.mapped("INDI._MARNM")
 		case c.Tag == "SEX":
@@ -942,7 +1026,7 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 	}
 	res, err := im.insertPerson.ExecContext(ctx, im.a.TreeID, primary.given, primary.surname, primary.prefix, primary.suffix,
 		primary.nickname, sex, joinNotes(notes), r.Xref, extraJSON(kept), im.now, im.now, nullID(im.a.UserID), nullID(im.a.UserID),
-		db.NamesKey(primary.surname), db.NamesKey(primary.given))
+		db.NamesKey(primary.surname), db.NamesKey(primary.given), joinNotes(primary.notes))
 	if err != nil {
 		return err
 	}
@@ -955,24 +1039,41 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 	im.mapped("INDI")
 
 	allNames := []string{primary.given, primary.surname, primary.nickname}
+	for _, tag := range primary.noteTags {
+		im.mapped(primary.path + "." + tag)
+	}
 	for i, n := range others {
 		if n.given == "" && n.surname == "" && n.nickname == "" {
+			for range n.sources {
+				im.tag(n.path+".SOUR", TagDropped, DropNameEmpty)
+			}
+			for _, tag := range n.noteTags {
+				im.tag(n.path+"."+tag, TagDropped, DropNameEmpty)
+			}
 			continue
 		}
-		if _, err := im.insertName.ExecContext(ctx, pid, n.nameType, n.given, n.surname, n.prefix, n.suffix, n.nickname,
-			defaultStatus(n.status), n.statusReason, i); err != nil {
+		for _, tag := range n.noteTags {
+			im.mapped(n.path + "." + tag)
+		}
+		res, err := im.insertName.ExecContext(ctx, pid, n.nameType, n.given, n.surname, n.prefix, n.suffix, n.nickname,
+			defaultStatus(n.status), n.statusReason, i, joinNotes(n.notes))
+		if err != nil {
 			return err
+		}
+		nameID, _ := res.LastInsertId()
+		for _, c := range n.sources {
+			if err := im.citation(ctx, n.path, c, "name", nameID); err != nil {
+				return err
+			}
 		}
 		allNames = append(allNames, n.given, n.surname, n.nickname)
 	}
 	if _, err := im.insertFTS.ExecContext(ctx, pid, searchFold.Replace(strings.Join(allNames, " "))); err != nil {
 		return err
 	}
-	if primaryNode != nil {
-		for _, c := range primaryNode.All("SOUR") {
-			if err := im.citation(ctx, "INDI.NAME", c, "person", pid); err != nil {
-				return err
-			}
+	for _, c := range primary.sources {
+		if err := im.citationField(ctx, "INDI.NAME", c, "person", pid, "name"); err != nil {
+			return err
 		}
 	}
 	for _, c := range citations {
@@ -1108,6 +1209,7 @@ func (im *importer) event(ctx context.Context, owner string, e *gedcom.Node, per
 		return 0, err
 	}
 	eid, _ := res.LastInsertId()
+	im.eventNodes[e] = eid
 	im.report.Counts["events"]++
 	im.mapped(path)
 	for _, c := range citations {
@@ -1497,6 +1599,11 @@ func (im *importer) heirloom(ctx context.Context, r *gedcom.Node) error {
 		case "SOUR":
 			citations = append(citations, c)
 			continue
+		case "OBJE":
+			if im.objeFate(c) != objeImported {
+				im.tag(path+".OBJE", TagDropped, DropHeirloomMedia)
+			}
+			continue // otherwise linked by linkMedia
 		default:
 			im.tag(path+"."+c.Tag, TagDropped, DropHeirloomField)
 			continue
@@ -1522,6 +1629,7 @@ func (im *importer) heirloom(ctx context.Context, r *gedcom.Node) error {
 		return err
 	}
 	id, _ := res.LastInsertId()
+	im.heirlooms[r.Xref] = id
 	if err := writeCustody(ctx, im.tx, id, in.Custody); err != nil {
 		return err
 	}

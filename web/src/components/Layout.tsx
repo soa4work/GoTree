@@ -1,9 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GopherCredit } from './GopherCredit'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
-import { ApiError, getAuthState, logout } from '../api/client'
+import { ApiError, getAuthState } from '../api/client'
+import { useLogout } from '../auth/useLogout'
+import { TreeSwitcher } from '../trees/TreeSwitcher'
 import { mdQuery, useMediaQuery } from '../hooks/useMediaQuery'
 import { useShortcuts } from '../hooks/useShortcuts'
 import { Button } from './Button'
@@ -14,7 +16,6 @@ import { UpdateNotice } from './UpdateNotice'
 import { DialogShell } from './DialogShell'
 import { MoreIcon } from './icons'
 import { homeItem, navGroups, phoneItems, type NavItem } from './navGroups'
-import { treeDisplayName } from '../lib/treeName'
 
 function sideLinkClass({ isActive }: { isActive: boolean }) {
   return [
@@ -36,13 +37,21 @@ function SideLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void
   )
 }
 
+/** The links this user may see: administrator-only ones are left out for everyone else. */
+function useVisibleGroups() {
+  const auth = useQuery({ queryKey: ['auth'], queryFn: ({ signal }) => getAuthState(signal), staleTime: Infinity })
+  const admin = auth.data?.user?.role === 'admin'
+  return navGroups.map((g) => ({ ...g, items: g.items.filter((i) => admin || !i.adminOnly) }))
+}
+
 /** The sections as headed lists; the sidebar and the phone's More menu share it. */
 function GroupedLinks({ idPrefix, level, onNavigate }: { idPrefix: string; level: 2 | 3; onNavigate?: () => void }) {
   const { t } = useTranslation()
+  const groups = useVisibleGroups()
   const Heading = `h${level}` as const
   return (
     <>
-      {navGroups.map((group) => {
+      {groups.map((group) => {
         const headingId = `${idPrefix}-${group.id}`
         return (
           <div key={group.id} className="mt-3">
@@ -67,7 +76,7 @@ function GroupedLinks({ idPrefix, level, onNavigate }: { idPrefix: string; level
 function MoreMenu({ pathname }: { pathname: string }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const inMenu = navGroups.some((g) =>
+  const inMenu = useVisibleGroups().some((g) =>
     g.items.some((i) => !i.phone && (pathname === i.to || pathname.startsWith(`${i.to}/`))),
   )
   return (
@@ -101,22 +110,8 @@ export function Layout() {
   const location = useLocation()
   const mainRef = useRef<HTMLElement>(null)
   const firstRender = useRef(true)
-  const queryClient = useQueryClient()
   const auth = useQuery({ queryKey: ['auth'], queryFn: ({ signal }) => getAuthState(signal), staleTime: Infinity })
-  const signedOut = () => {
-    // Drop everything the previous user loaded, but keep the auth query
-    // mounted so its refetch switches to the login screen.
-    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' })
-    void queryClient.invalidateQueries({ queryKey: ['auth'] })
-  }
-  const logoutMutation = useMutation({
-    mutationFn: logout,
-    onSuccess: () => signedOut(),
-    // The session was already gone, so the user is effectively logged out.
-    onError: (err) => {
-      if (err instanceof ApiError && err.status === 401) signedOut()
-    },
-  })
+  const logoutMutation = useLogout()
   const user = auth.data?.user
   const navigate = useNavigate()
   const [help, setHelp] = useState(false)
@@ -160,9 +155,7 @@ export function Layout() {
       <header className="sticky top-0 z-30 flex print:hidden h-14 items-center gap-3 border-b border-slate-200 bg-slate-100/95 px-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
         <img src="/icons/logo-64.png" alt="" width={32} height={32} className="size-8 rounded-md" />
         <span className="max-sm:sr-only text-lg font-semibold text-brand-700 dark:text-brand-100">{t('app.name')}</span>
-        {auth.data?.tree && (
-          <span className="hidden truncate text-slate-600 sm:inline dark:text-slate-400">· {treeDisplayName(auth.data.tree.name, t)}</span>
-        )}
+        <TreeSwitcher />
         {user && (
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <LanguageSwitch />

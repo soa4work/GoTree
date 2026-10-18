@@ -55,6 +55,22 @@ describe('import page', () => {
     expect(screen.queryByText(/Only the owner of the tree/)).not.toBeInTheDocument()
   })
 
+  it('offers an owner the export with everyone', async () => {
+    mockApi(people(3))
+    renderApp('/import-export')
+    expect(await screen.findByRole('radio', { name: 'Include everyone' })).toBeChecked()
+    expect(screen.queryByText(/export the tree without living people/)).not.toBeInTheDocument()
+  })
+
+  it('offers a viewer no export with living people', async () => {
+    mockApi({ ...people(3), 'GET /api/auth/state': [200, { ...loggedInState, tree: { id: 1, name: 'Weber family', role: 'viewer' } }] })
+    renderApp('/import-export')
+    expect(await screen.findByText(/export the tree without living people/)).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: 'Include everyone' })).not.toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Leave living people out' })).toBeChecked()
+    expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute('href', expect.stringContaining('privacy=exclude-living'))
+  })
+
   it('disables replacing for an editor and says why', async () => {
     mockApi({ ...people(3), ...asEditor })
     renderApp('/import-export')
@@ -241,5 +257,23 @@ describe('import page', () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Check the export' }))
       expect(await screen.findByText(/An export check is already running/)).toBeInTheDocument()
     })
+  })
+})
+
+describe('backup section', () => {
+  it('tells administrators that the backup holds every tree and account', async () => {
+    mockApi(people(0))
+    renderApp('/import-export')
+    expect(await screen.findByText(/The backup holds every tree and every account on this server/)).toBeInTheDocument()
+  })
+
+  it('leaves the backup section out for users who are not administrators', async () => {
+    mockApi({
+      ...people(0),
+      'GET /api/auth/state': [200, { ...loggedInState, user: { id: 2, username: 'bob', displayName: '', role: 'user' } }] as [number, unknown],
+    })
+    renderApp('/import-export')
+    await screen.findByLabelText('GEDCOM file')
+    expect(screen.queryByText(/The backup holds every tree/)).not.toBeInTheDocument()
   })
 })

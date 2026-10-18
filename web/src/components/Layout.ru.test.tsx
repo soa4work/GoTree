@@ -26,6 +26,8 @@ describe('Russian interface', () => {
     expect(links).toContain('Главная')
     expect(links).toContain('Настенная схема')
     expect(links).toContain('Карта переселений')
+    expect(links).toContain('Участники')
+    expect(links).toContain('Учётные записи')
     expect(await screen.findByRole('heading', { name: 'Добро пожаловать в GoTree' })).toBeInTheDocument()
   })
 

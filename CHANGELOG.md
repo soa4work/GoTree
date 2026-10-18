@@ -9,6 +9,11 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Tree switcher in the header and a screen to pick or create a tree; a Members page where owners
+  rename the tree, add accounts by username as owner, editor or viewer, change roles and remove
+  members, and where every member can leave the tree; viewers can export only without living
+  people (#59)
+
 - Accounts, trees and members over the API (#59): administrators create and delete accounts,
   change their role and reset passwords (which signs the account out everywhere); owners add
   existing accounts to a tree as owner, editor or viewer, change roles and remove members, and a

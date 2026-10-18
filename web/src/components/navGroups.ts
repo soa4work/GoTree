@@ -1,6 +1,6 @@
 import type { ParseKeys } from 'i18next'
 import type { ComponentType } from 'react'
-import { AccountIcon, ChartIcon, CheckIcon, HeirloomIcon, HomeIcon, LinkIcon, MapIcon, PeopleIcon, PhotoIcon, ResearchIcon, ShareIcon, SourceIcon, TranscribeIcon, TransferIcon, TreeIcon, WallChartIcon } from './icons'
+import { AccountIcon, ChartIcon, CheckIcon, HeirloomIcon, HomeIcon, LinkIcon, MapIcon, MembersIcon, PeopleIcon, PhotoIcon, ResearchIcon, ShareIcon, SourceIcon, TranscribeIcon, TransferIcon, TreeIcon, WallChartIcon } from './icons'
 
 export interface NavItem {
   to: string
@@ -61,6 +61,7 @@ export const navGroups: NavGroup[] = [
     key: 'nav.groups.settings',
     items: [
       { to: '/sharing', key: 'nav.sharing', Icon: ShareIcon },
+      { to: '/members', key: 'nav.members', Icon: MembersIcon },
       { to: '/import-export', key: 'nav.importExport', Icon: TransferIcon },
       { to: '/account', key: 'nav.account', Icon: AccountIcon },
     ],

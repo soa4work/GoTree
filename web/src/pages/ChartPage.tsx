@@ -12,6 +12,7 @@ import { Button } from '../components/Button'
 import { SelectField } from '../components/Field'
 import { PageHeading } from '../components/PageHeading'
 import { TextField } from '../components/TextField'
+import { formatDay } from '../lib/dates'
 import { fullName } from '../lib/people'
 import { PersonPicker } from '../people/PersonPicker'
 import { layoutTree, type TreeView } from '../tree/layout'
@@ -30,7 +31,7 @@ async function asDataUri(url: string): Promise<string> {
 }
 
 export function ChartPage() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const [params, setParams] = useSearchParams()
   const rootId = Number(params.get('root')) || null
   const [view, setView] = useState<TreeView>('pedigree')
@@ -71,7 +72,7 @@ export function ChartPage() {
     (index
       ? t('chart.defaultSubtitle', {
           count: index.persons.size,
-          date: new Date().toLocaleDateString(i18n.language, { dateStyle: 'long' }),
+          date: formatDay(new Date().toISOString()),
         })
       : '')
   const size = paper === 'custom' ? custom : papers[paper]

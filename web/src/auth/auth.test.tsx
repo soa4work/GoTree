@@ -102,7 +102,7 @@ describe('login', () => {
     await user.clear(screen.getByLabelText('Password'))
     await user.type(screen.getByLabelText('Password'), 'correct horse battery')
     await user.click(screen.getByRole('button', { name: 'Log in' }))
-    expect(await screen.findByText('· Weber family')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Weber family/ })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Log out' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Log in' })).toBeInTheDocument()

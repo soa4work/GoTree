@@ -1,9 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GopherCredit } from './GopherCredit'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
-import { ApiError, getAuthState, logout } from '../api/client'
+import { ApiError, getAuthState } from '../api/client'
+import { useLogout } from '../auth/useLogout'
+import { TreeSwitcher } from '../trees/TreeSwitcher'
 import { mdQuery, useMediaQuery } from '../hooks/useMediaQuery'
 import { useShortcuts } from '../hooks/useShortcuts'
 import { Button } from './Button'
@@ -100,22 +102,8 @@ export function Layout() {
   const location = useLocation()
   const mainRef = useRef<HTMLElement>(null)
   const firstRender = useRef(true)
-  const queryClient = useQueryClient()
   const auth = useQuery({ queryKey: ['auth'], queryFn: ({ signal }) => getAuthState(signal), staleTime: Infinity })
-  const signedOut = () => {
-    // Drop everything the previous user loaded, but keep the auth query
-    // mounted so its refetch switches to the login screen.
-    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' })
-    void queryClient.invalidateQueries({ queryKey: ['auth'] })
-  }
-  const logoutMutation = useMutation({
-    mutationFn: logout,
-    onSuccess: () => signedOut(),
-    // The session was already gone, so the user is effectively logged out.
-    onError: (err) => {
-      if (err instanceof ApiError && err.status === 401) signedOut()
-    },
-  })
+  const logoutMutation = useLogout()
   const user = auth.data?.user
   const navigate = useNavigate()
   const [help, setHelp] = useState(false)
@@ -159,9 +147,7 @@ export function Layout() {
       <header className="sticky top-0 z-30 flex print:hidden h-14 items-center gap-3 border-b border-slate-200 bg-slate-100/95 px-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
         <img src="/icons/logo-64.png" alt="" width={32} height={32} className="size-8 rounded-md" />
         <span className="max-sm:sr-only text-lg font-semibold text-brand-700 dark:text-brand-100">{t('app.name')}</span>
-        {auth.data?.tree && (
-          <span className="hidden truncate text-slate-600 sm:inline dark:text-slate-400">· {auth.data.tree.name}</span>
-        )}
+        <TreeSwitcher />
         {user && (
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <LanguageSwitch />

@@ -21,6 +21,7 @@
     "quality": "Data quality",
     "relationship": "Relationships",
     "sharing": "Sharing",
+    "members": "Members",
     "account": "Account",
     "research": "Research",
     "transcribe": "Transcribe",
@@ -597,7 +598,8 @@
       "citations": "Citations",
       "heirlooms": "Heirlooms",
       "custody": "Heirloom holders"
-    }
+    },
+    "viewerPrivacy": "As a viewer you can export the tree without living people."
   },
   "relationship": {
     "intro": "Pick two people to see how the second is related to the first, and the line of people that connects them.",
@@ -816,6 +818,46 @@
     "reissueConfirm": "The current address of “{{label}}” will stop working. Send the new one to everyone who should keep access.",
     "reissuedTitle": "New address for “{{label}}”",
     "copyFailed": "Could not copy. Select the address and copy it by hand."
+  },
+  "roles": {
+    "owner": "Owner",
+    "editor": "Editor",
+    "viewer": "Viewer"
+  },
+  "trees": {
+    "title": "Your trees",
+    "switcherLabel": "Tree: {{name}}. Switch tree",
+    "current": "current",
+    "newName": "Name of the new tree",
+    "create": "Create tree",
+    "switchFailed": "Could not switch: {{message}}",
+    "noTreeTitle": "Choose a tree",
+    "noTreeText": "You are not working in a tree right now. Open one of your trees, create a new one, or ask the owner of a family tree to add you."
+  },
+  "members": {
+    "intro": "People with an account can work in this tree. Owners manage members, editors change the tree, viewers only read it.",
+    "manage": "Manage members",
+    "treeName": "Name of the tree",
+    "count_one": "{{count}} member",
+    "count_other": "{{count}} members",
+    "roleFor": "Role of {{name}}",
+    "username": "Username of the account",
+    "role": "Role",
+    "roleHint": {
+      "owner": "Manages members and sharing, can replace the tree.",
+      "editor": "Adds and changes people, sources and media.",
+      "viewer": "Only reads the tree; exports leave out living people."
+    },
+    "add": "Add member",
+    "added": "{{name}} was added.",
+    "remove": "Remove from tree",
+    "removeTitle": "Remove {{name}}?",
+    "removeMessage": "{{name}} will no longer see or change this tree. Their account stays.",
+    "ownerOnly": "Only the owners of this tree manage its members.",
+    "yourRole": "Your role in this tree: {{role}}.",
+    "leave": "Leave this tree",
+    "leaveTitle": "Leave this tree?",
+    "leaveMessage": "You will no longer see this tree. An owner can add you again."
   },
   "share": {
     "readOnly": "Read-only view",

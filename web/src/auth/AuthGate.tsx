@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getAuthState } from '../api/client'
 import { UpdateNotice } from '../components/UpdateNotice'
+import { NoTreePage } from '../trees/NoTreePage'
 import { LoginPage } from './LoginPage'
 import { SetupPage } from './SetupPage'
 
@@ -39,6 +40,14 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return (
       <>
         <LoginPage />
+        <UpdateNotice />
+      </>
+    )
+  }
+  if (!auth.data.tree) {
+    return (
+      <>
+        <NoTreePage />
         <UpdateNotice />
       </>
     )

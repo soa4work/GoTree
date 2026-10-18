@@ -1,4 +1,4 @@
-import { del, getJSON, postJSON, putJSON, uploadFile } from './client'
+import { del, getJSON, postJSON, putJSON, uploadFile, type TreeRole, type TreeSummary } from './client'
 import type {
   EventInput,
   Family,
@@ -209,3 +209,21 @@ export const getStats = (signal?: AbortSignal) => getJSON<Stats>('/stats', signa
 export const getMapData = (scope: 'all' | 'ancestors' | 'descendants', root: number | null, signal?: AbortSignal) =>
   getJSON<MapData>(`/map?${qs({ scope, root: root ?? 0 })}`, signal)
 export const getUnmappedPlaces = (signal?: AbortSignal) => getJSON<UnmappedPlaces>('/map/unmapped-places', signal)
+
+/** An account that works in a tree, with its role there. */
+export interface Member {
+  userId: number
+  username: string
+  displayName: string
+  role: TreeRole
+}
+
+export const listTrees = (signal?: AbortSignal) => getJSON<TreeSummary[]>('/trees', signal)
+export const createTree = (name: string) => postJSON<TreeSummary>('/trees', { name })
+export const renameTree = (id: number, name: string) => putJSON<TreeSummary>(`/trees/${id}`, { name })
+export const listMembers = (treeId: number, signal?: AbortSignal) => getJSON<Member[]>(`/trees/${treeId}/members`, signal)
+export const addMember = (treeId: number, username: string, role: TreeRole) =>
+  postJSON<Member>(`/trees/${treeId}/members`, { username, role })
+export const setMemberRole = (treeId: number, userId: number, role: TreeRole) =>
+  putJSON<Member>(`/trees/${treeId}/members/${userId}`, { role })
+export const removeMember = (treeId: number, userId: number) => del(`/trees/${treeId}/members/${userId}`)

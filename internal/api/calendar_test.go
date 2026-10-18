@@ -64,8 +64,8 @@ func TestCalendarFeedLanguage(t *testing.T) {
 		{"?lang=en", en},
 		{"?lang=xx", en},
 		{"?lang=", en},
-		{"?lang=ru", []string{"SUMMARY:День рождения: Anna Weber (год рождения 1850)", "SUMMARY:День памяти: Anna Weber (год смерти 1920)", "DESCRIPTION:Из семейного древа «"}},
-		{"?lang=KK-kz", []string{"SUMMARY:Туған күн: Anna Weber (туған жылы 1850)", "SUMMARY:Еске алу күні: Anna Weber (қайтыс болған жылы 1920)", `DESCRIPTION:GoTree-дегі "`}},
+		{"?lang=ru", []string{"SUMMARY:День рождения: Anna Weber (год рождения 1850)", "SUMMARY:День памяти: Anna Weber (год смерти 1920)", "DESCRIPTION:Из семейного дерева «"}},
+		{"?lang=KK-kz", []string{"SUMMARY:Туған күн: Anna Weber (туған жылы 1850)", "SUMMARY:Еске алу күні: Anna Weber (қайтыс болған жылы 1920)", `DESCRIPTION:GoTree-дегі «`}},
 	} {
 		resp, body := get(t, ts.URL+"/ical/"+feed.Token+".ics"+tc.query)
 		if resp.StatusCode != http.StatusOK {
@@ -92,7 +92,7 @@ func TestCalendarTexts(t *testing.T) {
 	}{
 		{"en", "Wedding anniversary: A & B (1900)"},
 		{"ru", "Годовщина свадьбы: A & B (1900)"},
-		{"kk", "Үйлену тойының жылдығы: A & B (1900)"},
+		{"kk", "Үйлену мерейтойы: A & B (1900)"},
 		{"", "Wedding anniversary: A & B (1900)"},
 	} {
 		if got := calendarTextsFor(tc.lang).summary("MARR", "A & B", 1900); got != tc.want {

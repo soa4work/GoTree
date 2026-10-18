@@ -74,7 +74,7 @@ describe('kk: siblings by seniority and ego sex', () => {
     const people = [p(1, 'M', MID), p(10, 'M'), p(2, 'M', OLD), p(20, 'M'), p(21, 'F')]
     const half = (ancestor: number) => kinshipName(t, kin(1, 1, [1, 10, 2], { half: true, ancestors: [ancestor] }), 'M', byId(people))
     expect(half(20)).toBe('аға (әкесі бір)')
-    expect(half(21)).toBe('аға (анасы бір)')
+    expect(half(21)).toBe('аға (шешесі бір)')
     expect(half(-3)).toBe('аға (жартылай)')
   })
 })
@@ -84,7 +84,7 @@ describe('kk: parents and ancestors', () => {
   const mother = p(11, 'F')
   it.each<[string, number, PersonRef[], string]>([
     ['father', 1, [p(1, 'M'), p(2, 'M')], 'әке'],
-    ['mother', 1, [p(1, 'M'), p(2, 'F')], 'ана'],
+    ['mother', 1, [p(1, 'M'), p(2, 'F')], 'шеше'],
     ['parent of unknown sex', 1, [p(1, 'M'), p(2, 'U')], 'ата-ана'],
     ['paternal grandfather', 2, [p(1, 'M'), father, p(2, 'M')], 'ата'],
     ['paternal grandmother', 2, [p(1, 'M'), father, p(2, 'F')], 'әже'],
@@ -224,7 +224,7 @@ describe('kk: half and adoptive', () => {
 
   it('marks adoptive direct kin and siblings with a prefix and others with a note', () => {
     expect(blood(1, 0, [p(1, 'M'), p(2, 'M')], { adoptive: true })).toBe('асырап алған әке')
-    expect(blood(1, 0, [p(1, 'M'), p(2, 'F')], { adoptive: true })).toBe('асырап алған ана')
+    expect(blood(1, 0, [p(1, 'M'), p(2, 'F')], { adoptive: true })).toBe('асырап алған шеше')
     expect(blood(0, 1, [p(1, 'M'), p(2, 'F')], { adoptive: true })).toBe('асыранды қыз')
     expect(blood(1, 1, [p(1, 'M', MID), p(10, 'M'), p(2, 'M', OLD)], { adoptive: true })).toBe('асыранды аға')
     expect(blood(2, 1, [p(1, 'M'), p(10, 'M'), p(12, 'M'), p(2, 'F')], { adoptive: true })).toBe('тәте (асырап алу арқылы)')
@@ -234,7 +234,7 @@ describe('kk: half and adoptive', () => {
     const people = [p(1, 'M'), p(10, 'M'), p(12, 'M'), p(2, 'F'), p(20, 'M'), p(21, 'F')]
     const path = [1, 10, 12, 2]
     expect(kinshipName(t, kin(2, 1, path, { half: true, ancestors: [20] }), 'F', byId(people))).toBe('тәте (әкесі бір)')
-    expect(kinshipName(t, kin(2, 1, path, { half: true, ancestors: [21] }), 'F', byId(people))).toBe('тәте (анасы бір)')
+    expect(kinshipName(t, kin(2, 1, path, { half: true, ancestors: [21] }), 'F', byId(people))).toBe('тәте (шешесі бір)')
   })
 })
 

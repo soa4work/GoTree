@@ -102,6 +102,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Kazakh and Russian wording proofread (#46)
+
 - Errors in transcription rows and in GEDCOM files are shown in the interface language (#43)
 
 - «й» and the Kazakh letters sort in alphabet order, and transcriptions reuse a place whatever the

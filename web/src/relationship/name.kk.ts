@@ -17,7 +17,7 @@ import type { Kinship, PersonRef, RelationshipReport, Sex } from '../api/types'
  * path, which is why kinship parts carry `path`.
  *
  * Direct kin
- *  - Parents: әке, ана; unknown sex ата-ана. Grandparents: ата, әже through the
+ *  - Parents: әке, шеше; unknown sex ата-ана. Grandparents: ата, әже through the
  *    father (or when the side is unknown), нағашы ата, нағашы әже through the
  *    mother. Great-grandparents: арғы ата, арғы әже. Further up
  *    "N-ші буын ата-бабасы".
@@ -41,7 +41,7 @@ import type { Kinship, PersonRef, RelationshipReport, Sex } from '../api/types'
  *    unknown parent sex, "немере" + the sibling term.
  *  - Anything else: "N-ші буындағы туыс" with N = up + down; ordinals take
  *    -ші or -шы by the vowel harmony of the numeral (6-шы, 9-шы, 10-шы).
- * Half-blood marks: "(әкесі бір)" (same father), "(анасы бір)" (same mother).
+ * Half-blood marks: "(әкесі бір)" (same father), "(шешесі бір)" (same mother).
  * Adoptive parents are "асырап алған әке/шеше", adoptive children and siblings
  * take the prefix асыранды.
  *
@@ -87,7 +87,7 @@ const possessive: Record<string, string> = {
   бөле: 'бөлесі',
   туыс: 'туысы',
   әке: 'әкесі',
-  ана: 'анасы',
+  шеше: 'шешесі',
   'ата-ана': 'ата-анасы',
   ата: 'атасы',
   әже: 'әжесі',
@@ -206,7 +206,7 @@ function bloodTerm(k: KinshipPart, g: Gender, c: Context): Term {
   const { up, down } = k
   const egoG = gender(c.ego?.sex)
   if (down === 0) {
-    if (up === 1) return g === 'M' ? one('әке') : g === 'F' ? one('ана') : one('ата-ана')
+    if (up === 1) return g === 'M' ? one('әке') : g === 'F' ? one('шеше') : one('ата-ана')
     if (up === 2) {
       // Through the mother (the mother's parents) the grandparents are нағашы.
       const maternal = c.at(1)?.sex === 'F'
@@ -289,7 +289,7 @@ function modify(term: Term, k: KinshipPart, halfSex: Sex | undefined): Term {
   }
   if (k.half) {
     // The shared parent: the same father or the same mother.
-    return withTail(term, halfSex === 'M' ? ' (әкесі бір)' : halfSex === 'F' ? ' (анасы бір)' : ' (жартылай)')
+    return withTail(term, halfSex === 'M' ? ' (әкесі бір)' : halfSex === 'F' ? ' (шешесі бір)' : ' (жартылай)')
   }
   return term
 }

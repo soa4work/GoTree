@@ -23,6 +23,12 @@ func (s *Server) exportGEDCOM(w http.ResponseWriter, r *http.Request) {
 	v7 := q.Get("version") == "7.0"
 	zipped := q.Get("format") == "gedzip"
 	a := actorFrom(r)
+	// Viewers read the tree but may not take a full copy of living relatives'
+	// data; an empty privacy means "all" (store.ExportGEDCOM).
+	if p := q.Get("privacy"); (p == "" || p == store.PrivacyAll) && !a.CanEdit() {
+		writeError(w, http.StatusForbidden, CodeExportLivingEditors, "only owners and editors can export living people")
+		return
+	}
 	ex, err := s.Store.ExportGEDCOM(r.Context(), a, store.ExportOptions{
 		Version7: v7, Privacy: q.Get("privacy"), WithMedia: zipped, AppVersion: s.Version,
 	})

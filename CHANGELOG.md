@@ -112,7 +112,7 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 - Replacing a tree by GEDCOM import is refused for anyone but the owner in the storage layer too, and viewers cannot import (#57)
 
-- Failed logins are limited per username as well as per address, so a botnet cannot keep guessing one account's password and one client behind a trusted proxy can no longer lock everyone out; the list of failures no longer grows without bound (#57)
+- Failed logins are limited per username as well as per address, so a botnet cannot keep guessing one account's password and one client behind a trusted proxy can no longer lock everyone out; guessing the owner's name does not lock the owner out of an address they recently logged in from; the list of failures no longer grows without bound (#57)
 
 - Searching places, sources, repositories and heirlooms ignores the case of Russian and Kazakh
   letters and treats ё as е, so «москва» finds «Москва» (#52)

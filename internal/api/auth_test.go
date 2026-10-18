@@ -404,7 +404,7 @@ func TestThrottleKnownAddressIsNotLockedOutByUsername(t *testing.T) {
 	if th.allow("203.0.113.9", "owner") {
 		t.Error("the address limit must still apply")
 	}
-	// After 90 days the memory expires.
+	// After knownAddressTTL the memory expires.
 	now = now.Add(th.trustTTL + th.window + time.Minute)
 	for i := range th.maxUser {
 		th.allow(fmt.Sprintf("198.51.100.%d", i), "owner")
@@ -521,5 +521,17 @@ func TestSessionCookieIsRefreshedWhenExtended(t *testing.T) {
 	// The session was created a moment before t0, so allow a few seconds.
 	if got, want := maxAge(), int(10*day/time.Second); got > want || got < want-5 {
 		t.Errorf("cookie near the absolute limit: MaxAge = %d, want %d", got, want)
+	}
+}
+
+func TestThrottleKnownAddressOutlastsSession(t *testing.T) {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	th := newLoginThrottle()
+	th.now = func() time.Time { return now }
+	th.succeed("203.0.113.9", "owner")
+	// The session from that login ends now and the owner must log in again.
+	now = now.Add(store.SessionMaxAge)
+	if !th.isKnown(userKey("owner"), ipKey("203.0.113.9")) {
+		t.Error("the owner's address must still be known when their session reaches its absolute limit")
 	}
 }

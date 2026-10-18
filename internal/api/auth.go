@@ -410,12 +410,16 @@ const (
 	maxKnownPerUser = 8
 	// maxUsernameLen is validUsername's maximum; longer names cannot exist.
 	maxUsernameLen = 64
+	// knownAddressTTL outlasts a session, so the owner is still recognised
+	// when the session from their last login reaches SessionMaxAge and they
+	// have to log in again.
+	knownAddressTTL = store.SessionMaxAge + store.SessionTTL
 )
 
 func newLoginThrottle() *loginThrottle {
 	return &loginThrottle{failures: map[string][]time.Time{}, known: map[string]map[string]time.Time{},
 		maxIP: 20, maxUser: 10, window: 15 * time.Minute, maxKeys: 10_000,
-		trustTTL: store.SessionMaxAge, now: time.Now}
+		trustTTL: knownAddressTTL, now: time.Now}
 }
 
 // addrKey names a client address; an IPv6 client usually holds a whole /64,

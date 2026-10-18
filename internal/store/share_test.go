@@ -305,6 +305,27 @@ func TestShareSearchNameOnlyUsesPrimaryName(t *testing.T) {
 		t.Errorf("members still search every name: %+v", owner.Items)
 	}
 
+	// Accents the index keeps must not be dropped: «і» finds «Їжак» only
+	// through the hidden «Іван».
+	person(PersonInput{GivenNames: "Їжак", Surname: "Коваль", Nickname: "Іван"}, false)
+	for _, q := range []string{"і", "Іван"} {
+		if list := search(sh, q); list.Total != 0 {
+			t.Errorf("%q must not find Їжак: %+v", q, list.Items)
+		}
+	}
+	if list := search(sh, "Їжак"); list.Total != 1 {
+		t.Errorf("Їжак: %+v", list.Items)
+	}
+
+	// Relevance would put the namesake whose hidden names repeat «W» first.
+	plain := person(PersonInput{GivenNames: "Lisa", Surname: "Weber"}, false)
+	if list := search(sh, "W"); len(list.Items) != 2 || list.Items[0].ID != lisa.ID || list.Items[1].ID != plain.ID {
+		t.Errorf("W: name order expected: %+v", list.Items)
+	}
+	if list := search(sh, "We"); len(list.Items) != 2 || list.Items[0].ID != lisa.ID {
+		t.Errorf("We: name order expected: %+v", list.Items)
+	}
+
 	deceased := shareFor(t, s, a, ShareLinkInput{Label: "deceased", Scope: ShareScopeTree, Privacy: SharePrivacyDeceased})
 	if list := search(deceased, "Lisa"); list.Total != 0 {
 		t.Errorf("deceased-only link finds the living: %+v", list.Items)

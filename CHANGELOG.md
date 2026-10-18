@@ -103,7 +103,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - Share links that show living people by name only no longer find them by nickname or other names,
-  such as a maiden name; only their given names and surname are searched (#58)
+  such as a maiden name; only their given names and surname are searched, and such links list
+  matches in name order, since relevance also weighed the hidden names (#58)
 
 - Searching places, sources, repositories and heirlooms ignores the case of Russian and Kazakh
   letters and treats ё as е, so «москва» finds «Москва» (#52)

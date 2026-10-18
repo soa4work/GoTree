@@ -196,21 +196,26 @@ func (s *Store) SharePersons(ctx context.Context, sh Share, query string) (Perso
 	if err != nil {
 		return PersonList{}, err
 	}
-	ids, err := personIDs(ctx, s.DB, sh.Actor, ftsQuery(query), -1, 0)
-	if err != nil {
-		return PersonList{}, err
-	}
 	// The search index also holds nicknames and alternate names (a maiden
 	// name, say). A person shown by name only must not be found by those,
-	// or the link would reveal names it hides.
+	// or the link would reveal names it hides. Relevance is computed over
+	// all names too, so such links list matches in name order instead.
+	var ids []int64
 	var words []string
 	var given, surname map[int64]string
 	if sc.namesOnly {
-		if words = searchWords(query); len(words) > 0 {
-			if given, surname, err = s.primaryNames(ctx, sh.Actor); err != nil {
-				return PersonList{}, err
-			}
+		words = searchWords(query)
+	}
+	if len(words) > 0 {
+		if given, surname, err = s.primaryNames(ctx, sh.Actor); err != nil {
+			return PersonList{}, err
 		}
+		ids, err = queryIDs(ctx, s.DB, searchPersonsByNameSQL, ftsQuery(query), sh.Actor.TreeID, -1, 0)
+	} else {
+		ids, err = personIDs(ctx, s.DB, sh.Actor, ftsQuery(query), -1, 0)
+	}
+	if err != nil {
+		return PersonList{}, err
 	}
 	out := PersonList{Items: []PersonRef{}}
 	var shown []int64
@@ -218,7 +223,7 @@ func (s *Store) SharePersons(ctx context.Context, sh Share, query string) (Perso
 		if !sc.sees(id) {
 			continue
 		}
-		if words != nil && sc.reduced(id) && !primaryNameMatches(given[id], surname[id], words) {
+		if len(words) > 0 && sc.reduced(id) && !primaryNameMatches(given[id], surname[id], words) {
 			continue
 		}
 		out.Total++
@@ -235,6 +240,14 @@ func (s *Store) SharePersons(ctx context.Context, sh Share, query string) (Perso
 	}
 	return out, nil
 }
+
+// searchPersonsByNameSQL is searchPersonsSQL in list order, without the
+// relevance that hidden names would sway.
+const searchPersonsByNameSQL = `
+	SELECT p.id FROM persons_fts f JOIN persons p ON p.id = f.rowid
+	WHERE persons_fts MATCH ? AND p.tree_id = ?
+	ORDER BY p.surname = '', p.surname_key, p.given_key, p.id
+	LIMIT ? OFFSET ?`
 
 // primaryNames loads the given names and surname of every person of the tree.
 func (s *Store) primaryNames(ctx context.Context, a Actor) (given, surname map[int64]string, err error) {
@@ -256,13 +269,22 @@ func (s *Store) primaryNames(ctx context.Context, a Actor) (given, surname map[i
 }
 
 // nameTokens splits a name the way the search index does: folded like
-// searchFold, lower-cased, accents removed, split at non-letters/digits.
+// searchFold, lower-cased, accents of Latin letters removed, split at
+// non-letters/digits. The index keeps other accents (ї stays ї), so they
+// stay here too: dropping them would let «і» match «Їжак» while the index
+// matched a hidden «Іван».
 func nameTokens(s string) []string {
 	var b strings.Builder
+	latin := false
 	for _, r := range norm.NFD.String(s) {
-		if !unicode.Is(unicode.Mn, r) {
-			b.WriteRune(r)
+		if unicode.Is(unicode.Mn, r) {
+			if latin {
+				continue
+			}
+		} else {
+			latin = unicode.Is(unicode.Latin, r)
 		}
+		b.WriteRune(r)
 	}
 	return strings.FieldsFunc(db.SearchFold(b.String()), func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)

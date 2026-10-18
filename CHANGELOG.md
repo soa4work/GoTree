@@ -102,6 +102,10 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The people list and a share link's people list no longer sort the whole tree for every page,
+  so a share link on a large tree answers quickly, and paging through search results no longer
+  repeats or skips people whose names differ only in case or accents (#49)
+
 - Kazakh and Russian wording proofread (#46)
 
 - Errors in transcription rows and in GEDCOM files are shown in the interface language (#43)

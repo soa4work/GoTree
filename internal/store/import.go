@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/praetorianer777/gotree/internal/db"
 	"github.com/praetorianer777/gotree/internal/gedcom"
 	"github.com/praetorianer777/gotree/internal/gendate"
 )
@@ -244,8 +245,8 @@ func (im *importer) prepare(ctx context.Context) error {
 	var err error
 	if im.insertPerson, err = im.tx.PrepareContext(ctx, `
 		INSERT INTO persons (tree_id, given_names, surname, name_prefix, name_suffix, nickname, sex, notes, gedcom_xref,
-			extra_json, created_at, updated_at, created_by, updated_by)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
+			extra_json, created_at, updated_at, created_by, updated_by, surname_key, given_key)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
 		return err
 	}
 	if im.insertEvent, err = im.tx.PrepareContext(ctx, `
@@ -730,7 +731,8 @@ func (im *importer) person(ctx context.Context, r *gedcom.Node) error {
 		primary = &parsedName{}
 	}
 	res, err := im.insertPerson.ExecContext(ctx, im.a.TreeID, primary.given, primary.surname, primary.prefix, primary.suffix,
-		primary.nickname, sex, joinNotes(notes), r.Xref, extraJSON(kept), im.now, im.now, nullID(im.a.UserID), nullID(im.a.UserID))
+		primary.nickname, sex, joinNotes(notes), r.Xref, extraJSON(kept), im.now, im.now, nullID(im.a.UserID), nullID(im.a.UserID),
+		db.NamesKey(primary.surname), db.NamesKey(primary.given))
 	if err != nil {
 		return err
 	}

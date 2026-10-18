@@ -46,4 +46,17 @@ describe('lookupPlace', () => {
     await vi.advanceTimersByTimeAsync(LOOKUP_GAP_MS * 2)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+
+  it('gives an aborted last slot back to the next lookup', async () => {
+    await lookupPlace('Leipzig')
+    const ctl = new AbortController()
+    const queued = lookupPlace('Dresden', ctl.signal)
+    const rejected = expect(queued).rejects.toBeDefined()
+    ctl.abort()
+    await rejected
+    const next = lookupPlace('Berlin')
+    await vi.advanceTimersByTimeAsync(LOOKUP_GAP_MS)
+    await next
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
 })

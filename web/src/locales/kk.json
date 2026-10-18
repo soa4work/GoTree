@@ -615,7 +615,7 @@
       "ansel_unreadable_one": "{{count}} ANSEL таңбасы оқылмады, олар � белгісімен ауыстырылды",
       "ansel_unreadable_other": "{{count}} ANSEL таңбасы оқылмады, олар � белгісімен ауыстырылды",
       "broken_reference": "@{{xref}}@ жазбасы ({{what}}) жоқ",
-      "partner_and_child": "@{{xref}}@ — @{{family}}@ отбасында әрі жұбай, әрі бала; бала байланысы өткізілді",
+      "partner_and_child": "@{{xref}}@ — @{{family}}@ отбасында әрі жұбай, әрі бала; бала байланысы өткізіліп жіберілді",
       "famc_child": "@{{xref}}@ @{{family}}@ отбасына бала ретінде қосылды",
       "famc_child_unnamed": "Адам @{{family}}@ отбасына бала ретінде қосылды",
       "invalid_date": "«{{date}}»"

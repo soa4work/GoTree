@@ -28,16 +28,24 @@ function waitTurn(signal?: AbortSignal): Promise<void> {
   nextSlot = at + LOOKUP_GAP_MS
   if (at === now) return Promise.resolve()
   return new Promise((resolve, reject) => {
-    if (signal?.aborted) return reject(signal.reason)
-    const timer = setTimeout(resolve, at - now)
-    signal?.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer)
-        reject(signal.reason)
-      },
-      { once: true },
-    )
+    // An aborted call gives its slot back when nobody queued behind it.
+    const release = () => {
+      if (nextSlot === at + LOOKUP_GAP_MS) nextSlot = at
+    }
+    if (signal?.aborted) {
+      release()
+      return reject(signal.reason)
+    }
+    const onAbort = () => {
+      clearTimeout(timer)
+      release()
+      reject(signal?.reason)
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, at - now)
+    signal?.addEventListener('abort', onAbort, { once: true })
   })
 }
 

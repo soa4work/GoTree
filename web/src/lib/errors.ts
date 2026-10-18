@@ -20,7 +20,7 @@ function translate(t: TFunction, prefix: string, detail: ErrorDetail, fallback: 
 }
 
 /** Browsers word a failed fetch differently: "Failed to fetch", "Load failed", "NetworkError when attempting to fetch resource". */
-const networkFailure = /fetch|network|load failed/i
+const networkFailure = /failed to fetch|networkerror|load failed|network request failed/i
 
 /**
  * The text of an error in the interface language. Server errors are looked up

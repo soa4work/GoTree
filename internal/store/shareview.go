@@ -332,7 +332,7 @@ func (s *Store) SharePerson(ctx context.Context, sh Share, id int64) (PersonDeta
 	d.Portrait = nil
 	d.CreatedAt, d.UpdatedAt = "", ""
 	if sc.reduced(id) {
-		d.NamePrefix, d.NameSuffix, d.Nickname, d.Notes = "", "", "", ""
+		d.NamePrefix, d.NameSuffix, d.Nickname, d.Notes, d.NameNotes = "", "", "", "", ""
 		d.IsLiving = nil
 		d.AlternateNames, d.Citations, d.Events = []AlternateName{}, []CitationRef{}, []Event{}
 	} else {

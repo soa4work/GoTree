@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import type { ImportReport, TagStat } from '../api/types'
 
-const countKeys = ['persons', 'families', 'events', 'places', 'sources', 'repositories', 'citations'] as const
+const countKeys = ['persons', 'families', 'events', 'places', 'sources', 'repositories', 'citations', 'media'] as const
 
 export function ImportReportView({ report }: { report: ImportReport }) {
   const { t } = useTranslation()

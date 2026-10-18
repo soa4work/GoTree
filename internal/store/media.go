@@ -139,39 +139,15 @@ func (s *Store) checkMediaLink(ctx context.Context, q queryer, a Actor, l MediaL
 // CreateMedia records a stored file, or returns the existing record when
 // the tree already has the same file. link, when given, attaches it.
 func (s *Store) CreateMedia(ctx context.Context, a Actor, in NewMedia, link *MediaLinkInput) (m Media, created bool, err error) {
+	var id int64
 	err = s.tx(ctx, func(tx *sql.Tx) error {
 		if link != nil {
 			if err := s.checkMediaLink(ctx, tx, a, *link); err != nil {
 				return err
 			}
 		}
-		var id int64
-		err := tx.QueryRowContext(ctx, `SELECT id FROM media WHERE tree_id = ? AND sha256 = ?`, a.TreeID, in.SHA256).Scan(&id)
-		switch {
-		case errors.Is(err, sql.ErrNoRows):
-			title := strings.TrimSuffix(in.OriginalName, extOf(in.OriginalName))
-			now := s.now()
-			res, err := tx.ExecContext(ctx, `
-				INSERT INTO media (tree_id, sha256, mime, kind, size, original_name, width, height, orientation, title,
-					taken_at, gps_lat, gps_lng, created_at, updated_at, created_by, updated_by)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				a.TreeID, in.SHA256, in.Mime, in.Kind, in.Size, in.OriginalName, in.Width, in.Height, max(in.Orientation, 1),
-				title, in.TakenAt, in.Lat, in.Lng, now, now, nullID(a.UserID), nullID(a.UserID))
-			if err != nil {
-				return err
-			}
-			id, _ = res.LastInsertId()
-			for _, r := range in.Regions {
-				if validRegion(r) {
-					if _, err := tx.ExecContext(ctx, `
-						INSERT INTO media_regions (media_id, name, x, y, w, h, source) VALUES (?, ?, ?, ?, ?, ?, 'xmp')`,
-						id, truncate(r.Name, 200), r.X, r.Y, r.W, r.H); err != nil {
-						return err
-					}
-				}
-			}
-			created = true
-		case err != nil:
+		var err error
+		if id, created, err = s.insertMedia(ctx, tx, a, in, s.now()); err != nil {
 			return err
 		}
 		if link != nil {
@@ -188,6 +164,45 @@ func (s *Store) CreateMedia(ctx context.Context, a Actor, in NewMedia, link *Med
 		return nil
 	})
 	return m, created, err
+}
+
+// insertMedia adds the record of a stored file to the tree, or finds the
+// one the tree already has for the same content. Face tags are imported
+// only for a new record.
+func (s *Store) insertMedia(ctx context.Context, tx *sql.Tx, a Actor, in NewMedia, now string) (id int64, created bool, err error) {
+	err = tx.QueryRowContext(ctx, `SELECT id FROM media WHERE tree_id = ? AND sha256 = ?`, a.TreeID, in.SHA256).Scan(&id)
+	if !errors.Is(err, sql.ErrNoRows) {
+		return id, false, err
+	}
+	title := strings.TrimSuffix(in.OriginalName, extOf(in.OriginalName))
+	res, err := tx.ExecContext(ctx, `
+		INSERT INTO media (tree_id, sha256, mime, kind, size, original_name, width, height, orientation, title,
+			taken_at, gps_lat, gps_lng, created_at, updated_at, created_by, updated_by)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.TreeID, in.SHA256, in.Mime, in.Kind, in.Size, in.OriginalName, in.Width, in.Height, max(in.Orientation, 1),
+		title, in.TakenAt, in.Lat, in.Lng, now, now, nullID(a.UserID), nullID(a.UserID))
+	if err != nil {
+		return 0, false, err
+	}
+	id, _ = res.LastInsertId()
+	for _, r := range in.Regions {
+		if validRegion(r) {
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO media_regions (media_id, name, x, y, w, h, source) VALUES (?, ?, ?, ?, ?, ?, 'xmp')`,
+				id, truncate(r.Name, 200), r.X, r.Y, r.W, r.H); err != nil {
+				return 0, false, err
+			}
+		}
+	}
+	return id, true, nil
+}
+
+// MediaFileUsed reports whether any tree has a medium with this content,
+// that is, whether the stored file is still needed.
+func (s *Store) MediaFileUsed(ctx context.Context, sha string) (bool, error) {
+	var n int
+	err := s.DB.QueryRowContext(ctx, `SELECT count(*) FROM media WHERE sha256 = ?`, sha).Scan(&n)
+	return n > 0, err
 }
 
 func extOf(name string) string {

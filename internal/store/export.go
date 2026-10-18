@@ -56,6 +56,7 @@ type exportPerson struct {
 	id                                       int64
 	given, surname, prefix, suffix, nickname string
 	sex, notes, xref, extra                  string
+	nameNotes                                string
 	living                                   bool
 }
 
@@ -64,6 +65,7 @@ type exportName struct {
 	id                                            int64
 	typ, given, surname, prefix, suffix, nickname string
 	status, statusReason                          string
+	notes                                         string
 }
 
 type exportEvent struct {
@@ -148,6 +150,9 @@ func (s *Store) ExportGEDCOM(ctx context.Context, a Actor, opt ExportOptions) (E
 	if err := ex.load(ctx); err != nil {
 		return Export{}, err
 	}
+	if err := ex.loadMediaXrefs(ctx); err != nil {
+		return Export{}, err
+	}
 	if err := ex.build(ctx); err != nil {
 		return Export{}, err
 	}
@@ -161,14 +166,14 @@ func (ex *exporter) load(ctx context.Context) error {
 		return err
 	}
 	rows, err := db.QueryContext(ctx, `
-		SELECT id, given_names, surname, name_prefix, name_suffix, nickname, sex, notes, gedcom_xref, extra_json
+		SELECT id, given_names, surname, name_prefix, name_suffix, nickname, sex, notes, gedcom_xref, extra_json, name_notes
 		FROM persons WHERE tree_id = ? ORDER BY id`, a.TreeID)
 	if err != nil {
 		return err
 	}
 	for rows.Next() {
 		var p exportPerson
-		if err := rows.Scan(&p.id, &p.given, &p.surname, &p.prefix, &p.suffix, &p.nickname, &p.sex, &p.notes, &p.xref, &p.extra); err != nil {
+		if err := rows.Scan(&p.id, &p.given, &p.surname, &p.prefix, &p.suffix, &p.nickname, &p.sex, &p.notes, &p.xref, &p.extra, &p.nameNotes); err != nil {
 			rows.Close()
 			return err
 		}
@@ -191,14 +196,14 @@ func (ex *exporter) load(ctx context.Context) error {
 	}
 
 	rows, err = db.QueryContext(ctx, `
-		SELECT n.person_id, n.id, n.type, n.given_names, n.surname, n.name_prefix, n.name_suffix, n.nickname, n.status, n.status_reason
+		SELECT n.person_id, n.id, n.type, n.given_names, n.surname, n.name_prefix, n.name_suffix, n.nickname, n.status, n.status_reason, n.notes
 		FROM person_names n JOIN persons p ON p.id = n.person_id WHERE p.tree_id = ? ORDER BY n.person_id, n.sort_order, n.id`, a.TreeID)
 	if err != nil {
 		return err
 	}
 	for rows.Next() {
 		var n exportName
-		if err := rows.Scan(&n.personID, &n.id, &n.typ, &n.given, &n.surname, &n.prefix, &n.suffix, &n.nickname, &n.status, &n.statusReason); err != nil {
+		if err := rows.Scan(&n.personID, &n.id, &n.typ, &n.given, &n.surname, &n.prefix, &n.suffix, &n.nickname, &n.status, &n.statusReason, &n.notes); err != nil {
 			rows.Close()
 			return err
 		}
@@ -279,25 +284,55 @@ func (ex *exporter) load(ctx context.Context) error {
 
 	rows, err = db.QueryContext(ctx, `
 		-- GEDCOM cites a fact as a whole; a citation of its date and of its
-		-- place is one SOUR.
-		SELECT DISTINCT l.entity_type, l.entity_id, c.id, c.source_id, c.page, c.text, c.notes, c.quality, c.extra_json
+		-- place is one SOUR (see the de-duplication below). A citation of the
+		-- main name is field "name" of the person.
+		SELECT l.entity_type, l.entity_id, l.field, c.id, c.source_id, c.page, c.text, c.notes, c.quality, c.extra_json
 		FROM citation_links l JOIN citations c ON c.id = l.citation_id
 		WHERE c.tree_id = ? ORDER BY c.id`, a.TreeID)
 	if err != nil {
 		return err
 	}
 	for rows.Next() {
-		var typ string
+		var typ, field string
 		var eid int64
 		var c exportCitation
-		if err := rows.Scan(&typ, &eid, &c.id, &c.sourceID, &c.page, &c.text, &c.notes, &c.quality, &c.extra); err != nil {
+		if err := rows.Scan(&typ, &eid, &field, &c.id, &c.sourceID, &c.page, &c.text, &c.notes, &c.quality, &c.extra); err != nil {
 			rows.Close()
 			return err
 		}
 		key := fmt.Sprintf("%s:%d", typ, eid)
-		ex.cites[key] = append(ex.cites[key], c)
+		if typ == "person" && field == "name" {
+			key = fmt.Sprintf("person-name:%d", eid)
+		}
+		dup := false
+		for _, o := range ex.cites[key] {
+			dup = dup || o.id == c.id
+		}
+		if !dup {
+			ex.cites[key] = append(ex.cites[key], c)
+		}
 	}
 	rows.Close()
+	// A citation of the person as a whole that also cites the name is
+	// written once, at person level.
+	for key, list := range ex.cites {
+		id, ok := strings.CutPrefix(key, "person-name:")
+		if !ok {
+			continue
+		}
+		whole := ex.cites["person:"+id]
+		kept := list[:0:0]
+		for _, c := range list {
+			dup := false
+			for _, o := range whole {
+				dup = dup || o.id == c.id
+			}
+			if !dup {
+				kept = append(kept, c)
+			}
+		}
+		ex.cites[key] = kept
+	}
 
 	rows, err = db.QueryContext(ctx, `
 		SELECT p.event_id, p.person_id, p.role, p.custom_role FROM event_participants p JOIN events e ON e.id = p.event_id WHERE e.tree_id = ?`, a.TreeID)
@@ -380,6 +415,29 @@ func (ex *exporter) load(ctx context.Context) error {
 		rows.Close()
 	}
 	return nil
+}
+
+// loadMediaXrefs maps the GEDCOM IDs of imported media objects to the ones
+// the export writes, so that kept pointers to them stay valid. Without media
+// in the export there are no such objects, and those pointers are dropped.
+func (ex *exporter) loadMediaXrefs(ctx context.Context) error {
+	if !ex.opt.WithMedia {
+		return nil
+	}
+	rows, err := ex.s.DB.QueryContext(ctx, `SELECT id, gedcom_xref FROM media WHERE tree_id = ? AND gedcom_xref <> ''`, ex.a.TreeID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var xref string
+		if err := rows.Scan(&id, &xref); err != nil {
+			return err
+		}
+		ex.xrefMap[xref] = fmt.Sprintf("O%d", id)
+	}
+	return rows.Err()
 }
 
 func personXref(id int64) string { return fmt.Sprintf("I%d", id) }
@@ -531,12 +589,16 @@ func (ex *exporter) nameNode(typ, given, surname, prefix, suffix, nickname strin
 
 func (ex *exporter) personRecord(p exportPerson, events []exportEvent, partnerFams []int64, childFams []exportChildRef) *gedcom.Node {
 	r := &gedcom.Node{Xref: personXref(p.id), Tag: "INDI"}
-	r.Children = append(r.Children, ex.nameNode("", p.given, p.surname, p.prefix, p.suffix, p.nickname))
+	nn0 := ex.nameNode("", p.given, p.surname, p.prefix, p.suffix, p.nickname)
+	r.Children = append(r.Children, nn0)
 	short := ex.nameOnly[p.id]
 	if !short {
+		add(nn0, "NOTE", p.nameNotes)
+		ex.citations(nn0, "person-name", p.id)
 		for _, n := range ex.names[p.id] {
 			nn := ex.nameNode(n.typ, n.given, n.surname, n.prefix, n.suffix, n.nickname)
 			ex.status(nn, n.status, n.statusReason)
+			add(nn, "NOTE", n.notes)
 			ex.citations(nn, "name", n.id)
 			r.Children = append(r.Children, nn)
 		}
@@ -821,6 +883,13 @@ func (ex *exporter) fromKept(k keptNode) *gedcom.Node {
 				return nil
 			}
 		}
+		if strings.HasPrefix(mapped, "O") {
+			// A kept pointer to a media object (under a citation, say) needs
+			// the object in the file.
+			var id int64
+			fmt.Sscanf(mapped, "O%d", &id)
+			ex.used[id] = true
+		}
 	}
 	for _, c := range k.Children {
 		if cn := ex.fromKept(c); cn != nil {
@@ -944,7 +1013,7 @@ var mediaExt = map[string]string{
 
 func (ex *exporter) mediaRecords(ctx context.Context) ([]*gedcom.Node, error) {
 	rows, err := ex.s.DB.QueryContext(ctx, `
-		SELECT id, sha256, mime, kind, title FROM media WHERE tree_id = ? ORDER BY id`, ex.a.TreeID)
+		SELECT id, sha256, mime, kind, title, description, extra_json FROM media WHERE tree_id = ? ORDER BY id`, ex.a.TreeID)
 	if err != nil {
 		return nil, err
 	}
@@ -952,8 +1021,8 @@ func (ex *exporter) mediaRecords(ctx context.Context) ([]*gedcom.Node, error) {
 	var out []*gedcom.Node
 	for rows.Next() {
 		var id int64
-		var sha, mime, kind, title string
-		if err := rows.Scan(&id, &sha, &mime, &kind, &title); err != nil {
+		var sha, mime, kind, title, description, extra string
+		if err := rows.Scan(&id, &sha, &mime, &kind, &title, &description, &extra); err != nil {
 			return nil, err
 		}
 		// Media linked only to records that were left out for privacy stay out,
@@ -978,7 +1047,10 @@ func (ex *exporter) mediaRecords(ctx context.Context) ([]*gedcom.Node, error) {
 			file.Children = append(file.Children, form)
 			add(file, "TITL", title)
 		}
-		out = append(out, &gedcom.Node{Xref: fmt.Sprintf("O%d", id), Tag: "OBJE", Children: []*gedcom.Node{file}})
+		obje := &gedcom.Node{Xref: fmt.Sprintf("O%d", id), Tag: "OBJE", Children: []*gedcom.Node{file}}
+		add(obje, "NOTE", description)
+		obje.Children = append(obje.Children, ex.kept(extra)...)
+		out = append(out, obje)
 		ex.out.Media = append(ex.out.Media, MediaFile{SHA256: sha, Path: path, Mime: mime})
 		ex.out.Counts["media"]++
 	}

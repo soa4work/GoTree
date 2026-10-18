@@ -343,6 +343,9 @@ func (s *Store) Relationship(ctx context.Context, a Actor, aID, bID int64) (Rela
 	if rel.Via != 0 {
 		ids = append(ids, rel.Via)
 	}
+	if rel.Via2 != 0 {
+		ids = append(ids, rel.Via2)
+	}
 	for _, k := range append([]graph.Kinship{deref(rel.Kinship)}, rel.Others...) {
 		ids = append(ids, k.Path...)
 		ids = append(ids, k.Ancestors...)

@@ -236,6 +236,20 @@ export function relationshipName(t: TFunction, rep: RelationshipReport): string 
       }
       return `${kinship(t, k, b?.sex, rep.persons, 'nom')} ${spouseGenitive[viaG]}`
     }
+    case 'spouse_blood_spouse': {
+      if (!k) return null
+      const via2 = rep.via2 ? rep.persons[rep.via2] : undefined
+      // The path runs A, the spouse, ..., the spouse's relative, B.
+      const blood = { ...k, path: k.path.slice(1, -1) }
+      // Husbands of two sisters: свояк.
+      if (is(k, 1, 1) && !k.half && g === 'M' && viaG === 'F' && via2?.sex === 'F') return 'свояк'
+      return `${spouseTerm(t, b?.sex)} ${kinship(t, blood, via2?.sex, rep.persons, 'gen')} ${spouseGenitive[viaG]}`
+    }
+    case 'step_sibling':
+      return pick(t, g, 'сводный брат', 'сводная сестра')
+    case 'co_parent_in_law':
+      // Parents of a married couple call each other сват and сватья.
+      return pick(t, g, 'сват', 'сватья')
     default:
       return null
   }

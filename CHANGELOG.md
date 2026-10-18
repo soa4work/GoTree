@@ -9,6 +9,8 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The relationship calculator also names in-laws through two marriages and step-siblings (#43)
+
 - Error messages from the server are shown in the interface language (#24)
 
 - Kazakh relationship names (to be proofread by a native speaker) (#24)

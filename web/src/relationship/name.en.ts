@@ -92,6 +92,23 @@ export function relationshipName(t: TFunction, rep: RelationshipReport): string 
       if (is(k, 0, 1)) return term('stepChild')
       if (is(k, 1, 1) && !k.half) return term('siblingInLaw')
       return t('relationship.possessive', { owner: spouseTerm(t, via?.sex), name: kinshipName(t, k, b?.sex) })
+    case 'spouse_blood_spouse': {
+      if (!k) return null
+      const via2 = rep.via2 ? rep.persons[rep.via2] : undefined
+      if (is(k, 1, 1) && !k.half && via?.sex === via2?.sex) {
+        // Husbands of sisters, wives of brothers.
+        if (g === 'M' && via?.sex === 'F') return t('relationship.coSiblingInLaw_M')
+        if (g === 'F' && via?.sex === 'M') return t('relationship.coSiblingInLaw_F')
+      }
+      if (!rep.via2) return null
+      // "wife’s sister’s husband": the spouse's relative, then B as their spouse.
+      const owner = relationshipName(t, { ...rep, kind: 'relative_of_spouse', b: rep.via2, kinship: { ...k, path: k.path.slice(0, -1) } })
+      return owner ? t('relationship.possessive', { owner, name: spouseTerm(t, b?.sex) }) : null
+    }
+    case 'step_sibling':
+      return term('stepSibling')
+    case 'co_parent_in_law':
+      return t('relationship.coParentInLaw')
     default:
       return null
   }

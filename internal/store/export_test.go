@@ -980,10 +980,18 @@ func TestExportFamilyWitnessesPrivacy(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := s.CreateEvent(ctx, a, EventInput{PersonID: &anna.ID, Type: "BAPM", Date: "1850",
-		Participants: []ParticipantInput{{PersonID: lena.ID, Role: "godparent"}}}); err != nil {
+		Participants: []ParticipantInput{{PersonID: lena.ID, Role: "godparent", Notes: "lena secret"}}}); err != nil {
 		t.Fatal(err)
 	}
 	marr := fmt.Sprintf("(MARR F%d)", fam.ID)
+	for _, v7 := range []bool{false, true} {
+		if text := exportText(t, s, a, ExportOptions{Privacy: PrivacyAll, Version7: v7}); !strings.Contains(text, "lena secret") {
+			t.Errorf("v7=%v: full export lacks the participant note", v7)
+		}
+		if text := exportText(t, s, a, ExportOptions{Privacy: PrivacyLivingNameOnly, Version7: v7}); strings.Contains(text, "lena secret") {
+			t.Errorf("v7=%v: name-only export leaked the participant note:\n%s", v7, text)
+		}
+	}
 	if text := exportText(t, s, a, ExportOptions{Privacy: PrivacyAll}); !strings.Contains(indiBlock(t, text, anna.ID), marr) {
 		t.Errorf("full export lacks the family witness:\n%s", text)
 	}
@@ -992,6 +1000,9 @@ func TestExportFamilyWitnessesPrivacy(t *testing.T) {
 		// The living partner takes the family's events, and so their witnesses.
 		if strings.Contains(text, marr) || strings.Contains(text, "best man") {
 			t.Errorf("%s: the witness of a hidden family event leaked:\n%s", mode, text)
+		}
+		if mode == PrivacyLivingNameOnly && strings.Contains(text, "lena secret") {
+			t.Errorf("%s: the note of a name-only participant leaked:\n%s", mode, text)
 		}
 		lenaRef := fmt.Sprintf("ASSO @I%d@", lena.ID)
 		if mode == PrivacyExcludeLiving && strings.Contains(text, lenaRef) {

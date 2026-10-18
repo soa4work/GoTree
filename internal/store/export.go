@@ -656,7 +656,9 @@ func (ex *exporter) assoNodes(r *gedcom.Node, e exportEvent, famXref string, ord
 		}
 		asso := pointer("ASSO", personXref(p.personID))
 		asso.Children = append(asso.Children, node("RELA", relaText(p.role, p.customRole, e.typ, famXref, ordinal)))
-		add(asso, "NOTE", p.notes)
+		if !ex.nameOnly[p.personID] {
+			add(asso, "NOTE", p.notes)
+		}
 		r.Children = append(r.Children, asso)
 	}
 }
@@ -751,7 +753,9 @@ func (ex *exporter) eventNode(e exportEvent) *gedcom.Node {
 			if ex.included[p.personID] {
 				asso := pointer("ASSO", personXref(p.personID))
 				asso.Children = append(asso.Children, roleNode(p.role, p.customRole))
-				add(asso, "NOTE", p.notes)
+				if !ex.nameOnly[p.personID] {
+					add(asso, "NOTE", p.notes)
+				}
 				n.Children = append(n.Children, asso)
 			}
 		}

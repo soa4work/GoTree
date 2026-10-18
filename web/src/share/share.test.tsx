@@ -86,6 +86,7 @@ describe('sharing page', () => {
 
     expect(await screen.findByRole('heading', { name: 'New address for “Cousins”' })).toBeInTheDocument()
     expect(screen.getByLabelText('Share link')).toHaveValue(`${window.location.origin}/share/abc123`)
+    await waitFor(() => expect(screen.getByRole('region', { name: 'New address for “Cousins”' })).toHaveFocus())
   })
 
   it('says when copying fails', async () => {

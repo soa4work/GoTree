@@ -165,11 +165,17 @@ function CreatedLink({ link, reissued, onDone }: { link: ShareLink; reissued: bo
   const sectionRef = useRef<HTMLElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const url = shareUrl(link.token!)
-  // A new address replaces the old one on screen: bring it into view.
+  // A new address replaces the old one on screen: bring it into view. The
+  // focus waits a tick: the confirm dialog closes in its own effect, which
+  // runs after this one, and until then the page behind it is inert and its
+  // closing would move the focus back to the button that opened it.
   useEffect(() => {
     reset()
-    sectionRef.current?.focus()
-    sectionRef.current?.scrollIntoView?.({ block: 'nearest' })
+    const timer = setTimeout(() => {
+      sectionRef.current?.focus()
+      sectionRef.current?.scrollIntoView?.({ block: 'nearest' })
+    })
+    return () => clearTimeout(timer)
   }, [link.token, reset])
   useEffect(() => {
     if (state === 'failed') inputRef.current?.select()

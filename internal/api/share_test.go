@@ -80,4 +80,5 @@ func TestShareEndpoints(t *testing.T) {
 	}
 	c.call("GET", "/api/share-links", nil, http.StatusForbidden, nil)
 	c.call("POST", "/api/share-links", map[string]any{"label": "x", "scope": "tree", "privacy": "deceased", "expiresOn": ""}, http.StatusForbidden, nil)
+	c.call("POST", fmt.Sprintf("/api/share-links/%d/token", link.ID), nil, http.StatusForbidden, nil)
 }

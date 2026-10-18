@@ -9,6 +9,7 @@ import { SelectField } from '../components/Field'
 import { LogDialog } from './LogDialog'
 import { TaskDialog } from './TaskDialog'
 import { formatDay } from '../lib/dates'
+import { errorText } from '../lib/errors'
 
 type Open = { kind: 'task'; task?: ResearchTask } | { kind: 'log'; entry?: LogEntry; taskId?: number | null } | null
 
@@ -256,6 +257,11 @@ function Suggestions({ personId, label }: { personId: number; label: string }) {
             className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-slate-300 px-4 py-2 dark:border-slate-700"
           >
             <span>{title(s)}</span>
+            {make.isError && make.variables?.origin === s.origin && (
+              <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-400">
+                {t('common.saveFailed', { message: errorText(make.error, t) })}
+              </p>
+            )}
             <Button
               variant="ghost"
               busy={make.isPending && make.variables?.origin === s.origin}

@@ -160,7 +160,7 @@ export function MapPage() {
             <h2 id={tableId} className="text-xl font-semibold">
               {t('map.where', { year: shown })}
             </h2>
-            {/* biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable regions must be reachable by keyboard (WCAG 2.1.1) */}
+            {/* Scrollable regions must be reachable by keyboard (WCAG 2.1.1). */}
             {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- same reason */}
             <div className="overflow-x-auto" tabIndex={0} role="group" aria-labelledby={tableId}>
               <table className="w-full">

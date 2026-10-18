@@ -82,6 +82,13 @@ func (s *Server) Handler() http.Handler {
 			r.Delete("/auth/sessions/{id}", s.endSession)
 			r.Post("/auth/logout-all", s.logoutAll)
 			r.Post("/auth/password", s.changePassword)
+
+			// Accounts, trees and memberships need a login but not a tree,
+			// so a user who belongs to no tree can still pick or create
+			// one. The store checks the admin and owner rules itself.
+			r.Get("/backup", s.backup)
+			s.treeRoutes(r)
+			s.accountRoutes(r)
 		})
 
 		r.Group(func(r chi.Router) {
@@ -94,7 +101,6 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/import/gedcom", s.importGEDCOM)
 			r.Get("/export/gedcom", s.exportGEDCOM)
 			r.Post("/export/verify", s.verifyExport)
-			r.Get("/backup", s.backup)
 			s.shareLinkRoutes(r)
 			s.calendarFeedRoutes(r)
 			s.researchRoutes(r)

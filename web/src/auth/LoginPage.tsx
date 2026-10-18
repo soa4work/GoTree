@@ -16,7 +16,12 @@ export function LoginPage() {
 
   const mutation = useMutation({
     mutationFn: () => login(username, password),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['auth'] }),
+    onSuccess: () => {
+      // Data cached for a previous user (e.g. after a session expired) must not
+      // show to whoever logs in now; keep the auth query so its refetch applies.
+      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' })
+      return queryClient.invalidateQueries({ queryKey: ['auth'] })
+    },
   })
 
   let formError: string | null = null

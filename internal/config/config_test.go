@@ -12,12 +12,13 @@ func env(m map[string]string) func(string) string {
 
 func TestLoad(t *testing.T) {
 	tests := []struct {
-		name     string
-		args     []string
-		env      map[string]string
-		wantDir  string
-		wantAddr string
-		wantErr  bool
+		name       string
+		args       []string
+		env        map[string]string
+		wantDir    string
+		wantAddr   string
+		wantHealth bool
+		wantErr    bool
 	}{
 		{name: "defaults", wantDir: "data", wantAddr: ":8080"},
 		{
@@ -33,6 +34,7 @@ func TestLoad(t *testing.T) {
 			wantDir:  "/flag",
 			wantAddr: ":1",
 		},
+		{name: "healthcheck", args: []string{"-healthcheck"}, wantDir: "data", wantAddr: ":8080", wantHealth: true},
 		{name: "empty data dir", args: []string{"-data-dir", ""}, wantErr: true},
 		{name: "unknown flag", args: []string{"-nope"}, wantErr: true},
 	}
@@ -48,8 +50,8 @@ func TestLoad(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if cfg.DataDir != tt.wantDir || cfg.ListenAddr != tt.wantAddr {
-				t.Errorf("got %+v, want dir %q addr %q", cfg, tt.wantDir, tt.wantAddr)
+			if cfg.DataDir != tt.wantDir || cfg.ListenAddr != tt.wantAddr || cfg.HealthCheck != tt.wantHealth {
+				t.Errorf("got %+v, want dir %q addr %q healthcheck %v", cfg, tt.wantDir, tt.wantAddr, tt.wantHealth)
 			}
 		})
 	}

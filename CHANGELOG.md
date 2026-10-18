@@ -14,6 +14,15 @@ and the versioning [Semantic Versioning](https://semver.org/).
   to them, and a primary photo becomes the portrait; an export without media no longer points to
   media records it does not contain (#54)
 
+- Accounts, trees and members over the API (#59): administrators create and delete accounts,
+  change their role and reset passwords (which signs the account out everywhere); owners add
+  existing accounts to a tree as owner, editor or viewer, change roles and remove members, and a
+  tree always keeps one owner; any account can create a tree and switch between its trees, and
+  logging in opens the tree chosen last
+
+- Health check: `gotree -healthcheck` asks the running server whether it is healthy, and the
+  Docker image uses it as its HEALTHCHECK (#62)
+
 - People list: sort by surname, birth (oldest or youngest first) or recent changes, and filter by
   sex and living or deceased, kept in the address; the sources list and the media gallery load more
   with a "Show more" button instead of stopping at 100 sources and 200 media (#60)
@@ -113,7 +122,16 @@ and the versioning [Semantic Versioning](https://semver.org/).
   photo tools wrote, and use a photo or a face as a person's portrait, shown in lists and on the
   tree (#15)
 
+- Share links can get a new address at any time, for example when the first one was not
+  copied: the old address stops working and the new one is shown once; copying a share or
+  calendar address says when the browser refused it (#60)
+
 ### Fixed
+
+- Switching between media no longer carries the form over (saving could overwrite the other
+  medium), saving a transcription keeps unsaved rows, failed task, repository, photo link, face,
+  match search and logout actions say so, an expired session during a save brings up the login screen, and a new version is
+  offered even if it arrived on the login page (#60)
 
 - A GEDCOM 5.5.1 export of a large tree no longer goes through every event for every person (#56)
 
@@ -224,6 +242,12 @@ and the versioning [Semantic Versioning](https://semver.org/).
   scripts from its own files (#2)
 
 ### Changed
+
+- Viewers can export GEDCOM only without living people (#59)
+
+- Docker images: `latest` and `X.Y` move only to the newest release, so re-running an older
+  release or publishing a prerelease no longer moves them back, and the image is built from base
+  images pinned by digest; prereleases are marked as such on GitHub (#62)
 
 - The tree chart redraws only the cards whose selection or focus changed, the wall chart's SVG
   download fetches at most four photos at a time, and the tree no longer gets stuck on "Could not

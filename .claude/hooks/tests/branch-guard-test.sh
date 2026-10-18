@@ -24,7 +24,7 @@ fixture_main() {
 
 W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
-git clone -q "$SRC" "$W/r" && cd "$W/r"
+git clone -q "$SRC" "$W/r" && { cd "$W/r" || exit 1; }
 fixture_main && cp -r "$SRC/.claude" . && cp "$SRC/run-tests.sh" . && git add -A && git commit -qm fixture
 export CLAUDE_PROJECT_DIR="$W/r"
 G="git"; C="commit"
@@ -63,17 +63,26 @@ check deny  Bash  "$G push origin fix/42-audio:main"
 check ask   Bash  "gh pr merge 3"
 check ask   Bash  "GH_PAGER=cat gh pr merge 3"
 check allow Bash  "echo $G $C"
-check allow Bash  "bash -c \"echo x && $G add -A\""
-check allow Bash  "cat > f <<'EOF'
+check allow Bash  "bash -c \"echo $G add -A\""
+check allow Bash  "cat > $W/f <<'EOF'
 text
 $G add -A
 EOF
 echo done"
-check deny  Bash  "cat > f <<'EOF'
+check deny  Bash  "cat > $W/f <<'EOF'
 text
 EOF
 $G add -A"
 check deny  Bash  "echo a
+$G $C -m x"
+# A "<<" that opens no heredoc must not hide the lines after it.
+check deny  Bash  "echo \"<<X\"
+$G $C -m x"
+check deny  Bash  "echo '<<X'
+$G $C -m x"
+check deny  Bash  "echo \$((1<<2))
+$G $C -m x"
+check deny  Bash  "cat <<<word
 $G $C -m x"
 check allow Bash  "$G -C /tmp/other $C -m x"
 check deny  Bash  "$G -C . $C -m x"
@@ -81,6 +90,66 @@ check deny  Bash  "time $G $C -m x"
 check deny  Bash  "env FOO=1 $G push origin main"
 check deny  Bash  "sudo $G $C -m x"
 check ask   Bash  "time gh pr merge 3"
+
+echo "== on main: bypasses that used to slip through"
+# Code inside quotes that a shell runs is code.
+check deny  Bash  "bash -c \"$G push origin main\""
+check deny  Bash  "sh -c '$G $C -m x'"
+check deny  Bash  "bash -lc \"echo x && $G add -A\""
+check deny  Bash  "eval \"$G $C -m x\""
+check deny  Bash  "echo \$($G $C -m x)"
+check deny  Bash  "echo \"\$($G $C -m x)\""
+check deny  Bash  "echo \`$G $C -m x\`"
+check deny  Bash  "bash <<'EOF'
+$G $C -m x
+EOF"
+check deny  Bash  "env -S '$G $C -m x'"
+check deny  Bash  "( $G $C -m x )"
+check deny  Bash  "{ $G $C -m x; }"
+check deny  Bash  "if $G $C -m x; then echo; fi"
+check deny  Bash  "timeout 60 $G $C -m x"
+check deny  Bash  "nice -n 5 $G $C -m x"
+check deny  Bash  "sudo -u root $G $C -m x"
+# Another spelling of git is still git.
+check deny  Bash  "/usr/bin/$G $C -m x"
+check deny  Bash  "\\$G $C -m x"
+check deny  Bash  "echo x | xargs $G $C -m"
+check deny  Bash  "echo main | xargs $G push origin"
+check deny  Bash  "$G -c alias.p=push p origin main"
+check ask   Bash  "$G --git-dir=$W/r/.git $C -m x"
+check ask   Bash  "GIT_DIR=$W/r/.git $G $C -m x"
+# Every refspec that lands on main.
+check deny  Bash  "$G push origin +main"
+check deny  Bash  "$G push origin :main"
+check deny  Bash  "$G push origin HEAD:refs/heads/main"
+check deny  Bash  "$G push --force origin +fix/42-audio:main"
+# Other ways to move main.
+check deny  Bash  "$G update-ref refs/heads/main HEAD~1"
+check deny  Bash  "$G stash"
+check deny  Bash  "$G stash pop"
+check allow Bash  "$G stash list"
+check deny  Bash  "$G branch -f main HEAD~1"
+check deny  Bash  "$G branch -D main"
+check deny  Bash  "$G pull"
+check deny  Bash  "$G pull origin main"
+check allow Bash  "$G pull --ff-only"
+# Writing into the checkout from Bash is editing it.
+check deny  Bash  "echo x > README.md"
+check deny  Bash  "echo x >> $W/r/README.md"
+check deny  Bash  "echo x 2> README.md"
+check deny  Bash  "echo x &> README.md"
+check deny  Bash  "echo x | tee -a README.md"
+check deny  Bash  "echo x > newdir/sub/file.txt"
+check allow Bash  "echo x > /dev/null 2>&1"
+check allow Bash  "echo x > $W/outside.txt"
+check allow Bash  "echo \"a > README.md\""
+check allow Bash  "$G log > /tmp/log.txt"
+# A target built from a variable, ~ or $(...) is not a file in the checkout.
+check allow Bash  "S=$W; echo x > \$S/out.txt"
+check allow Bash  "echo x | tee \"\$TMPDIR/out.txt\""
+check allow Bash  "echo x > ~/out.txt"
+check allow Bash  "echo x > \$(mktemp)"
+check allow Bash  "cd \$S && echo x > out.txt"
 
 git switch -qc fix/1-test
 echo "== on fix/1-test"
@@ -123,15 +192,22 @@ git switch -q fix/1-test
 
 printf '#!/bin/sh\necho stub ok\n' > run-tests.sh; chmod +x run-tests.sh
 check allow Bash  "$G push -u origin HEAD"
+git branch -q --set-upstream-to=origin/main fix/1-test
+git config push.default upstream
+check deny  Bash  "$G push"
+git config --unset push.default
+git branch -q --unset-upstream fix/1-test
 printf '#!/bin/sh\necho "Failed: ScheduleEngine window boundary"; exit 1\n' > run-tests.sh
 check deny  Bash  "$G push -u origin HEAD"
+# A push quoted in a commit message is not a push: no tests run.
+check allow Bash  "$G $C -m \"$G push origin main\""
 
 true
 
 # ── Worktrees (#27) ──────────────────────────────────────
 W2=$(mktemp -d)
 trap 'rm -rf "$W" "$W2"' EXIT
-git clone -q "$SRC" "$W2/r" && cd "$W2/r"
+git clone -q "$SRC" "$W2/r" && { cd "$W2/r" || exit 1; }
 fixture_main && cp -r "$SRC/.claude" . && cp "$SRC/run-tests.sh" . && git add -A && git commit -qm fixture
 export CLAUDE_PROJECT_DIR="$W2/r"
 G="git"; C="commit"
@@ -161,6 +237,19 @@ check allow Bash  "$G $C -m x" "$WT"
 check deny  Bash  "$G push origin main" "$WT"
 # The gate must run the worktree's own script: the main checkout's copy fails.
 check allow Bash  "$G push -u origin HEAD" "$WT"
+
+echo "== cd moves the checkout a command is judged against"
+check deny  Bash  "cd $W2/r && $G $C -m x" "$WT"
+check allow Bash  "cd $WT && $G $C -m x" "$W2/r"
+check deny  Bash  "cd $WT && cd - && $G $C -m x" "$W2/r"
+check deny  Bash  "(cd $WT) && $G $C -m x" "$W2/r"
+check allow Bash  "(cd $WT && $G $C -m x)" "$W2/r"
+check deny  Bash  "pushd $WT && popd && $G $C -m x" "$W2/r"
+check deny  Bash  "env -C $W2/r $G $C -m x" "$WT"
+check deny  Bash  "cd $W2/r && echo x > README.md" "$WT"
+check allow Bash  "cd $WT && echo x > README.md" "$W2/r"
+check deny  Bash  "cd /tmp && $G -C $W2/r $C -m x" "$WT"
+check allow Bash  "cd /tmp && $G $C -m x" "$W2/r"
 
 echo "== rebase in a worktree reads that worktree's head-name"
 printf 'ours\n' > "$W2/r/conflict.txt"

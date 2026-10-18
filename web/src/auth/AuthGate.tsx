@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getAuthState } from '../api/client'
+import { UpdateNotice } from '../components/UpdateNotice'
 import { LoginPage } from './LoginPage'
 import { SetupPage } from './SetupPage'
 
@@ -26,7 +27,21 @@ export function AuthGate({ children }: { children: ReactNode }) {
       </main>
     )
   }
-  if (auth.data.setupRequired) return <SetupPage />
-  if (!auth.data.user) return <LoginPage />
+  if (auth.data.setupRequired) {
+    return (
+      <>
+        <SetupPage />
+        <UpdateNotice />
+      </>
+    )
+  }
+  if (!auth.data.user) {
+    return (
+      <>
+        <LoginPage />
+        <UpdateNotice />
+      </>
+    )
+  }
   return <>{children}</>
 }

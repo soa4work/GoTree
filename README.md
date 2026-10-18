@@ -58,6 +58,9 @@ or download a binary from the releases page and run `./gotree`. Open http://loca
 | Keep the GPS position in served and exported photos | | `GOTREE_PHOTO_LOCATION` | `strip` |
 | Trusted reverse proxies (their X-Forwarded-For names the client) | | `GOTREE_TRUSTED_PROXIES` | unset |
 
+`gotree -healthcheck` asks the running server on the listen address for `/api/health` and exits 0
+when it is healthy; the Docker image uses it as its HEALTHCHECK.
+
 Photos are served and exported without their GPS position (EXIF and XMP in JPEG, PNG and WebP);
 the position read on upload stays visible to members of the tree. `GOTREE_PHOTO_LOCATION=keep`
 serves the originals instead, but a GEDZIP export without living people strips it anyway.
@@ -101,7 +104,8 @@ made again when first shown.
 
 ## Development
 
-Requires Go and Node.js (LTS).
+Requires Go and Node.js (LTS). `GOTREE_RACE=1 ./run-tests.sh` runs the Go tests with the race
+detector, which also needs a C compiler (CI does this).
 
 ```bash
 make dev     # API on :8080, Vite on :5173 with hot reload (proxies /api)
@@ -110,7 +114,8 @@ make test    # ./run-tests.sh — the same gate the pre-push hook and CI use
 ```
 
 The end-to-end tests (`web/e2e`, Playwright) use the installed Chrome or Chromium; set
-`CHROME_PATH` if it is not found in the usual places.
+`CHROME_PATH` if it is not found in the usual places. `GOTREE_AUDIT=1 ./run-tests.sh` also runs
+govulncheck and `npm audit` (CI does this on every PR and nightly).
 
 Layout: `cmd/gotree` (entry point), `internal/` (`config`, `db` + migrations, `gendate` GEDCOM
 dates, `store` domain logic, `api` HTTP handlers), `web/` (React app, embedded into the binary

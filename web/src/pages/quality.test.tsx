@@ -94,3 +94,17 @@ describe('relationship page', () => {
     await waitFor(async () => expect(await axeViolations(container)).toEqual([]))
   })
 })
+
+describe('making a task from a finding', () => {
+  it('says so when saving the task fails', async () => {
+    mockApi({
+      'GET /api/checks': [200, checks],
+      'GET /api/dates/proposals': [200, { items: [], unreadable: 0, persons: {} }],
+      'POST /api/research/tasks': [500, { error: 'disk full' }],
+    })
+    renderApp('/quality')
+    await screen.findByText('Anna Weber was born after they died.')
+    fireEvent.click(screen.getAllByRole('button', { name: /Make a task/ })[0]!)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save')
+  })
+})

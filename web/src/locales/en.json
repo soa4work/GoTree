@@ -164,6 +164,9 @@
     "livingYes": "Living",
     "livingNo": "Deceased",
     "alternateNames": "Other names",
+    "nameNotes": "Notes on the name",
+    "nameNote": "Note on this name",
+    "nameNotesShown": "About the name: {{notes}}",
     "addName": "Add a name",
     "nameType": "Kind of name",
     "notes": "Notes",
@@ -502,7 +505,7 @@
     "importTitle": "Import a GEDCOM file",
     "importIntro": "GEDCOM is the exchange format of genealogy programs. Export your tree from Ancestry, MyHeritage, FamilySearch, webtrees, Gramps or RootsMagic and import it here. Nothing is lost: what GoTree does not use is kept and written back on export.",
     "file": "GEDCOM file",
-    "fileHint": "A .ged file, or a .zip / .gdz containing one. GEDCOM 5.5, 5.5.1 and 7.0.",
+    "fileHint": "A .ged file, or a .zip / .gdz containing one; photos and documents in the zip are imported too. GEDCOM 5.5, 5.5.1 and 7.0.",
     "importButton": "Import",
     "replaceButton": "Replace the tree",
     "replaceWarning": "Your tree already has data. Importing replaces its people, families, events, places and sources. Photos stay in the media list.",
@@ -523,7 +526,8 @@
       "places": "Places",
       "sources": "Sources",
       "repositories": "Archives",
-      "citations": "Citations"
+      "citations": "Citations",
+      "media": "Photos and documents"
     },
     "viewPeople": "Go to the people",
     "invalidDates_one": "{{count}} date is not in GEDCOM format",

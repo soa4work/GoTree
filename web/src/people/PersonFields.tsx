@@ -93,6 +93,8 @@ export function PersonFields({ value, onChange, errors, full, life }: Props) {
             <TextField label={t('person.nameSuffix')} hint={t('person.nameSuffixHint')} value={value.nameSuffix} onChange={(e) => set('nameSuffix', e.target.value)} />
           </div>
 
+          <TextAreaField label={t('person.nameNotes')} value={value.nameNotes} onChange={(e) => set('nameNotes', e.target.value)} rows={2} />
+
           <fieldset className="space-y-3">
             <legend className="text-sm font-semibold">{t('person.alternateNames')}</legend>
             {errors.alternateNames && (
@@ -117,6 +119,9 @@ export function PersonFields({ value, onChange, errors, full, life }: Props) {
                   {t('common.remove')}
                   <span className="sr-only">: {t(`nameType.${n.type}`)}</span>
                 </Button>
+                <div className="sm:col-span-4">
+                  <TextField label={t('person.nameNote')} value={n.notes} onChange={(e) => setName(i, { notes: e.target.value })} />
+                </div>
               </div>
             ))}
             <Button
@@ -125,7 +130,7 @@ export function PersonFields({ value, onChange, errors, full, life }: Props) {
               onClick={() =>
                 set('alternateNames', [
                   ...value.alternateNames,
-                  { type: 'birth', givenNames: '', surname: '', namePrefix: '', nameSuffix: '', nickname: '', status: 'accepted', statusReason: '' },
+                  { type: 'birth', givenNames: '', surname: '', namePrefix: '', nameSuffix: '', nickname: '', status: 'accepted', statusReason: '', notes: '' },
                 ])
               }
             >

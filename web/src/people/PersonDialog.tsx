@@ -27,6 +27,7 @@ const toInput = (p: Person): PersonInput => ({
   sex: p.sex,
   isLiving: p.isLiving,
   notes: p.notes,
+  nameNotes: p.nameNotes,
   alternateNames: p.alternateNames.map((n) => ({
     id: n.id,
     type: n.type,
@@ -37,6 +38,7 @@ const toInput = (p: Person): PersonInput => ({
     nickname: n.nickname,
     status: n.status,
     statusReason: n.statusReason,
+    notes: n.notes,
   })),
 })
 

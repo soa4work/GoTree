@@ -768,3 +768,81 @@ func TestDatePhraseKeepsParentheses(t *testing.T) {
 		t.Errorf("5.5.1 DATE = %q", got)
 	}
 }
+
+func TestExportNamesRoundTrip(t *testing.T) {
+	for _, v7 := range []bool{false, true} {
+		t.Run(fmt.Sprintf("v7=%v", v7), func(t *testing.T) {
+			s := newStore(t)
+			a := setup(t, s)
+			p, err := s.CreatePerson(ctx, a, PersonInput{GivenNames: "Anna", Surname: "Weber", NameNotes: "spelled Maier",
+				AlternateNames: []AlternateNameInput{{Type: "married", GivenNames: "Anna", Surname: "Schmidt", Notes: "after 1890"}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			src, err := s.CreateSource(ctx, a, SourceInput{Title: "Parish book"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cite := func(page string, links ...LinkInput) {
+				t.Helper()
+				if _, err := s.CreateCitation(ctx, a, CitationInput{SourceID: src.ID, Page: page, Links: links}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cite("main name", LinkInput{EntityType: "person", EntityID: p.ID, Field: "name"})
+			cite("other name", LinkInput{EntityType: "name", EntityID: p.AlternateNames[0].ID})
+			// Cites the name and the person: written once, on the person.
+			cite("both", LinkInput{EntityType: "person", EntityID: p.ID, Field: "name"}, LinkInput{EntityType: "person", EntityID: p.ID})
+			cite("whole", LinkInput{EntityType: "person", EntityID: p.ID})
+
+			text := exportText(t, s, a, ExportOptions{Version7: v7})
+			for _, want := range []string{"\n2 NOTE spelled Maier", "\n2 NOTE after 1890"} {
+				if strings.Count(text, want) != 1 {
+					t.Errorf("%q not written once:\n%s", want, text)
+				}
+			}
+			first := text[strings.Index(text, "1 NAME Anna /Weber/"):]
+			first = first[:strings.Index(first, "\n1 NAME Anna /Schmidt/")]
+			if !strings.Contains(first, "2 NOTE spelled Maier") || strings.Count(first, "2 SOUR") != 1 {
+				t.Errorf("the first NAME should have the note and one SOUR:\n%s", first)
+			}
+			if strings.Count(text, "\n1 SOUR @S") != 2 {
+				t.Errorf("want two person-level SOUR lines:\n%s", text)
+			}
+
+			s2, a2 := reimport(t, text)
+			got := findPerson(t, s2, a2, "anna")
+			if got.NameNotes != "spelled Maier" || len(got.AlternateNames) != 1 || got.AlternateNames[0].Notes != "after 1890" {
+				t.Errorf("notes after reimport: %q %+v", got.NameNotes, got.AlternateNames)
+			}
+			count := func(q string) int {
+				var n int
+				if err := s2.DB.QueryRow(q).Scan(&n); err != nil {
+					t.Fatal(err)
+				}
+				return n
+			}
+			if n := count(`SELECT count(*) FROM citation_links WHERE entity_type = 'person' AND field = 'name'`); n != 1 {
+				t.Errorf("person/name links: %d", n)
+			}
+			if n := count(`SELECT count(*) FROM citation_links WHERE entity_type = 'name' AND field = ''`); n != 1 {
+				t.Errorf("name links: %d", n)
+			}
+			if n := count(`SELECT count(*) FROM citation_links WHERE entity_type = 'person' AND field = ''`); n != 2 {
+				t.Errorf("person links: %d", n)
+			}
+			if n := count(`SELECT count(*) FROM citations`); n != 4 {
+				t.Errorf("citations: %d, want 4", n)
+			}
+
+			// A living person exported as name only keeps neither.
+			if _, err := s.CreatePerson(ctx, a, PersonInput{GivenNames: "Living", Surname: "Person", NameNotes: "secret name note"}); err != nil {
+				t.Fatal(err)
+			}
+			text = exportText(t, s, a, ExportOptions{Version7: v7, Privacy: PrivacyLivingNameOnly})
+			if !strings.Contains(text, "Living /Person/") || strings.Contains(text, "secret name note") {
+				t.Errorf("name-only export:\n%s", text)
+			}
+		})
+	}
+}

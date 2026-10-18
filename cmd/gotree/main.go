@@ -65,12 +65,13 @@ func run(log *slog.Logger) error {
 	defer cancelRequests()
 	var inflight sync.WaitGroup
 	srv := newHTTPServer(cfg.ListenAddr, trackRequests(&inflight, (&api.Server{
-		Store:     st,
-		Files:     media.Files{Root: cfg.MediaDir()},
-		MaxUpload: int64(cfg.MaxUploadMB) << 20,
-		Version:   version,
-		Frontend:  web.Dist(),
-		Log:       log,
+		Store:             st,
+		Files:             media.Files{Root: cfg.MediaDir()},
+		MaxUpload:         int64(cfg.MaxUploadMB) << 20,
+		KeepPhotoLocation: cfg.KeepPhotoLocation,
+		Version:           version,
+		Frontend:          web.Dist(),
+		Log:               log,
 	}).Handler()), baseCtx)
 
 	errc := make(chan error, 1)

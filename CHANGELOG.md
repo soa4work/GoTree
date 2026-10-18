@@ -102,6 +102,13 @@ and the versioning [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Photos are served and exported in GEDZIP archives without their GPS position (EXIF and XMP, in
+  JPEG, PNG and WebP); the position read on upload stays visible to members of the tree, and
+  GOTREE_PHOTO_LOCATION=keep serves the originals, except in exports without living people (#58)
+
+- Deleting a medium while the same file is uploaded again no longer leaves the new upload without
+  its file (#58)
+
 - Searching places, sources, repositories and heirlooms ignores the case of Russian and Kazakh
   letters and treats ё as е, so «москва» finds «Москва» (#52)
 

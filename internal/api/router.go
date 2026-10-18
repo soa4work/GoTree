@@ -25,8 +25,14 @@ type Server struct {
 	// Frontend is the built SPA (web/dist); see web.Dist.
 	Frontend fs.FS
 	Log      *slog.Logger
+	// KeepPhotoLocation serves photos with their GPS position; by default it is
+	// removed from files leaving the server (the parsed position stays in the database).
+	KeepPhotoLocation bool
 
 	throttle *loginThrottle
+	// fileLocks keeps "this file is unused, remove it" and an upload of the same
+	// content from interleaving.
+	fileLocks media.HashLocks
 }
 
 // Handler builds the complete HTTP handler.

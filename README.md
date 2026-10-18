@@ -55,6 +55,12 @@ or download a binary from the releases page and run `./gotree`. Open http://loca
 | Listen address | `-listen` | `GOTREE_LISTEN_ADDR` | `:8080` |
 | First admin account (only used while there is none) | | `GOTREE_ADMIN_USER`, `GOTREE_ADMIN_PASSWORD` | `admin`, unset |
 | Largest upload (MB) | | `GOTREE_MAX_UPLOAD_MB` | `100` |
+| Keep the GPS position in served and exported photos | | `GOTREE_PHOTO_LOCATION` | `strip` |
+
+Photos are served and exported without their GPS position (EXIF and XMP in JPEG, PNG and WebP);
+the position read on upload stays visible to members of the tree. `GOTREE_PHOTO_LOCATION=keep`
+serves the originals instead, but a GEDZIP export without living people strips it anyway.
+Backups always hold the originals.
 
 On first start GoTree asks you in the browser to create the admin account and name your tree.
 For unattended installs, set `GOTREE_ADMIN_PASSWORD` instead.

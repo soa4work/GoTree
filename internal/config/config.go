@@ -21,6 +21,9 @@ type Config struct {
 	AdminPassword string
 	// MaxUploadMB limits the size of one uploaded file.
 	MaxUploadMB int
+	// KeepPhotoLocation serves photos with their GPS position. By default
+	// (GOTREE_PHOTO_LOCATION=strip) it is removed from files that leave the server.
+	KeepPhotoLocation bool
 }
 
 // MediaDir is where uploaded files are kept inside DataDir.
@@ -49,6 +52,13 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 			return Config{}, errors.New("GOTREE_MAX_UPLOAD_MB must be a positive number")
 		}
 		cfg.MaxUploadMB = n
+	}
+	switch v := getenv("GOTREE_PHOTO_LOCATION"); v {
+	case "", "strip":
+	case "keep":
+		cfg.KeepPhotoLocation = true
+	default:
+		return Config{}, errors.New("GOTREE_PHOTO_LOCATION must be strip or keep")
 	}
 
 	fs := flag.NewFlagSet("gotree", flag.ContinueOnError)

@@ -60,6 +60,8 @@ const (
 	CodeGedcomZipNoFile   = "gedcom_zip_no_ged"
 	CodeGedcomZipSeveral  = "gedcom_zip_several_ged"
 	CodeTreeNotEmpty      = "tree_not_empty"
+
+	CodeMediaPrepareFailed = "media_prepare_failed"
 )
 
 // Codes of per-field validation messages (the "fieldCodes" of a 422).

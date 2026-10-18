@@ -6,6 +6,7 @@ import (
 )
 
 func TestDualAndJulianDatesStored(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	p := mustPerson(t, s, a, "Anna", "Weber")
@@ -49,6 +50,7 @@ func TestDualAndJulianDatesStored(t *testing.T) {
 }
 
 func TestChecksDualJulianAndBC(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	ev := func(p Person, typ, date string) {
@@ -92,6 +94,7 @@ func TestChecksDualJulianAndBC(t *testing.T) {
 }
 
 func TestRecordYearBC(t *testing.T) {
+	t.Parallel()
 	for in, want := range map[string]int{
 		"15 MAR 50 B.C.": -50,
 		"FEB 1750/51":    1751,
@@ -105,6 +108,7 @@ func TestRecordYearBC(t *testing.T) {
 }
 
 func TestDecadeAndAge(t *testing.T) {
+	t.Parallel()
 	for key, want := range map[int]int{-499685: -50, -489685: -50, -509685: -60, 18550312: 1850} {
 		if got := decadeOf(key); got != want {
 			t.Errorf("decadeOf(%d) = %d, want %d", key, got, want)
@@ -119,6 +123,7 @@ func TestDecadeAndAge(t *testing.T) {
 }
 
 func TestExportDualYear(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	p := mustPerson(t, s, a, "Anna", "Weber")
@@ -143,6 +148,7 @@ func TestExportDualYear(t *testing.T) {
 }
 
 func TestImportOldGedcom7DualYear(t *testing.T) {
+	t.Parallel()
 	for _, value := range []string{"12 FEB 1750", "12 FEB 1751"} {
 		text := "0 HEAD\n1 GEDC\n2 VERS 7.0\n" +
 			"0 @I1@ INDI\n1 NAME Anna /Weber/\n1 RESI\n2 DATE " + value + "\n3 PHRASE 12 FEB 1750/51\n0 TRLR\n"

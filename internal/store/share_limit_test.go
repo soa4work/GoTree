@@ -7,6 +7,7 @@ import (
 )
 
 func TestSharePersonsLimitAndTotal(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	dead := map[int64]bool{}

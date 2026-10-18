@@ -9,6 +9,7 @@ import (
 )
 
 func TestTranscriptionEndpoints(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	var src store.Source

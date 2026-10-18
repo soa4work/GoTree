@@ -6,6 +6,7 @@ import (
 )
 
 func TestImportReplaceNeedsOwnerInStore(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	doc := parseFixture(t, "ancestry-551.ged")
@@ -26,6 +27,7 @@ func TestImportReplaceNeedsOwnerInStore(t *testing.T) {
 }
 
 func TestImportNeedsEditor(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	viewer := a

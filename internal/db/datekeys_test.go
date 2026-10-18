@@ -10,6 +10,7 @@ import (
 )
 
 func TestOpenRecomputesDateKeys(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "test.db")
 	conn, err := Open(ctx, path)

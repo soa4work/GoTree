@@ -18,6 +18,7 @@ func citationExists(t *testing.T, s *Store, a Actor, id int64) bool {
 }
 
 func TestCitationDeletedWithItsLastTarget(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	src, err := s.CreateSource(ctx, a, SourceInput{Title: "Register"})
@@ -101,6 +102,7 @@ func TestCitationDeletedWithItsLastTarget(t *testing.T) {
 }
 
 func TestUpdateCitationKeepsAndReplacesLinks(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	src, err := s.CreateSource(ctx, a, SourceInput{Title: "Register"})

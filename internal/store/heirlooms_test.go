@@ -7,6 +7,7 @@ import (
 )
 
 func TestHeirlooms(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	anna := mustPerson(t, s, a, "Anna", "Weber")
@@ -72,6 +73,7 @@ func TestHeirlooms(t *testing.T) {
 }
 
 func TestHeirloomGEDCOMRoundTrip(t *testing.T) {
+	t.Parallel()
 	for _, v7 := range []bool{false, true} {
 		s := newStore(t)
 		a := setup(t, s)
@@ -132,6 +134,7 @@ func TestHeirloomGEDCOMRoundTrip(t *testing.T) {
 }
 
 func TestHeirloomCustodyDatesRoundTrip(t *testing.T) {
+	t.Parallel()
 	type pair struct{ from, to string }
 	for _, v7 := range []bool{false, true} {
 		t.Run(fmt.Sprintf("v7=%v", v7), func(t *testing.T) {
@@ -219,6 +222,7 @@ func TestHeirloomCustodyDatesRoundTrip(t *testing.T) {
 }
 
 func TestHeirloomExportPrivacy(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	living := mustPerson(t, s, a, "Lisa", "Weber")

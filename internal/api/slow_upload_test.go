@@ -10,6 +10,7 @@ import (
 
 // A client that stalls mid-body is cut off by the read deadline and gets 408.
 func TestSlowUploadTimesOut(t *testing.T) {
+	// Not parallel: it changes uploadGrace and minUploadRate.
 	oldGrace, oldRate := uploadGrace, minUploadRate
 	uploadGrace, minUploadRate = 300*time.Millisecond, 1<<40
 	t.Cleanup(func() { uploadGrace, minUploadRate = oldGrace, oldRate })

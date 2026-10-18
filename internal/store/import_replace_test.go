@@ -29,6 +29,7 @@ func annaFile(t *testing.T, xref, surname string) *gedcom.Document {
 }
 
 func TestReplaceKeepsShareLinksWhosePersonIsInTheFile(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	root := mustPerson(t, s, a, "Anna", "Weber")
@@ -90,6 +91,7 @@ func TestReplaceKeepsShareLinksWhosePersonIsInTheFile(t *testing.T) {
 }
 
 func TestReplaceDropsShareLinkWhenTheNameDiffers(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	root := mustPerson(t, s, a, "Anna", "Weber")
@@ -111,6 +113,7 @@ func TestReplaceDropsShareLinkWhenTheNameDiffers(t *testing.T) {
 }
 
 func TestReplaceKeepsShareLinkFoundByGedcomID(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	// The tree came from a file with its own ids.
@@ -140,6 +143,7 @@ func TestReplaceKeepsShareLinkFoundByGedcomID(t *testing.T) {
 }
 
 func TestReplaceClearsTranscriptionPeople(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	src := mustSource(t, s, a, "Census 1900")
@@ -179,6 +183,7 @@ func TestReplaceClearsTranscriptionPeople(t *testing.T) {
 }
 
 func TestIDsAreNotReusedByReplaceImport(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	old := []int64{mustPerson(t, s, a, "A", "").ID, mustPerson(t, s, a, "B", "").ID}

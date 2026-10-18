@@ -22,6 +22,7 @@ func indiBlock(t *testing.T, text string, id int64) string {
 // A 5.5.1 export writes an association on the person whose event it is
 // and nowhere else; GEDCOM 7 has it on the event.
 func TestExportAssociationsOnlyOnThePrincipal(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	pa := mustPerson(t, s, a, "Anna", "Weber")

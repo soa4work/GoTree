@@ -3,6 +3,7 @@ package store
 import "testing"
 
 func TestStats(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	ev := func(p Person, typ, date string) {
@@ -72,6 +73,7 @@ func TestStats(t *testing.T) {
 }
 
 func TestMapData(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	saxony, _ := s.CreatePlace(ctx, a, PlaceInput{Name: "Sachsen", Lat: ptr(51.0), Lng: ptr(13.3)})

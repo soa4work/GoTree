@@ -3,6 +3,7 @@ package store
 import "testing"
 
 func TestSetupDefaultTreeName(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s) // no tree name given
 	name, err := s.TreeName(ctx, a.TreeID)

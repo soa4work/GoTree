@@ -11,6 +11,7 @@ import (
 )
 
 func TestNamesKeyMatchesCollation(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -81,6 +82,7 @@ func TestNamesKeyMatchesCollation(t *testing.T) {
 }
 
 func TestNamesKeyGolden(t *testing.T) {
+	t.Parallel()
 	// If this fails after changing sortKeyText or upgrading golang.org/x/text,
 	// add a migration that recomputes persons.surname_key/given_key with
 	// names_key().
@@ -101,6 +103,7 @@ func TestNamesKeyGolden(t *testing.T) {
 }
 
 func TestMigrationFillsPersonSortKeys(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -147,6 +150,7 @@ func TestMigrationFillsPersonSortKeys(t *testing.T) {
 }
 
 func TestOpenRecomputesStaleNameKeys(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "test.db")
 	conn, err := Open(ctx, path)

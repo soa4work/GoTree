@@ -57,6 +57,7 @@ func tagReason(r store.ImportReport, path string) string {
 }
 
 func TestImportGedzipMedia(t *testing.T) {
+	t.Parallel()
 	// A tree with a photo goes out as a GEDZIP ...
 	src := loggedIn(t, newServer(t, builtFrontend))
 	var anna store.Person
@@ -113,6 +114,7 @@ const gedWithPhoto = `0 HEAD
 `
 
 func TestImportGedzipFileResolution(t *testing.T) {
+	t.Parallel()
 	photo := jpegBytes(t, 40, 30)
 	for _, tc := range []struct{ name, value, entry string }{
 		{"windows path, by name", `C:\Pics\photo.jpg`, "photo.jpg"},
@@ -138,9 +140,10 @@ func TestImportGedzipFileResolution(t *testing.T) {
 }
 
 func TestImportGedzipSkipsFilesThatFailTheUploadChecks(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
-	srv := testServers[ts]
+	srv := serverOf(ts)
 	ihdr := append([]byte("IHDR"), 0, 0, 0x9c, 0x40, 0, 0, 0x9c, 0x40, 8, 6, 0, 0, 0)
 	bomb := append([]byte("\x89PNG\r\n\x1a\n\x00\x00\x00\x0d"), ihdr...)
 	bomb = binary.BigEndian.AppendUint32(bomb, crc32.ChecksumIEEE(ihdr))
@@ -196,9 +199,10 @@ func TestImportGedzipSkipsFilesThatFailTheUploadChecks(t *testing.T) {
 }
 
 func TestImportGedzipIntoNonEmptyTreeStoresNothing(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
-	srv := testServers[ts]
+	srv := serverOf(ts)
 	var anna store.Person
 	c.call("POST", "/api/persons", map[string]any{"givenNames": "Anna"}, http.StatusCreated, &anna)
 
@@ -214,9 +218,10 @@ func TestImportGedzipIntoNonEmptyTreeStoresNothing(t *testing.T) {
 }
 
 func TestImportGedzipReplaceKeepsFileOfExistingMedia(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
-	srv := testServers[ts]
+	srv := serverOf(ts)
 	archive := buildZip(t, map[string][]byte{
 		"gedcom.ged": []byte(fmt.Sprintf(gedWithPhoto, "a.jpg")), "a.jpg": jpegBytes(t, 20, 20),
 	}, "gedcom.ged", "a.jpg")
@@ -233,9 +238,10 @@ func TestImportGedzipReplaceKeepsFileOfExistingMedia(t *testing.T) {
 }
 
 func TestImportGedzipCapsUnpackedSizeAndStaysInsideTheZip(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
-	srv := testServers[ts]
+	srv := serverOf(ts)
 	outside := t.TempDir()
 
 	// Six distinct files of 900 KB each zip to almost nothing but unpack to
@@ -285,6 +291,7 @@ func TestImportGedzipCapsUnpackedSizeAndStaysInsideTheZip(t *testing.T) {
 }
 
 func TestImportGedzipWebFileSurvivesExport(t *testing.T) {
+	t.Parallel()
 	c := loggedIn(t, newServer(t, builtFrontend))
 	ged := "0 HEAD\n1 GEDC\n2 VERS 5.5.1\n1 CHAR UTF-8\n0 @I1@ INDI\n1 NAME Anna /Weber/\n" +
 		"1 OBJE\n2 FILE a.jpg\n1 OBJE\n2 FILE https://example.com/web.jpg\n0 TRLR\n"

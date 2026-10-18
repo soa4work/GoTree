@@ -8,6 +8,7 @@ import (
 // Ids of deleted rows are never handed out again, so a stale id in a draft,
 // a URL or a bookmark finds nothing instead of someone else.
 func TestIDsAreNotReused(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 

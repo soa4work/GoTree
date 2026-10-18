@@ -10,6 +10,7 @@ import (
 )
 
 func TestNamesCollation(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -45,6 +46,7 @@ func TestNamesCollation(t *testing.T) {
 }
 
 func TestNamesCollationAlphabetOrder(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -81,6 +83,7 @@ func TestNamesCollationAlphabetOrder(t *testing.T) {
 }
 
 func TestNamesCollationCompare(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -108,6 +111,7 @@ func TestNamesCollationCompare(t *testing.T) {
 
 // Sorting a big list must not be noticeably slower than a binary sort.
 func TestNamesCollationSpeed(t *testing.T) {
+	// Not parallel: it asserts a time budget.
 	if testing.Short() {
 		t.Skip("timing test")
 	}
@@ -136,6 +140,7 @@ func TestNamesCollationSpeed(t *testing.T) {
 }
 
 func TestMigrationFoldsExistingSearchIndex(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	conn, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {

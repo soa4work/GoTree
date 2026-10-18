@@ -45,6 +45,7 @@ func accountID(t *testing.T, admin *client, username string) int64 {
 }
 
 func TestAdminAccountsAPI(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	admin := loggedIn(t, ts)
 
@@ -126,6 +127,7 @@ func containsHash(raw []byte) bool {
 }
 
 func TestNoTreeUserCanCreateAndSwitch(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	admin := loggedIn(t, ts)
 	bob := newAccount(t, ts, admin, "bob", "user")
@@ -170,6 +172,7 @@ func TestNoTreeUserCanCreateAndSwitch(t *testing.T) {
 }
 
 func TestTreeIsolationAfterSwitch(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	admin := loggedIn(t, ts)
 	bob := newAccount(t, ts, admin, "bob", "user")
@@ -189,6 +192,7 @@ func TestTreeIsolationAfterSwitch(t *testing.T) {
 }
 
 func TestMembersAPIPermissions(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	admin := loggedIn(t, ts)
 	bob := newAccount(t, ts, admin, "bob", "user")
@@ -258,6 +262,7 @@ func TestMembersAPIPermissions(t *testing.T) {
 }
 
 func TestBackupStaysAdminOnlyWithSeveralTrees(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	admin := loggedIn(t, ts)
 	bob := newAccount(t, ts, admin, "bob", "user")
@@ -272,6 +277,7 @@ func TestBackupStaysAdminOnlyWithSeveralTrees(t *testing.T) {
 }
 
 func TestAdminWithoutTreeCanDownloadBackup(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	admin := loggedIn(t, ts)
 	bob := newAccount(t, ts, admin, "bob", "user")
@@ -290,6 +296,7 @@ func TestAdminWithoutTreeCanDownloadBackup(t *testing.T) {
 }
 
 func TestViewerExportWithoutLiving(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	admin := loggedIn(t, ts)
 	viewer := newAccount(t, ts, admin, "vera", "user")

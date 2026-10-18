@@ -47,6 +47,7 @@ func tagOutcome(r ImportReport, path string) string {
 }
 
 func TestImportChildOnlyInFAMC(t *testing.T) {
+	t.Parallel()
 	// Interpreted strings: the trailing space after Otto's FAMC matters.
 	src := strings.Join([]string{
 		"0 HEAD", "1 GEDC", "2 VERS 5.5.1", "1 CHAR UTF-8",
@@ -114,6 +115,7 @@ func TestImportChildOnlyInFAMC(t *testing.T) {
 }
 
 func TestImportAncestry551(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	report, err := s.ImportGEDCOM(ctx, a, parseFixture(t, "ancestry-551.ged"), ImportIntoEmpty)
@@ -235,6 +237,7 @@ func TestImportAncestry551(t *testing.T) {
 }
 
 func TestImportGedcom7(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	report, err := s.ImportGEDCOM(ctx, a, parseFixture(t, "gedcom7.ged"), ImportIntoEmpty)
@@ -261,6 +264,7 @@ func TestImportGedcom7(t *testing.T) {
 }
 
 func TestImportBrokenFile(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	report, err := s.ImportGEDCOM(ctx, a, parseFixture(t, "broken.ged"), ImportIntoEmpty)
@@ -280,6 +284,7 @@ func TestImportBrokenFile(t *testing.T) {
 }
 
 func TestImportModes(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	mustPerson(t, s, a, "Existing", "")
@@ -316,6 +321,7 @@ func TestImportModes(t *testing.T) {
 }
 
 func TestImportLargeFile(t *testing.T) {
+	// Not parallel: it asserts a wall-clock budget.
 	if testing.Short() {
 		t.Skip("large import")
 	}
@@ -357,6 +363,7 @@ func TestImportLargeFile(t *testing.T) {
 }
 
 func TestImportStatusFromFile(t *testing.T) {
+	t.Parallel()
 	src := strings.Join([]string{
 		"0 HEAD", "1 GEDC", "2 VERS 5.5.1", "1 CHAR UTF-8",
 		"0 @I1@ INDI",
@@ -420,6 +427,7 @@ func TestImportStatusFromFile(t *testing.T) {
 }
 
 func TestImportRolePhrase(t *testing.T) {
+	t.Parallel()
 	src := strings.Join([]string{
 		"0 HEAD", "1 GEDC", "2 VERS 7.0",
 		"0 @I1@ INDI", "1 NAME Anna /Weber/",
@@ -461,6 +469,7 @@ func TestImportRolePhrase(t *testing.T) {
 }
 
 func TestImportNameNotesAndSources(t *testing.T) {
+	t.Parallel()
 	src := strings.Join([]string{
 		"0 HEAD", "1 GEDC", "2 VERS 5.5.1", "1 CHAR UTF-8",
 		"0 @S1@ SOUR", "1 TITLE Parish book",
@@ -544,6 +553,7 @@ func TestImportNameNotesAndSources(t *testing.T) {
 }
 
 func TestImportAssoVariants(t *testing.T) {
+	t.Parallel()
 	src := strings.Join([]string{
 		"0 HEAD", "1 GEDC", "2 VERS 7.0",
 		"0 @I1@ INDI", "1 NAME Anna /Weber/",

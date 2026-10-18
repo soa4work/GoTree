@@ -16,6 +16,7 @@ func ids(g TreeGraph) []string {
 }
 
 func TestTree(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 
@@ -77,6 +78,7 @@ func TestTree(t *testing.T) {
 }
 
 func TestTreeIsCapped(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	root := mustPerson(t, s, a, "Root", "")

@@ -6,6 +6,7 @@ import (
 )
 
 func TestListSourcesPages(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	for i := 1; i <= 5; i++ {

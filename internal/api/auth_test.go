@@ -90,6 +90,7 @@ func loggedIn(t *testing.T, ts *httptest.Server) *client {
 }
 
 func TestSetupLoginLogout(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := newClient(t, ts)
 
@@ -129,6 +130,7 @@ func TestSetupLoginLogout(t *testing.T) {
 }
 
 func TestSessionCookieFlags(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	resp, err := http.Post(ts.URL+"/api/auth/setup", "application/json",
 		strings.NewReader(`{"username":"admin","password":"`+testPassword+`"}`))
@@ -151,6 +153,7 @@ func TestSessionCookieFlags(t *testing.T) {
 }
 
 func TestLoginThrottle(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	loggedIn(t, ts)
 	c := newClient(t, ts)
@@ -162,6 +165,7 @@ func TestLoginThrottle(t *testing.T) {
 }
 
 func TestThrottleWindow(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	th := newLoginThrottle()
 	th.now = func() time.Time { return now }
@@ -181,6 +185,7 @@ func TestThrottleWindow(t *testing.T) {
 }
 
 func TestThrottlePerUsername(t *testing.T) {
+	t.Parallel()
 	th := newLoginThrottle()
 	for i := range th.maxUser {
 		th.allow(fmt.Sprintf("10.0.0.%d", i), "Admin")
@@ -198,6 +203,7 @@ func TestThrottlePerUsername(t *testing.T) {
 }
 
 func TestThrottleSucceedKeepsAddressCount(t *testing.T) {
+	t.Parallel()
 	th := newLoginThrottle()
 	for i := range th.maxIP - 1 {
 		th.allow("1.2.3.4", fmt.Sprintf("u%d", i))
@@ -211,6 +217,7 @@ func TestThrottleSucceedKeepsAddressCount(t *testing.T) {
 }
 
 func TestThrottleIsBounded(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	th := newLoginThrottle()
 	th.now = func() time.Time { return now }
@@ -229,6 +236,7 @@ func TestThrottleIsBounded(t *testing.T) {
 }
 
 func TestThrottleIPv6Prefix(t *testing.T) {
+	t.Parallel()
 	th := newLoginThrottle()
 	for i := range th.maxIP {
 		th.allow(fmt.Sprintf("2001:db8::%x", i+1), fmt.Sprintf("u%d", i))
@@ -242,6 +250,7 @@ func TestThrottleIPv6Prefix(t *testing.T) {
 }
 
 func TestClientIP(t *testing.T) {
+	t.Parallel()
 	trusted := []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}
 	tests := []struct {
 		name    string
@@ -283,6 +292,7 @@ func behindProxy(s *Server) {
 }
 
 func TestLoginThrottlePerUsernameBehindProxy(t *testing.T) {
+	t.Parallel()
 	ts := newServerWith(t, builtFrontend, behindProxy)
 	loggedIn(t, ts)
 	c := newClient(t, ts)
@@ -301,6 +311,7 @@ func TestLoginThrottlePerUsernameBehindProxy(t *testing.T) {
 }
 
 func TestLoginThrottleOneProxyClientDoesNotLockOthers(t *testing.T) {
+	t.Parallel()
 	ts := newServerWith(t, builtFrontend, behindProxy)
 	loggedIn(t, ts)
 	c := newClient(t, ts)
@@ -319,6 +330,7 @@ func TestLoginThrottleOneProxyClientDoesNotLockOthers(t *testing.T) {
 }
 
 func TestLoginThrottleIgnoresForwardedForWithoutTrustedProxy(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	loggedIn(t, ts)
 	c := newClient(t, ts)
@@ -336,6 +348,7 @@ func TestLoginThrottleIgnoresForwardedForWithoutTrustedProxy(t *testing.T) {
 }
 
 func TestCrossOriginWritesAreRejected(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	status, _ := c.do("POST", "/api/persons", map[string]string{"givenNames": "X"},
@@ -350,11 +363,12 @@ func TestCrossOriginWritesAreRejected(t *testing.T) {
 }
 
 func TestViewerCannotWrite(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	c.call("POST", "/api/persons", map[string]string{"givenNames": "Before"}, http.StatusCreated, nil)
 
-	srv := testServers[ts]
+	srv := serverOf(ts)
 	if _, err := srv.Store.DB.Exec(`UPDATE tree_members SET role = 'viewer'`); err != nil {
 		t.Fatal(err)
 	}
@@ -363,6 +377,7 @@ func TestViewerCannotWrite(t *testing.T) {
 }
 
 func TestThrottleEvictsWeakestFirstAndKeepsLockedKeys(t *testing.T) {
+	t.Parallel()
 	th := newLoginThrottle()
 	th.maxKeys = 100
 	for i := range th.maxUser {
@@ -383,6 +398,7 @@ func TestThrottleEvictsWeakestFirstAndKeepsLockedKeys(t *testing.T) {
 }
 
 func TestThrottleKnownAddressIsNotLockedOutByUsername(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	th := newLoginThrottle()
 	th.now = func() time.Time { return now }
@@ -415,6 +431,7 @@ func TestThrottleKnownAddressIsNotLockedOutByUsername(t *testing.T) {
 }
 
 func TestThrottleKnownAddressesAreBounded(t *testing.T) {
+	t.Parallel()
 	th := newLoginThrottle()
 	for i := range 50 {
 		th.succeed(fmt.Sprintf("10.0.0.%d", i), "owner")
@@ -431,6 +448,7 @@ func TestThrottleKnownAddressesAreBounded(t *testing.T) {
 }
 
 func TestLoginRejectsLongUsernameBeforeThrottle(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	loggedIn(t, ts)
 	c := newClient(t, ts)
@@ -438,7 +456,7 @@ func TestLoginRejectsLongUsernameBeforeThrottle(t *testing.T) {
 	if e.Code != CodeBadCredentials {
 		t.Errorf("code %q", e.Code)
 	}
-	if n := len(testServers[ts].throttle.failures); n != 0 {
+	if n := len(serverOf(ts).throttle.failures); n != 0 {
 		t.Errorf("a long username reached the throttle: %d keys", n)
 	}
 	if k := userKey(strings.Repeat("a", 5000)); len(k) != len("user|")+32 {
@@ -447,6 +465,7 @@ func TestLoginRejectsLongUsernameBeforeThrottle(t *testing.T) {
 }
 
 func TestLoginThrottleConcurrentGuesses(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	loggedIn(t, ts)
 	var wg sync.WaitGroup
@@ -470,6 +489,7 @@ func TestLoginThrottleConcurrentGuesses(t *testing.T) {
 }
 
 func TestLoginOwnerKeepsAccessFromUsualAddress(t *testing.T) {
+	t.Parallel()
 	ts := newServerWith(t, builtFrontend, behindProxy)
 	loggedIn(t, ts)
 	c := newClient(t, ts)
@@ -489,9 +509,10 @@ func TestLoginOwnerKeepsAccessFromUsualAddress(t *testing.T) {
 }
 
 func TestSessionCookieIsRefreshedWhenExtended(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
-	st := testServers[ts].Store
+	st := serverOf(ts).Store
 	t0 := st.Now()
 	maxAge := func() int {
 		t.Helper()
@@ -525,6 +546,7 @@ func TestSessionCookieIsRefreshedWhenExtended(t *testing.T) {
 }
 
 func TestThrottleKnownAddressOutlastsSession(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	th := newLoginThrottle()
 	th.now = func() time.Time { return now }
@@ -537,6 +559,7 @@ func TestThrottleKnownAddressOutlastsSession(t *testing.T) {
 }
 
 func TestThrottleFailsClosedWhenFullOfLockedKeys(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	th := newLoginThrottle()
 	th.now = func() time.Time { return now }
@@ -572,6 +595,7 @@ func TestThrottleFailsClosedWhenFullOfLockedKeys(t *testing.T) {
 }
 
 func TestLoginOwnerCanLogInWhenThrottleIsFull(t *testing.T) {
+	t.Parallel()
 	ts := newServerWith(t, builtFrontend, behindProxy)
 	loggedIn(t, ts)
 	c := newClient(t, ts)
@@ -583,7 +607,7 @@ func TestLoginOwnerCanLogInWhenThrottleIsFull(t *testing.T) {
 		}
 	}
 	login("admin", testPassword, "203.0.113.9", http.StatusNoContent)
-	th := testServers[ts].throttle
+	th := serverOf(ts).throttle
 	th.mu.Lock()
 	th.maxKeys = 10
 	for i := 0; len(th.failures) < th.maxKeys; i++ {

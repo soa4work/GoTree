@@ -217,6 +217,7 @@ var pinned = map[string]string{
 }
 
 func TestStoreMessagesAreClassified(t *testing.T) {
+	t.Parallel()
 	found := storeMessages(t)
 	var msgs []string
 	for m := range found {

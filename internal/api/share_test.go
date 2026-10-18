@@ -9,6 +9,7 @@ import (
 )
 
 func TestShareEndpoints(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 
@@ -79,7 +80,7 @@ func TestShareEndpoints(t *testing.T) {
 		t.Errorf("revoked rotate: %+v", missing)
 	}
 
-	srv := testServers[ts]
+	srv := serverOf(ts)
 	if _, err := srv.Store.DB.Exec(`UPDATE tree_members SET role = 'editor'`); err != nil {
 		t.Fatal(err)
 	}

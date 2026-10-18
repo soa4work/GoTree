@@ -14,6 +14,7 @@ import (
 )
 
 func TestImportEndpoint(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	ged, err := os.ReadFile("../store/testdata/ancestry-551.ged")
@@ -70,6 +71,7 @@ func personCount(t *testing.T, c *client) int {
 }
 
 func TestImportRejectsOversizedGedcom(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	ged, _ := os.ReadFile("../store/testdata/ancestry-551.ged")
@@ -102,6 +104,7 @@ func TestImportRejectsOversizedGedcom(t *testing.T) {
 }
 
 func TestImportReplaceIsOwnerOnly(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	ged, _ := os.ReadFile("../store/testdata/ancestry-551.ged")
@@ -110,7 +113,7 @@ func TestImportReplaceIsOwnerOnly(t *testing.T) {
 	}
 	before := personCount(t, c)
 
-	if _, err := testServers[ts].Store.DB.Exec(`UPDATE tree_members SET role = 'editor'`); err != nil {
+	if _, err := serverOf(ts).Store.DB.Exec(`UPDATE tree_members SET role = 'editor'`); err != nil {
 		t.Fatal(err)
 	}
 	status, body := c.upload("/api/import/gedcom?mode=replace", "tree.ged", ged)
@@ -125,7 +128,7 @@ func TestImportReplaceIsOwnerOnly(t *testing.T) {
 		t.Errorf("editor import into non-empty: %d", status)
 	}
 
-	if _, err := testServers[ts].Store.DB.Exec(`UPDATE tree_members SET role = 'owner'`); err != nil {
+	if _, err := serverOf(ts).Store.DB.Exec(`UPDATE tree_members SET role = 'owner'`); err != nil {
 		t.Fatal(err)
 	}
 	if status, body := c.upload("/api/import/gedcom?mode=replace", "tree.ged", ged); status != http.StatusOK {
@@ -134,6 +137,7 @@ func TestImportReplaceIsOwnerOnly(t *testing.T) {
 }
 
 func TestExportEndpoints(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	ged, _ := os.ReadFile("../store/testdata/ancestry-551.ged")
@@ -183,9 +187,10 @@ func TestExportEndpoints(t *testing.T) {
 }
 
 func TestExportCheckIsPostEditorOneAtATime(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
-	srv := testServers[ts]
+	srv := serverOf(ts)
 
 	if e := callError(t, c, "GET", "/api/export/verify", nil, http.StatusMethodNotAllowed); e.Code != CodeMethodNotAllowed {
 		t.Errorf("GET code %q", e.Code)

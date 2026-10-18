@@ -64,6 +64,7 @@ const mediaDoc = `0 HEAD
 0 TRLR`
 
 func TestImportMediaRecordsAndLinks(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	doc := parseLines(t, strings.Split(mediaDoc, "\n")...)
@@ -128,6 +129,7 @@ func TestImportMediaRecordsAndLinks(t *testing.T) {
 }
 
 func TestImportMediaPlainGed(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	doc := parseLines(t, strings.Split(mediaDoc, "\n")...)
@@ -161,6 +163,7 @@ func TestImportMediaPlainGed(t *testing.T) {
 // A web address is not imported, in a plain file or in a zip, but the line
 // goes back out as it came in.
 func TestImportMediaWebFileRoundTrip(t *testing.T) {
+	t.Parallel()
 	doc := func() *gedcom.Document {
 		return parseLines(t, "0 HEAD", "1 GEDC", "2 VERS 5.5.1", "1 CHAR UTF-8",
 			"0 @I1@ INDI", "1 NAME Anna /Weber/", "1 OBJE @O1@", "1 OBJE", "2 FILE https://example.com/a.jpg",
@@ -220,6 +223,7 @@ func TestImportMediaWebFileRoundTrip(t *testing.T) {
 }
 
 func TestImportMediaReplaceReusesFile(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	files := ImportFiles{Media: map[string]NewMedia{"media/a.png": pngMedia("a", "a.png"), "media/b.png": pngMedia("b", "b.png")}}
@@ -244,6 +248,7 @@ func TestImportMediaReplaceReusesFile(t *testing.T) {
 }
 
 func TestMediaPaths(t *testing.T) {
+	t.Parallel()
 	doc := parseLines(t,
 		"0 HEAD", "1 GEDC", "2 VERS 5.5.1", "1 CHAR UTF-8",
 		"0 @I1@ INDI", "1 NAME A /B/", "1 OBJE", "2 FILE x/one.jpg",
@@ -259,6 +264,7 @@ func TestMediaPaths(t *testing.T) {
 }
 
 func TestCheckImportTarget(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	if err := s.CheckImportTarget(ctx, a, ImportIntoEmpty); err != nil {

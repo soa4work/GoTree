@@ -30,6 +30,7 @@ func findLine(ws []gedcom.Warning, code string) *gedcom.Warning {
 }
 
 func TestReportLinesCarryCodes(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	report, err := s.ImportGEDCOM(ctx, a, parseFixture(t, "broken.ged"), ImportIntoEmpty)
@@ -59,6 +60,7 @@ func TestReportLinesCarryCodes(t *testing.T) {
 }
 
 func TestBrokenFamilyReferenceParams(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	src := strings.Join([]string{
@@ -87,6 +89,7 @@ func TestBrokenFamilyReferenceParams(t *testing.T) {
 }
 
 func TestEveryDroppedTagHasReasonCode(t *testing.T) {
+	t.Parallel()
 	known := map[string]bool{}
 	for _, c := range DropReasonCodes {
 		known[c] = true
@@ -129,6 +132,7 @@ func TestEveryDroppedTagHasReasonCode(t *testing.T) {
 // TestReportCodesMatchTranslations keeps the locale files and the codes the
 // server sends in step, like the api package does for error codes.
 func TestReportCodesMatchTranslations(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("../../web/src/locales/en.json")
 	if err != nil {
 		t.Fatal(err)

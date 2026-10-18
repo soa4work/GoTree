@@ -11,6 +11,7 @@ import (
 const newTestPassword = "a different horse staple"
 
 func TestSessionsListAndEnd(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c1 := loggedIn(t, ts)
 	c2 := newClient(t, ts)
@@ -66,6 +67,7 @@ func TestSessionsListAndEnd(t *testing.T) {
 }
 
 func TestLogoutEverywhere(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c1 := loggedIn(t, ts)
 	c2 := newClient(t, ts)
@@ -77,6 +79,7 @@ func TestLogoutEverywhere(t *testing.T) {
 }
 
 func TestChangePasswordAPI(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c1 := loggedIn(t, ts)
 	c2 := newClient(t, ts)
@@ -105,6 +108,7 @@ func TestChangePasswordAPI(t *testing.T) {
 }
 
 func TestChangePasswordThrottled(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	body := map[string]string{"currentPassword": "not the password", "newPassword": newTestPassword}
@@ -118,9 +122,10 @@ func TestChangePasswordThrottled(t *testing.T) {
 }
 
 func TestAccountRoutesWorkForViewersAndWithoutTree(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
-	srv := testServers[ts]
+	srv := serverOf(ts)
 	if _, err := srv.Store.DB.Exec(`UPDATE tree_members SET role = 'viewer'`); err != nil {
 		t.Fatal(err)
 	}
@@ -138,6 +143,7 @@ func TestAccountRoutesWorkForViewersAndWithoutTree(t *testing.T) {
 }
 
 func TestAccountRoutesNeedLogin(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	loggedIn(t, ts)
 	c := newClient(t, ts)

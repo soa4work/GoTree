@@ -5,6 +5,7 @@ import (
 )
 
 func TestChecks(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	mother := mustPerson(t, s, a, "Anna", "Weber")
@@ -61,6 +62,7 @@ func TestChecks(t *testing.T) {
 }
 
 func TestNormalizeDates(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	p := mustPerson(t, s, a, "Anna", "Weber")
@@ -131,6 +133,7 @@ func TestNormalizeDates(t *testing.T) {
 }
 
 func TestRelationship(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	a := setup(t, s)
 	anna := mustPerson(t, s, a, "Anna", "Weber")

@@ -10,6 +10,7 @@ import (
 )
 
 func TestCalendarFeed(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	var anna store.Person
@@ -46,6 +47,7 @@ func TestCalendarFeed(t *testing.T) {
 }
 
 func TestCalendarFeedLanguage(t *testing.T) {
+	t.Parallel()
 	ts := newServer(t, builtFrontend)
 	c := loggedIn(t, ts)
 	var anna store.Person
@@ -87,6 +89,7 @@ func TestCalendarFeedLanguage(t *testing.T) {
 }
 
 func TestCalendarFeedUnknownNameAndTreeName(t *testing.T) {
+	t.Parallel()
 	unfold := func(body string) string { return strings.ReplaceAll(body, "\r\n ", "") }
 	feedFor := func(c *client) store.CalendarFeed {
 		var nobody store.Person
@@ -133,6 +136,7 @@ func TestCalendarFeedUnknownNameAndTreeName(t *testing.T) {
 }
 
 func TestCalendarTexts(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		lang, want string
 	}{
@@ -148,6 +152,7 @@ func TestCalendarTexts(t *testing.T) {
 }
 
 func TestCalendarLanguagesComplete(t *testing.T) {
+	t.Parallel()
 	for _, lang := range []string{"en", "ru", "kk"} {
 		if _, ok := calendarLanguages[lang]; !ok {
 			t.Errorf("language %s is missing", lang)

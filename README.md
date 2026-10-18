@@ -65,7 +65,10 @@ cookie is marked secure. Failed logins are limited per username and per client a
 reverse proxy, set `GOTREE_TRUSTED_PROXIES` to the proxy's address or range (e.g. `127.0.0.1` or
 `172.16.0.0/12`) and have it set `X-Forwarded-For`; otherwise GoTree sees only the proxy's address
 and the per-address limit applies to all clients together. Never list addresses that clients can
-reach GoTree from directly.
+reach GoTree from directly. A username's limit does not lock out a client address that logged in as that
+user within the last 90 days (remembered in memory only, so a restart forgets it), so someone
+guessing the owner's name cannot lock the owner out of their usual device; the per-address limit
+still applies to it.
 
 Behind a reverse proxy, allow request bodies as large as the upload limit.
 

@@ -3,24 +3,18 @@ package store
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/praetorianer777/gotree/internal/db"
+	"github.com/praetorianer777/gotree/internal/db/dbtest"
 )
 
 var ctx = context.Background()
 
 func newStore(t *testing.T) *Store {
 	t.Helper()
-	conn, err := db.Open(ctx, filepath.Join(t.TempDir(), "test.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { conn.Close() })
-	s := New(conn)
+	s := New(dbtest.Open(t))
 	s.Now = func() time.Time { return time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC) }
 	return s
 }

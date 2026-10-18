@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -12,7 +11,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/praetorianer777/gotree/internal/db"
+	"github.com/praetorianer777/gotree/internal/db/dbtest"
 	"github.com/praetorianer777/gotree/internal/media"
 	"github.com/praetorianer777/gotree/internal/store"
 )
@@ -25,11 +24,7 @@ func newServer(t *testing.T, frontend fstest.MapFS) *httptest.Server {
 // newServerWith is newServer with a hook to adjust the Server before it starts.
 func newServerWith(t *testing.T, frontend fstest.MapFS, adjust func(*Server)) *httptest.Server {
 	t.Helper()
-	conn, err := db.Open(context.Background(), filepath.Join(t.TempDir(), "test.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { conn.Close() })
+	conn := dbtest.Open(t)
 	s := &Server{
 		Store:     store.New(conn),
 		Files:     media.Files{Root: filepath.Join(t.TempDir(), "media")},

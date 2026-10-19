@@ -15,40 +15,33 @@ const candidates = [
 const executablePath = candidates.find((p) => p && existsSync(p))
 if (!executablePath) throw new Error('No Chrome or Chromium found; set CHROME_PATH')
 
-const port = Number(process.env.E2E_PORT ?? 18095)
+/** E2E_WORKERS is a count or a percentage of the cores; anything else is ignored. */
+function workersFrom(value: string | undefined): number | string | undefined {
+  if (!value) return undefined
+  if (/^\d+%$/.test(value)) return value
+  const n = Number(value)
+  return Number.isInteger(n) && n > 0 ? n : undefined
+}
 
 export default defineConfig({
   testDir: './e2e',
-  // One server and database for all tests, so they run one after another.
-  workers: 1,
+  // Each worker starts its own server and database (e2e/base.ts), so files run in parallel.
+  // One Chrome renderer (axe is CPU-bound) plus a light Go server per worker. In CI the job
+  // has a 4-vCPU runner to itself; locally half the cores leave room for the IDE and other gates.
+  workers: workersFrom(process.env.E2E_WORKERS) ?? (process.env.CI ? 3 : '50%'),
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: `http://127.0.0.1:${port}`,
     launchOptions: { executablePath },
     trace: 'retain-on-failure',
-    // The app defaults to Russian; the specs read the English source strings, so
-    // every context starts with the hidden 'en' choice saved. Contexts made by
-    // hand (browser.newContext) must call forceEnglish() from e2e/helpers.ts.
-    // e2e/i18n.spec.ts switches to Russian and Kazakh on purpose.
-    storageState: {
-      cookies: [],
-      origins: [{ origin: `http://127.0.0.1:${port}`, localStorage: [{ name: 'gotree-lang', value: 'en' }] }],
-    },
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
-    { name: 'mobile', use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } } },
+    // Desktop runs every test except those that only make sense on a phone (@mobile-only).
+    { name: 'desktop', grepInvert: /@mobile-only/, use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
+    // The phone runs only the layout tests: @mobile (also on desktop) and @mobile-only. Playwright
+    // matches the pattern against the title and the tags; /@mobile/ also matches @mobile-only.
+    { name: 'mobile', grep: /@mobile/, use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } } },
   ],
-  webServer: {
-    // A fresh data directory per run; the admin comes from the environment.
-    command: `sh -c 'rm -rf .e2e-data && exec ../gotree -data-dir .e2e-data -listen 127.0.0.1:${port}'`,
-    url: `http://127.0.0.1:${port}/api/health`,
-    env: { GOTREE_ADMIN_USER: 'admin', GOTREE_ADMIN_PASSWORD: 'e2e correct horse' },
-    reuseExistingServer: false,
-    stdout: 'ignore',
-    stderr: 'pipe',
-  },
 })

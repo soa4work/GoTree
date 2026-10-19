@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, login, unique } from './helpers'
 
 test('cite a source on a birth and find it from the source', async ({ page }) => {

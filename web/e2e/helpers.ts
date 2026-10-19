@@ -2,16 +2,17 @@ import AxeBuilder from '@axe-core/playwright'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { expect, type BrowserContext, type Page } from '@playwright/test'
+import { ADMIN } from './base'
 
-/** Saves the hidden 'en' language choice for a context made by hand; contexts from the config already have it. */
+/** Saves the hidden 'en' language choice for a context made by hand; contexts from the fixture in base.ts already have it. */
 export async function forceEnglish(context: BrowserContext) {
   await context.addInitScript(() => localStorage.setItem('gotree-lang', 'en'))
 }
 
 export async function login(page: Page) {
   await page.goto('/')
-  await page.getByLabel('Username').fill('admin')
-  await page.getByLabel('Password').fill('e2e correct horse')
+  await page.getByLabel('Username').fill(ADMIN.user)
+  await page.getByLabel('Password').fill(ADMIN.password)
   await page.getByRole('button', { name: 'Log in' }).click()
   await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
 }
@@ -22,7 +23,7 @@ export async function expectAccessible(page: Page) {
   expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([])
 }
 
-/** A name that is unique per test run and project, since all share one database. */
+/** A name that is unique per test run and project, since the tests of a worker share one database. */
 export function unique(base: string, page: Page) {
   const viewport = page.viewportSize()?.width ?? 0
   return `${base}${viewport < 600 ? 'm' : 'd'}${Date.now().toString(36)}`

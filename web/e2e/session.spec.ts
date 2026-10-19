@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { login, unique } from './helpers'
 
 test('an expired session during a save brings up the login screen', async ({ page, context }) => {

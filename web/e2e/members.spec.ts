@@ -1,9 +1,9 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, login, openSection } from './helpers'
 
 // Switching or creating trees, adding members or leaving would move the shared admin
-// account (and every later login) into another tree, since all specs share one
-// database, so this only looks.
+// account (and every later login) into another tree, since the tests of a worker
+// share one database, so this only looks.
 test('the members page lists the owner', async ({ page }) => {
   await login(page)
   await openSection(page, 'Members')

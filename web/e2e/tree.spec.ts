@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, login, unique } from './helpers'
 
 /** Builds Paul with parents, a sibling, a partner and a child through the API. */
@@ -100,8 +101,7 @@ test('add a relative from the chart', async ({ page }) => {
   ).toBeVisible()
 })
 
-test('phone: controls are collapsed and a tapped person opens a sheet', async ({ page }, info) => {
-  test.skip(info.project.name !== 'mobile', 'phone layout')
+test('phone: controls are collapsed and a tapped person opens a sheet', { tag: '@mobile-only' }, async ({ page }) => {
   await login(page)
   const { surname, paul } = await family(page)
   await page.goto(`/tree?root=${paul}&view=pedigree&gen=3`)

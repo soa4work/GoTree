@@ -1,8 +1,9 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, login, openSection } from './helpers'
 
 // Changing the password or signing out everywhere would break the other specs,
-// which share one database and the password from helpers.ts, so this only looks.
+// which share a database with the other tests of their worker and the password
+// from base.ts, so this only looks.
 test('the account page lists this device', async ({ page }) => {
   await login(page)
   await openSection(page, 'Account')

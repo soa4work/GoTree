@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, login } from './helpers'
 
 const ancestry = readFileSync(fileURLToPath(new URL('./fixtures/ancestry-551.ged', import.meta.url)))

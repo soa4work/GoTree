@@ -1,7 +1,7 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, login, openSection } from './helpers'
 
-test('grouped navigation reaches every section', async ({ page }) => {
+test('grouped navigation reaches every section', { tag: '@mobile' }, async ({ page }) => {
   await login(page)
   const nav = page.getByRole('navigation', { name: 'Main navigation' })
 

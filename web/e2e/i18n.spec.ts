@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, expectNoEnglish, expectNoHorizontalScroll, localeText, login, useLanguage } from './helpers'
 
 // The only spec that leaves English on purpose: it walks the pages in Russian (the default)

@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, login, unique } from './helpers'
 
 test('dark theme is remembered and keeps contrast on the main pages', async ({ page }) => {

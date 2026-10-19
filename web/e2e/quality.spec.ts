@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, login, openSection, unique } from './helpers'
 
 test('find contradictions, unreadable dates and name a relationship', async ({ page }) => {

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, login, unique } from './helpers'
 
 const photoBytes = readFileSync(fileURLToPath(new URL('./fixtures/family-photo.jpg', import.meta.url)))

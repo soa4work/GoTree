@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, login, openSection } from './helpers'
 
 test('grouped navigation reaches every section', async ({ page }) => {

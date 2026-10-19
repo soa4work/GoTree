@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, login, openSection } from './helpers'
 
 // Switching or creating trees, adding members or leaving would move the shared admin

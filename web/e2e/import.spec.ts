@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, login } from './helpers'
 
 const ancestry = fileURLToPath(new URL('./fixtures/ancestry-551.ged', import.meta.url))

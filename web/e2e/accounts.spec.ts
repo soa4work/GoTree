@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { expectAccessible, login, openSection, unique } from './helpers'
 
 // All specs share one database and one admin password, so this never resets the

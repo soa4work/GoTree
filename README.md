@@ -132,6 +132,9 @@ make build   # frontend + single binary ./gotree
 make test    # ./run-tests.sh — the same gate the pre-push hook and CI use
 ```
 
+`./run-tests.sh go` (or `shell`, `web`, `e2e`, several at once) runs only those stages. Without
+arguments it runs all of them, as the pre-push hook does; CI runs the stages as parallel jobs.
+
 The end-to-end tests (`web/e2e`, Playwright) use the installed Chrome or Chromium; set
 `CHROME_PATH` if it is not found in the usual places. `GOTREE_AUDIT=1 ./run-tests.sh` also runs
 govulncheck and `npm audit` (CI does this on every PR and nightly).

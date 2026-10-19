@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { expect, test } from './base'
 import { expectAccessible, login, unique } from './helpers'
 
-test('dark theme is remembered and keeps contrast on the main pages', async ({ page }) => {
+test('dark theme is remembered and keeps contrast on the main pages', { tag: '@mobile' }, async ({ page }) => {
   await login(page)
   const surname = unique('Dark', page)
   const anna = await (await page.request.post('/api/persons', { data: { givenNames: 'Anna', surname } })).json()

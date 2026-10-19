@@ -38,7 +38,10 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
-    { name: 'mobile', use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } } },
+    // Desktop runs every test except those that only make sense on a phone (@mobile-only).
+    { name: 'desktop', grepInvert: /@mobile-only/, use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
+    // The phone runs only the layout tests: @mobile (also on desktop) and @mobile-only. Playwright
+    // matches the pattern against the title and the tags; /@mobile/ also matches @mobile-only.
+    { name: 'mobile', grep: /@mobile/, use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } } },
   ],
 })

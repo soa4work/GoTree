@@ -4,7 +4,7 @@ import { expectAccessible, expectNoEnglish, expectNoHorizontalScroll, localeText
 // The only spec that leaves English on purpose: it walks the pages in Russian (the default)
 // and Kazakh, at desktop and phone width, as issue #61 asks.
 for (const lang of ['ru', 'kk'] as const) {
-  test(`every main page is in ${lang}, fits the screen and passes axe`, async ({ page }) => {
+  test(`every main page is in ${lang}, fits the screen and passes axe`, { tag: '@mobile' }, async ({ page }) => {
     test.slow()
     // Map tiles and Nominatim are outside the test; aborting them keeps networkidle reachable.
     await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort())
@@ -54,7 +54,7 @@ for (const lang of ['ru', 'kk'] as const) {
     }
   })
 
-  test(`the login page is in ${lang}`, async ({ browser, page }) => {
+  test(`the login page is in ${lang}`, { tag: '@mobile' }, async ({ browser, page }) => {
     const context = await browser.newContext({ viewport: page.viewportSize() ?? undefined })
     await context.addInitScript((l) => localStorage.setItem('gotree-lang', l), lang)
     const visitor = await context.newPage()

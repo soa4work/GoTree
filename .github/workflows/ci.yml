@@ -1,8 +1,11 @@
-# The PR gate. It holds nothing but run-tests.sh on purpose: whatever gates a
-# push locally through the branch-guard hook is exactly what gates it here, so
-# the two can never drift apart. GOTREE_AUDIT adds the dependency audits
-# (govulncheck, npm audit), which need the network and change with every new
-# advisory, so they run here and nightly rather than before every local push.
+# The PR gate. Every job runs run-tests.sh with some of its stages, and
+# together the jobs run every stage, so what gates a push locally through the
+# branch-guard hook (run-tests.sh without arguments) is exactly what gates it
+# here. tests/test-ci-stages.sh fails when a stage is missing here. The stages
+# run in parallel jobs only to finish sooner. GOTREE_AUDIT adds the dependency
+# audits (govulncheck, npm audit), which need the network and change with every
+# new advisory, so they run here and nightly rather than before every local
+# push. GOTREE_RACE runs the Go tests with the race detector.
 name: CI
 
 on:
@@ -20,8 +23,16 @@ concurrency:
 permissions:
   contents: read
 
+# Each stage reads only the variables it uses.
+env:
+  GOTREE_AUDIT: "1"
+  GOTREE_RACE: "1"
+
 jobs:
-  test:
+  # Shell tests, gofmt, sqlc, vet, go test -race, govulncheck. The shell tests
+  # take seconds and need no setup, so they ride along instead of costing a
+  # runner of their own.
+  go:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -35,11 +46,43 @@ jobs:
           go-version-file: go.mod
           cache: ${{ hashFiles('go.sum') != '' }}
 
+      - run: ./run-tests.sh shell go
+
+  # npm ci, npm audit, lint, the build (which type-checks) and vitest.
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
-      - run: ./run-tests.sh
-        env:
-          GOTREE_AUDIT: "1"
-          GOTREE_RACE: "1"
+      - run: ./run-tests.sh web
+
+  # The frontend build, the binary and Playwright in the runner's Chrome.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: ${{ hashFiles('go.sum') != '' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: ./run-tests.sh e2e

@@ -71,8 +71,9 @@ export const test = base.extend<object, { gotree: Server }>({
   // the tests of different workers never share state. A worker restarted after a failure has a
   // new index and therefore a fresh database.
   gotree: [
+    // The callback parameter is not called `use`, which the React hooks lint rule would mistake for a hook.
     // eslint-disable-next-line no-empty-pattern
-    async ({}, use, workerInfo) => {
+    async ({}, provide, workerInfo) => {
       const dir = fileURLToPath(new URL(`../.e2e-data/w${workerInfo.workerIndex}`, import.meta.url))
       const binary = fileURLToPath(new URL('../../gotree', import.meta.url))
       if (!existsSync(binary)) throw new Error(`${binary} is missing; build it first: CGO_ENABLED=0 go build -o gotree ./cmd/gotree`)
@@ -90,7 +91,7 @@ export const test = base.extend<object, { gotree: Server }>({
       }
       if (!started) throw lastError
       try {
-        await use({ url: started.url })
+        await provide({ url: started.url })
       } finally {
         await stop(started.child)
         rmSync(dir, { recursive: true, force: true })
@@ -99,13 +100,13 @@ export const test = base.extend<object, { gotree: Server }>({
     { scope: 'worker', timeout: 60_000 },
   ],
 
-  baseURL: async ({ gotree }, use) => use(gotree.url),
+  baseURL: async ({ gotree }, provide) => provide(gotree.url),
   // The app defaults to Russian; the specs read the English source strings, so every context
   // starts with the hidden 'en' choice saved. The choice is kept per origin, and the origin has
   // the worker's port. Contexts made by hand (browser.newContext) get it too.
   // e2e/i18n.spec.ts switches to Russian and Kazakh on purpose.
-  storageState: async ({ gotree }, use) =>
-    use({ cookies: [], origins: [{ origin: gotree.url, localStorage: [{ name: 'gotree-lang', value: 'en' }] }] }),
+  storageState: async ({ gotree }, provide) =>
+    provide({ cookies: [], origins: [{ origin: gotree.url, localStorage: [{ name: 'gotree-lang', value: 'en' }] }] }),
 })
 
 export { expect }

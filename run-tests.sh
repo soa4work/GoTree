@@ -12,7 +12,7 @@
 #   order above. -h or --help prints this usage.
 #
 # ci.yml runs the same stages as parallel jobs, with GOTREE_AUDIT=1 and
-# GOTREE_RACE=1.
+# GOTREE_RACE=1. tests/test-ci-stages.sh fails when a stage is missing there.
 #
 # GOTREE_RACE=1 runs the Go tests with the race detector.
 #
@@ -93,6 +93,7 @@ stage_shell() {
   ./tests/test-release.sh
   ./tests/test-image-tags.sh
   ./tests/test-pins.sh
+  ./tests/test-ci-stages.sh
   ./.claude/hooks/tests/branch-guard-test.sh
 }
 

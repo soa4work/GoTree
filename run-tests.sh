@@ -1,7 +1,18 @@
 #!/usr/bin/env bash
-# The one entry point for the whole suite: the branch-guard hook runs this
-# before every push, and ci.yml has no other step (it only sets GOTREE_AUDIT=1 and
-# GOTREE_RACE=1).
+# The one entry point for the whole suite, in four stages:
+#
+#   shell  the shell tests (no Go, no Node needed)
+#   go     gofmt, sqlc, go vet, go test, and govulncheck with GOTREE_AUDIT=1
+#   web    npm ci, lint, frontend build (tsc -b: the one type check), vitest
+#   e2e    the real binary with the embedded frontend, driven by Playwright
+#
+# Usage: ./run-tests.sh [stage ...]
+#   No argument runs every stage. The branch-guard hook does exactly that
+#   before every push. Several stages may be given; they always run in the
+#   order above. -h or --help prints this usage.
+#
+# ci.yml runs the same stages as parallel jobs, with GOTREE_AUDIT=1 and
+# GOTREE_RACE=1. tests/test-ci-stages.sh fails when a stage is missing there.
 #
 # GOTREE_RACE=1 runs the Go tests with the race detector.
 #
@@ -11,21 +22,86 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-echo "🐚 Shell tests"
-./tests/test-release.sh
-./tests/test-image-tags.sh
-./tests/test-pins.sh
-./.claude/hooks/tests/branch-guard-test.sh
+STAGES=(shell go web e2e)
 
-# The backend and frontend arrive in later milestones; until then each stage
-# is skipped rather than failing a checkout that has nothing to test yet.
-if [[ -f go.mod ]]; then
-  if ! command -v go >/dev/null 2>&1; then
-    echo "❌ go not found — see README 'Development'" >&2
+usage() {
+  cat <<USAGE
+Usage: ./run-tests.sh [stage ...]
+       ./run-tests.sh -h | --help
+
+Stages: ${STAGES[*]}
+Without a stage every one runs, in that order. Several stages may be given.
+USAGE
+}
+
+# Hidden: the parity test reads the stage list from here.
+if [[ "${1:-}" == --list-stages ]]; then
+  echo "${STAGES[*]}"
+  exit 0
+fi
+
+declare -A selected=()
+for arg in "$@"; do
+  case "$arg" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    shell | go | web | e2e) selected[$arg]=1 ;;
+    *)
+      echo "❌ unknown stage '$arg'" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+if (($# == 0)); then
+  for s in "${STAGES[@]}"; do selected[$s]=1; done
+fi
+want() { [[ -n "${selected[$1]:-}" ]]; }
+
+need() { # need <tool>: fail early with a pointer to the docs
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "❌ $1 not found — see README 'Development'" >&2
     exit 1
   fi
+}
+
+# npm ci and the frontend build are needed by both web and e2e; a run of
+# both does each once.
+npm_ci_done=0
+npm_ci_once() {
+  ((npm_ci_done)) && return 0
+  echo "📦 npm ci"
+  (cd web && npm ci --no-audit --no-fund)
+  npm_ci_done=1
+}
+
+web_built=0
+build_web_once() {
+  ((web_built)) && return 0
+  npm_ci_once
+  # tsc -b is part of the build and is the only type check: it covers src,
+  # vite.config.ts and e2e/.
+  echo "🏗️  Frontend build (with types)"
+  (cd web && npm run build)
+  web_built=1
+}
+
+stage_shell() {
+  echo "🐚 Shell tests"
+  ./tests/test-release.sh
+  ./tests/test-image-tags.sh
+  ./tests/test-pins.sh
+  ./tests/test-ci-stages.sh
+  ./.claude/hooks/tests/branch-guard-test.sh
+}
+
+stage_go() {
+  need go
 
   echo "🎨 gofmt"
+  local unformatted
   unformatted="$(git ls-files --cached --others --exclude-standard -- '*.go' | xargs -r gofmt -l)"
   if [[ -n "$unformatted" ]]; then
     echo "❌ Not gofmt-formatted:" >&2
@@ -40,6 +116,7 @@ if [[ -f go.mod ]]; then
 
   # web/node_modules can ship Go packages of its own (flatted does), and
   # ./... would vet and test those too.
+  local go_pkgs
   mapfile -t go_pkgs < <(go list ./... | grep -v /node_modules/)
 
   echo "🔍 go vet"
@@ -63,30 +140,31 @@ if [[ -f go.mod ]]; then
     echo "🛡️  govulncheck"
     go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 "${go_pkgs[@]}"
   fi
-fi
+}
 
-if [[ -f web/package.json ]]; then
-  if ! command -v npm >/dev/null 2>&1; then
-    echo "❌ npm not found — see README 'Development'" >&2
-    exit 1
-  fi
-
-  echo "📦 npm ci"
-  (cd web && npm ci --no-audit --no-fund)
+stage_web() {
+  need npm
+  npm_ci_once
 
   if [[ "${GOTREE_AUDIT:-}" == 1 ]]; then
     echo "🛡️  npm audit"
     (cd web && npm audit --audit-level=high)
   fi
 
-  echo "🔍 Lint & types"
-  (cd web && npm run lint && npm run typecheck)
+  echo "🔍 Lint"
+  (cd web && npm run lint)
+
+  # Before vitest, so a type error fails early.
+  build_web_once
 
   echo "🧪 Frontend tests"
   (cd web && npm test)
+}
 
-  echo "🏗️  Frontend build"
-  (cd web && npm run build)
+stage_e2e() {
+  need go
+  need npm
+  build_web_once
 
   # The end-to-end tests drive the real binary with the embedded frontend
   # in the system's Chrome at phone and desktop size, with axe on each page.
@@ -99,6 +177,18 @@ if [[ -f web/package.json ]]; then
   export E2E_PORT
   CGO_ENABLED=0 go build -o gotree ./cmd/gotree
   (cd web && npm run e2e)
-fi
+}
 
-echo "✅ All tests passed"
+ran=()
+for s in "${STAGES[@]}"; do
+  if want "$s"; then
+    "stage_$s"
+    ran+=("$s")
+  fi
+done
+
+if (($# == 0)); then
+  echo "✅ All tests passed"
+else
+  echo "✅ Stages passed: ${ran[*]}"
+fi

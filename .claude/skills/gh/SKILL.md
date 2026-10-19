@@ -37,6 +37,7 @@ gh issue develop 42 --name feat/42-gedcom-export --base main --checkout
 
 # ... work ...
 
+./run-tests.sh web                   # one stage while iterating (shell, go, web, e2e)
 ./run-tests.sh                       # the hook runs this before every push anyway
 git push -u origin HEAD
 
@@ -58,3 +59,5 @@ gh run view --log-failed             # when CI is red
 - Commit messages are Conventional Commits, lowercase, imperative, subject ≤ 72 characters, and
   describe the **effect** rather than the files touched.
 - The PR number goes at the end of the subject once it is known.
+- CI runs the stages of `run-tests.sh` as the jobs `go`, `web` and `e2e`, so `gh run view
+  --log-failed` names the job that failed.

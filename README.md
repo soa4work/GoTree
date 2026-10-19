@@ -133,7 +133,11 @@ make test    # ./run-tests.sh — the same gate the pre-push hook and CI use
 ```
 
 The end-to-end tests (`web/e2e`, Playwright) use the installed Chrome or Chromium; set
-`CHROME_PATH` if it is not found in the usual places. `GOTREE_AUDIT=1 ./run-tests.sh` also runs
+`CHROME_PATH` if it is not found in the usual places. Each Playwright worker starts its own server and
+database (`web/e2e/base.ts`), so spec files run in parallel; `E2E_WORKERS` sets the count (a number or
+a percentage of the cores). The `desktop` project runs every test, the `mobile` project only those
+tagged `@mobile` (a test that checks phone layout and also runs on desktop) or `@mobile-only` (a test
+that only makes sense on a phone): `test('...', { tag: '@mobile' }, async ({ page }) => { ... })`. `GOTREE_AUDIT=1 ./run-tests.sh` also runs
 govulncheck and `npm audit` (CI does this on every PR and nightly).
 
 ### Languages

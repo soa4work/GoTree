@@ -1,7 +1,7 @@
 import { expect, test } from './base'
 import { expectAccessible, login, openSection, unique } from './helpers'
 
-// All specs share one database and one admin password, so this never resets the
+// The tests of a worker share one database and one admin password, so this never resets the
 // admin's password, changes the admin's role or deletes the admin: it creates an
 // account of its own and deletes only that one again.
 test('an administrator creates an account and deletes it again', async ({ page }) => {

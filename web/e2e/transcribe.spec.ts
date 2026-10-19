@@ -3,13 +3,10 @@ import { expectAccessible, login, unique } from './helpers'
 
 test('transcribe a census household and cite each line', async ({ page }) => {
   await login(page)
-  // Desktop and mobile share the database; fuzzy matching would pair
-  // names that differ only in the unique suffix, so each run has its own.
-  const mobile = (page.viewportSize()?.width ?? 0) < 600
-  const surname = unique(mobile ? 'Krause' : 'Meyer', page)
+  const surname = unique('Meyer', page)
   // In the tree already, spelled differently.
-  const variant = mobile ? surname.replace('Krause', 'Kraus') : surname.replace('Meyer', 'Maier')
-  const wife = mobile ? 'Greta' : 'Maria'
+  const variant = surname.replace('Meyer', 'Maier')
+  const wife = 'Maria'
   const johann = await (
     await page.request.post('/api/persons', { data: { givenNames: 'Johann', surname: variant, sex: 'M' } })
   ).json()

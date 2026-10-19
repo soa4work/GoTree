@@ -132,6 +132,9 @@ make build   # frontend + single binary ./gotree
 make test    # ./run-tests.sh — the same gate the pre-push hook and CI use
 ```
 
+`./run-tests.sh go` (or `shell`, `web`, `e2e`, several at once) runs only those stages. Without
+arguments it runs all of them, as the pre-push hook does; CI runs the stages as parallel jobs.
+
 The end-to-end tests (`web/e2e`, Playwright) use the installed Chrome or Chromium; set
 `CHROME_PATH` if it is not found in the usual places. Each Playwright worker starts its own server and
 database (`web/e2e/base.ts`), so spec files run in parallel; `E2E_WORKERS` sets the count (a number or

@@ -3,7 +3,7 @@
 #
 #   shell  the shell tests (no Go, no Node needed)
 #   go     gofmt, sqlc, go vet, go test, and govulncheck with GOTREE_AUDIT=1
-#   web    npm ci, lint, type check, vitest, frontend build
+#   web    npm ci, lint, frontend build (tsc -b: the one type check), vitest
 #   e2e    the real binary with the embedded frontend, driven by Playwright
 #
 # Usage: ./run-tests.sh [stage ...]
@@ -81,7 +81,9 @@ web_built=0
 build_web_once() {
   ((web_built)) && return 0
   npm_ci_once
-  echo "🏗️  Frontend build"
+  # tsc -b is part of the build and is the only type check: it covers src,
+  # vite.config.ts and e2e/.
+  echo "🏗️  Frontend build (with types)"
   (cd web && npm run build)
   web_built=1
 }
@@ -148,13 +150,14 @@ stage_web() {
     (cd web && npm audit --audit-level=high)
   fi
 
-  echo "🔍 Lint & types"
-  (cd web && npm run lint && npm run typecheck)
+  echo "🔍 Lint"
+  (cd web && npm run lint)
+
+  # Before vitest, so a type error fails early.
+  build_web_once
 
   echo "🧪 Frontend tests"
   (cd web && npm test)
-
-  build_web_once
 }
 
 stage_e2e() {

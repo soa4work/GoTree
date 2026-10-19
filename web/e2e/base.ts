@@ -51,10 +51,18 @@ async function start(binary: string, dir: string, prefix: string): Promise<Start
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
     if (exited) throw new Error(`gotree exited before it was ready (port ${port}):\n${stderr}`)
+    let ok = false
     try {
-      if ((await fetch(`${url}/api/health`)).ok) return { child, url }
+      ok = (await fetch(`${url}/api/health`)).ok
     } catch {
       // not listening yet
+    }
+    if (ok) {
+      // Another server may have taken the port first and answered instead; ours then fails to
+      // bind and exits, so make sure it is still running before trusting the answer.
+      await sleep(300)
+      if (exited) throw new Error(`gotree exited before it was ready (port ${port}):\n${stderr}`)
+      return { child, url }
     }
     await sleep(100)
   }

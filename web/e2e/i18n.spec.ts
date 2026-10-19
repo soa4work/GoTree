@@ -3,6 +3,9 @@ import { expectAccessible, expectNoEnglish, expectNoHorizontalScroll, localeText
 
 // The only spec that leaves English on purpose: it walks the pages in Russian (the default)
 // and Kazakh, at desktop and phone width, as issue #61 asks.
+
+// The slowest spec; each test logs in and makes its own data, so they can spread over the workers.
+test.describe.configure({ mode: 'parallel' })
 for (const lang of ['ru', 'kk'] as const) {
   test(`every main page is in ${lang}, fits the screen and passes axe`, { tag: '@mobile' }, async ({ page }) => {
     test.slow()

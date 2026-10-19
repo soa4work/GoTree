@@ -38,7 +38,10 @@ test('upload a photo, match the imported face and use it as portrait', async ({ 
   await expect(page.getByRole('button', { name: `Face: Rose ${surname}` })).toBeVisible()
   await expectAccessible(page)
 
+  // Leaving the page at once could cancel the request before it is sent.
+  const saved = page.waitForResponse((r) => r.url().endsWith(`/api/persons/${rose.id}/portrait`) && r.request().method() === 'PUT')
   await page.getByRole('button', { name: new RegExp(`^Use as portrait\\s?: Rose ${surname}$`) }).click()
+  expect((await saved).ok()).toBe(true)
   await page.goto(`/people/${rose.id}`)
   // The portrait is the cropped face, and the photo is in her gallery.
   await expect(page.locator('img[src*="region="]').first()).toBeVisible()

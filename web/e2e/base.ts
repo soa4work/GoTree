@@ -43,6 +43,11 @@ async function start(binary: string, dir: string, prefix: string): Promise<Start
   child.once('exit', () => {
     exited = true
   })
+  // A binary that cannot be started (not executable) emits 'error' instead of 'exit'.
+  child.once('error', (e) => {
+    stderr += `${e}\n`
+    exited = true
+  })
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
     if (exited) throw new Error(`gotree exited before it was ready (port ${port}):\n${stderr}`)
